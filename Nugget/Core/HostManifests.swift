@@ -113,21 +113,50 @@ enum HostManifests {
             }
         }
 
-        // Manifest.plist — the injector fills Applications; the keybag below is
-        // not optional.  Without it the device answers
-        // `MBErrorDomain/205 — No keybag in manifest` after it has pulled every
-        // payload (iOS 26.6.2, 2026-09-29), so the run dies in the restore and
-        // nothing is applied.  The reference seeds the same key with a fixed
-        // blob (`src/restore/backup.py:244`).
+        // Manifest.plist — the keybag below is not optional.  AppDomain payloads
+        // also have to be registered here: without a matching Applications entry,
+        // mobilebackup2 rejects the file row with MBErrorDomain/205
+        // "Unknown domain name in file record".
         let manifestURL = deviceDir.appendingPathComponent("Manifest.plist")
-        if !fm.fileExists(atPath: manifestURL.path) {
-            try? PropertyListSerialization.data(fromPropertyList: ["DataProtection": true,
-                                                                   "BackupKeyBag": Self.backupKeyBag,
-                                                                   "Lockdown": [:],
-                                                                   "SystemDomainsVersion": ios27 ? "24.0" : "20.0",
-                                                                   "Version": ios27 ? "10.0" : "9.1",
-                                                                   "Applications": [:]],
-                                                 format: .xml, options: 0)
+        if !fm.fileExists(atPath: manifestURL.path) || applications != nil {
+            var manifest: [String: Any]
+            if fm.fileExists(atPath: manifestURL.path),
+               let data = try? Data(contentsOf: manifestURL),
+               let existing = try? PropertyListSerialization.propertyList(
+                    from: data, options: [], format: nil) as? [String: Any] {
+                manifest = existing
+            } else {
+                manifest = [
+                    "DataProtection": true,
+                    "BackupKeyBag": Self.backupKeyBag,
+                    "Lockdown": [:],
+                    "SystemDomainsVersion": ios27 ? "24.0" : "20.0",
+                    "Version": ios27 ? "10.0" : "9.1",
+                    "Applications": [:],
+                ]
+            }
+
+            if let applications {
+                // Restore registration is the compact shape proven by this
+                // project's earlier app-container PoC.  FactoryInfo uses the
+                // full installation_proxy record; Manifest.plist only needs the
+                // app identity/path fields that make AppDomain-<bundle id>
+                // resolvable by mobilebackup2.
+                var registered: [String: Any] = [:]
+                for (bundleID, entry) in applications {
+                    var app: [String: Any] = [
+                        "CFBundleIdentifier": entry["CFBundleIdentifier"] as? String ?? bundleID,
+                    ]
+                    for key in ["CFBundleVersion", "Path", "ContainerContentClass"] {
+                        if let value = entry[key] { app[key] = value }
+                    }
+                    registered[bundleID] = app
+                }
+                manifest["Applications"] = registered
+            }
+
+            try PropertyListSerialization.data(fromPropertyList: manifest,
+                                               format: .xml, options: 0)
                 .write(to: manifestURL)
         }
 

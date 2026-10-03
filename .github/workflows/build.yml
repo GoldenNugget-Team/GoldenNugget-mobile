@@ -1,4 +1,4 @@
-name: Build
+name: Build Patched IPA
 
 on:
   push:
@@ -29,6 +29,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: goldennugget-ipa
+          name: GoldenNuggetMobile-patched
           path: build/GoldenNuggetMobile.ipa
           if-no-files-found: error
+
+# Manual rebuild trigger

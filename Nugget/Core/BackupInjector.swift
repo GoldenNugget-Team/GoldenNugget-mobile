@@ -196,7 +196,33 @@ enum BackupInjector {
         // (Info.plist / Status.plist / Manifest.plist), write minimal valid ones
         // — restore refuses a backup without them.
         let manifestStage = StageTimer("ensure host-side manifests")
-        try HostManifests.ensure(deviceDir: deviceDir, udid: udid, ios27: ios27)
+
+        // AppDomain-* file rows are not self-describing.  mobilebackup2 resolves
+        // the suffix as an installed application and refuses the restore with
+        // MBErrorDomain/205 ("Unknown domain name in file record") unless that
+        // application is registered in Manifest.plist.  PosterBoard is the first
+        // production payload in this port that uses AppDomain-*.
+        let appDomainPrefix = "AppDomain-"
+        let appBundleIDs = Set(tweakPayloads.compactMap { payload -> String? in
+            guard payload.domain.hasPrefix(appDomainPrefix) else { return nil }
+            let bundleID = String(payload.domain.dropFirst(appDomainPrefix.count))
+            return bundleID.isEmpty ? nil : bundleID
+        }).sorted()
+
+        var applications: [String: [String: Any]]?
+        if !appBundleIDs.isEmpty {
+            var records: [String: [String: Any]] = [:]
+            for bundleID in appBundleIDs {
+                let entry = try await Minimuxer.shared().appFactoryEntry(bundleId: bundleID)
+                records[bundleID] = entry
+                AppLog.write("Registered restore AppDomain for \(bundleID) "
+                    + "(\(entry.keys.count) installation_proxy field(s))")
+            }
+            applications = records
+        }
+
+        try HostManifests.ensure(deviceDir: deviceDir, udid: udid, ios27: ios27,
+                                 applications: applications)
         manifestStage.done()
 
         if !ios27 {

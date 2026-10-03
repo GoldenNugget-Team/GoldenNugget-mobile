@@ -97,16 +97,6 @@ struct PosterBoardView: View {
             applyMode = PosterBoardApplyModeSettings.current
             refreshDatabaseSummary()
         }
-        .fileImporter(isPresented: $showPackImporter, allowedContentTypes: [.data]) { result in
-            importPack(result)
-        }
-        .fileImporter(isPresented: $showVideoImporter,
-                      allowedContentTypes: [.movie, .video, .quickTimeMovie, .mpeg4Movie]) { result in
-            importMedia(result, into: PosterBoard.videoDirectory) { selection.video = $0 }
-        }
-        .fileImporter(isPresented: $showThumbnailImporter, allowedContentTypes: [.heic, .image]) { result in
-            importMedia(result, into: PosterBoard.thumbnailDirectory) { selection.thumbnail = $0 }
-        }
     }
 
     // MARK: - Device and database
@@ -212,6 +202,12 @@ struct PosterBoardView: View {
                 Label("Import .tendies pack", systemImage: "plus.circle")
             }
             .disabled(running)
+            // Keep each document picker attached to the control that presents it.
+            // Stacking three fileImporter modifiers on the parent List can cause
+            // one presentation host to shadow the others on iOS 26.
+            .fileImporter(isPresented: $showPackImporter, allowedContentTypes: [.data]) { result in
+                importPack(result)
+            }
             if selection.tendies.isEmpty {
                 NativeNote("No packs imported yet. A `.tendies` file is a ZIP "
                     + "holding a wallpaper's descriptor; import one from a wallpaper "
@@ -301,6 +297,10 @@ struct PosterBoardView: View {
                 }
             }
             .disabled(running)
+            .fileImporter(isPresented: $showVideoImporter,
+                          allowedContentTypes: [.movie, .video, .quickTimeMovie, .mpeg4Movie]) { result in
+                importMedia(result, into: PosterBoard.videoDirectory) { selection.video = $0 }
+            }
             Toggle("Loop (CoreAnimation frame list)", isOn: $selection.loop)
             if selection.loop {
                 Toggle("Reverse on loop", isOn: $selection.reverse)
@@ -319,6 +319,10 @@ struct PosterBoardView: View {
                     }
                 }
                 .disabled(running)
+                .fileImporter(isPresented: $showThumbnailImporter,
+                              allowedContentTypes: [.heic, .image]) { result in
+                    importMedia(result, into: PosterBoard.thumbnailDirectory) { selection.thumbnail = $0 }
+                }
             }
             if selection.video != nil || selection.thumbnail != nil {
                 Button(role: .destructive) {

@@ -109,10 +109,6 @@ enum PosterBoardStore {
               roleId TEXT,
               roleSortKey INTEGER
             );
-            CREATE TABLE IF NOT EXISTS sqlite_sequence (
-              name TEXT,
-              seq INTEGER
-            );
             """
         guard exec(db, schema) else {
             throw GoldenNuggetError("Could not create the empty PosterBoard database schema: "
