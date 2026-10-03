@@ -80,8 +80,8 @@ Wanted support? join our [Discord Server][server].
 
 **Thanks everyone who contributes to project!** 🎉
 
-<a href="https://github.com/GoldenNugget-Team/GoldenNugget-mobile/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=GoldenNugget-Team/GoldenNugget-mobile" alt="Contributors" />
+<a href="https://github.com/goldennugget-team/goldennugget-mobile/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=goldennugget-team/goldennugget-mobile" />
 </a>
 
 Want to see your name here? Open [Pull Request](https://github.com/GoldenNugget-Team/GoldenNugget-mobile/pulls)!
