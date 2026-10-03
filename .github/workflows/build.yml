@@ -1,4 +1,4 @@
-name: Build Patched IPA
+name: Build IPA
 
 on:
   push:
@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Show toolchain
         run: |
@@ -27,9 +27,9 @@ jobs:
         run: ./scripts/build-ipa.sh Release
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
-          name: GoldenNuggetMobile-patched
+          name: GoldenNuggetMobile
           path: build/GoldenNuggetMobile.ipa
           if-no-files-found: error
 
