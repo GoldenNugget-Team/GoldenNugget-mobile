@@ -1078,7 +1078,8 @@ struct GoldenNuggetView: View {
                 succeeded = true
             } catch let failure as TransportFailure where failure.isCancellation {
                 // Stopping on purpose is not a failure — say so, and do not let it
-                // read like the device did something wrong.
+                // read like the device did something wrong. The engine has already
+                // written both of these into the log file.
                 text = "⏹ stopped by the user (\(failure.label))"
                 tone = .warning
             } catch {

@@ -35,26 +35,72 @@ enum PosterBoardStore {
     ///   accepts any healthy database carrying poster-ish tables, because the
     ///   schema moves between iOS releases (db5+).
     static func validate(_ url: URL, strict: Bool = true) -> Bool {
+        diagnose(url, strict: strict) == nil
+    }
+
+    /// Which step of validation rejected the database, or `nil` when it is healthy.
+    ///
+    /// A bare `false` used to be all a failed fetch left behind: the run stopped,
+    /// the log ended on the line before, and the only place the reason existed was
+    /// a status line on the phone. `describeTables` only ever described a database
+    /// that opened, which is precisely the case that needs explaining least —
+    /// a store that will not open at all, or one whose `integrity_check` says
+    /// something other than "ok", said nothing anywhere.
+    static func diagnose(_ url: URL, strict: Bool = true) -> String? {
         let path = url.path
         let attributes = try? FileManager.default.attributesOfItem(atPath: path)
-        guard let size = attributes?[.size] as? Int, size >= 100 else { return false }
-        guard let db = open(path) else { return false }
+        guard let size = attributes?[.size] as? Int else {
+            return "there is no file at \(path)"
+        }
+        guard size >= 100 else { return "\(size) bytes — too small to be a database" }
+        guard let db = open(path) else {
+            return "SQLite will not open it: \(openComplaint(path))"
+        }
         defer { sqlite3_close(db) }
 
-        guard exec(db, "SELECT 1 FROM sqlite_master LIMIT 1") else { return false }
+        guard exec(db, "SELECT 1 FROM sqlite_master LIMIT 1") else {
+            return "sqlite_master is unreadable: \(String(cString: sqlite3_errmsg(db)))"
+        }
         if strict {
-            for table in requiredTables where !tableExists(db, table) { return false }
+            let missing = requiredTables.filter { !tableExists(db, $0) }
+            guard missing.isEmpty else {
+                return "missing table(s): \(missing.joined(separator: ", "))"
+            }
         } else {
             let tables = tableNames(db).map { $0.lowercased() }
-            guard tables.contains(where: { $0.contains("poster") }) else { return false }
+            guard tables.contains(where: { $0.contains("poster") }) else {
+                return "no table is named after PosterBoard (tables: "
+                    + "\(tables.isEmpty ? "none" : tables.joined(separator: ", ")))"
+            }
         }
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
-        guard sqlite3_prepare_v2(db, "PRAGMA integrity_check", -1, &statement, nil) == SQLITE_OK,
-              sqlite3_step(statement) == SQLITE_ROW,
-              let text = sqlite3_column_text(statement, 0),
-              String(cString: text) == "ok" else { return false }
-        return true
+        guard sqlite3_prepare_v2(db, "PRAGMA integrity_check", -1, &statement, nil) == SQLITE_OK else {
+            return "integrity_check would not run: \(String(cString: sqlite3_errmsg(db)))"
+        }
+        switch sqlite3_step(statement) {
+        case SQLITE_ROW:
+            guard let text = sqlite3_column_text(statement, 0) else {
+                return "integrity_check said nothing"
+            }
+            let verdict = String(cString: text)
+            return verdict == "ok" ? nil : "integrity_check: \(verdict)"
+        case SQLITE_DONE:
+            return "integrity_check returned no row"
+        default:
+            return "integrity_check failed: \(String(cString: sqlite3_errmsg(db)))"
+        }
+    }
+
+    /// `open`'s own complaint, for the cases `open` cannot report itself: a
+    /// read-only connection cannot create the `-shm` a WAL database needs, and
+    /// that failure surfaces as nothing at all rather than as an error string.
+    private static func openComplaint(_ path: String) -> String {
+        var db: OpaquePointer?
+        let rc = sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE, nil)
+        defer { sqlite3_close(db) }
+        guard rc != SQLITE_OK else { return "opened read-write only" }
+        return String(cString: sqlite3_errmsg(db))
     }
 
     /// `_is_encrypted_database`: a database that will not open as plain SQLite

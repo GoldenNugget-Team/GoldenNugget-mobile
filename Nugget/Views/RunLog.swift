@@ -15,8 +15,9 @@ import SwiftUI
 /// shape with its own `tail`.
 ///
 /// The split moves the invalidation to the one card that draws it: a line now
-/// re-evaluates `RunLogCard` (a `LazyVStack` over the last 600 lines) and
-/// nothing else, because no other view reads this store.
+/// re-evaluates `RunLogCard` (a `LazyVStack` over the last 600 lines, inside its
+/// own bounded viewport) and nothing else, because no other view reads this
+/// store.
 ///
 /// **Appends are coalesced, not queued per line.**  `append` may be called from
 /// any thread (the engine's callback arrives on the main queue today, but the
@@ -92,12 +93,45 @@ final class RunLog: ObservableObject {
 /// which meant the page had to read the log to decide, i.e. to be invalidated by
 /// it.  The gate lives here instead, so an empty log costs an empty view and a
 /// busy one costs this card.
+///
+/// **The log scrolls inside itself.**  The rows used to be laid out straight into
+/// the page's `List`, all 600 of them, which made the log taller than the
+/// screen and pushed every card below it — the Apply button, the status line —
+/// off the bottom, so reading the run meant scrolling the whole page past the
+/// controls.  A bounded viewport with its own `ScrollView` fixes that, and has to
+/// come with tailing: a run appends hundreds of lines in a few seconds, and a log
+/// that stays at the top while it grows is no more readable than one that is
+/// buried.  So it follows the newest line until the reader scrolls away from the
+/// end, and offers a way back.
 struct RunLogCard: View {
     @ObservedObject private var log = RunLog.shared
+    /// Whether the viewport is parked at the newest line.
+    ///
+    /// Driven by the scroll geometry rather than by "did the user touch it": a
+    /// drag that lands back at the end has to keep following, and a run that
+    /// appends while the reader is halfway up must not yank them down.
+    @State private var followsTail = true
+
+    /// How tall the viewport is.  A phone's worth of about fifteen log lines —
+    /// enough to read a step and its neighbours, small enough that the card stays
+    /// a card.
+    private static let viewportHeight: CGFloat = 200
+    /// The tail marker, scrolled to instead of the last row: an `.id` on the last
+    /// row aligns that row's *top* with the viewport's top edge, which leaves the
+    /// newest line half off the bottom.
+    private static let tail = "runlog.tail"
 
     var body: some View {
         if !log.lines.isEmpty {
             Section("Log") {
+                viewport
+            }
+        }
+    }
+
+    private var viewport: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
                 LazyVStack(alignment: .leading, spacing: 4) {
                     ForEach(rows, id: \.id) { row in
                         Text(row.text)
@@ -106,8 +140,62 @@ struct RunLogCard: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    Color.clear.frame(height: 1).id(Self.tail)
                 }
                 .padding(.vertical, 2)
+            }
+            .frame(height: Self.viewportHeight)
+            // The indicator is the page's, not the log's: two nested ones is one
+            // too many, and the page's says where the log sits in the whole.
+            .scrollIndicators(.hidden)
+            .overlay(alignment: .bottomTrailing) {
+                // Only while parked away from the end, and over the log rather
+                // than under it, so it cannot push the card taller.
+                if !followsTail {
+                    Button {
+                        followsTail = true
+                        proxy.scrollTo(Self.tail, anchor: .bottom)
+                    } label: {
+                        Label("Latest", systemImage: "arrow.down.to.line.compact")
+                            .font(.caption2.bold())
+                            .labelStyle(.titleAndIcon)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(.thickMaterial, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(8)
+                }
+            }
+            // Tailing is one hop behind an append, not one per line: the store
+            // already coalesces a burst into a single `lines` change.
+            .onChange(of: log.lines.count) { _, _ in
+                guard followsTail else { return }
+                proxy.scrollTo(Self.tail, anchor: .bottom)
+            }
+            .onChange(of: log.firstLineId) { _, _ in
+                // The window slid, so the row ids moved and the viewport's
+                // offset no longer means anything. Only matters when the reader
+                // is parked somewhere: at the tail the offset is already
+                // bottom-anchored.
+                guard !followsTail else { return }
+                proxy.scrollTo(Self.tail, anchor: .bottom)
+            }
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                // A row's slack: `contentSize` is the laid-out height, so the last
+                // row is fully visible a few points before the geometry says
+                // "at the end".
+                geometry.contentOffset.y + geometry.containerSize.height
+                    >= geometry.contentSize.height - 24
+            } action: { atEnd, _ in
+                if followsTail, !atEnd { followsTail = false }
+                else if !followsTail, atEnd { followsTail = true }
+            }
+            .task {
+                // A log that was already full when this page appeared — the user
+                // came back mid-run — opens at the end rather than at line one.
+                guard followsTail else { return }
+                proxy.scrollTo(Self.tail, anchor: .bottom)
             }
         }
     }

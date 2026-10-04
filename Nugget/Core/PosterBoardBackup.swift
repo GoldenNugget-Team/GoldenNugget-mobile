@@ -196,9 +196,14 @@ enum PosterBoardBackup {
                                            wal: extracted.wal,
                                            destination: destination,
                                            log: log)
-        guard PosterBoardStore.validate(consolidated, strict: false) else {
+        // Named, not just "did not validate": the log used to stop on the line
+        // above, which left the copy and the validation as the two candidates
+        // and nothing to tell them apart.
+        if let complaint = PosterBoardStore.diagnose(consolidated, strict: false) {
+            log("PosterBoard: the fetched database was rejected — \(complaint). Tables: "
+                + "\(PosterBoardStore.describeTables(consolidated)).")
             throw GoldenNuggetError("The PosterBoard database fetched from the device did not "
-                + "validate (\(PosterBoardStore.describeTables(consolidated))). Fetch it again.")
+                + "validate (\(complaint)). Fetch it again.")
         }
         log("PosterBoard: database ready — \(extracted.locatedBy), structure version "
             + "\(extracted.structureVersion), "
@@ -375,7 +380,14 @@ enum PosterBoardBackup {
         let fm = FileManager.default
         try? fm.removeItem(at: destination)
         guard let wal else {
-            try fm.copyItem(at: main, to: destination)
+            do {
+                try fm.copyItem(at: main, to: destination)
+            } catch {
+                log("PosterBoard: copying the store onto the cache failed — "
+                    + "\(error.localizedDescription) (from \(main.lastPathComponent), "
+                    + "\(fileSize(main)) bytes, onto \(destination.path))")
+                throw error
+            }
             return destination
         }
 
@@ -384,14 +396,24 @@ enum PosterBoardBackup {
         try fm.createDirectory(at: work, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: work) }
         let scratch = work.appendingPathComponent("posterboard.sqlite3")
-        try fm.copyItem(at: main, to: scratch)
-        try fm.copyItem(at: wal, to: URL(fileURLWithPath: scratch.path + "-wal"))
+        do {
+            try fm.copyItem(at: main, to: scratch)
+            try fm.copyItem(at: wal, to: URL(fileURLWithPath: scratch.path + "-wal"))
+        } catch {
+            log("PosterBoard: staging the store and its WAL failed — "
+                + "\(error.localizedDescription) (store \(fileSize(main)) bytes, "
+                + "WAL \(fileSize(wal)) bytes, in \(work.lastPathComponent))")
+            throw error
+        }
 
         let folded = fold(source: scratch, into: destination)
         if !folded || !PosterBoardStore.validate(destination, strict: false) {
+            let reason = folded
+                ? (PosterBoardStore.diagnose(destination, strict: false) ?? "validation failed")
+                : "the backup API refused"
             log("PosterBoard: WAL consolidation did not produce a healthy database "
-                + "(\(folded ? "validation failed" : "the backup API refused")) — using the "
-                + "plain file, which is what the reference falls back to as well")
+                + "(\(reason)) — using the plain file, which is what the reference falls "
+                + "back to as well")
             try? fm.removeItem(at: destination)
             try fm.copyItem(at: main, to: destination)
         }

@@ -50,6 +50,28 @@ class GoldenNuggetEngine {
         AppLog.shared.log(msg)
     }
 
+    /// Run `body` under `label`, writing a failure into the log before it escapes.
+    ///
+    /// Every run entry point throws to a view that turns the error into a status
+    /// line, and a status line lives exactly as long as the screen: the file sink
+    /// is the only record a failed run leaves once the app is closed. It has to
+    /// be written here rather than at the call sites because there are four of
+    /// them and a fifth would silently skip it — which is how a posterboard apply
+    /// came to end with its last line still on the *fetch* and nothing saying
+    /// why.
+    private func loggedRun<T>(_ label: String,
+                              _ body: () async throws -> T) async throws -> T {
+        do {
+            return try await body()
+        } catch let failure as TransportFailure where failure.isCancellation {
+            log("\(label) stopped: \(failure.label)")
+            throw failure
+        } catch {
+            log("\(label) failed: \(error.localizedDescription)")
+            throw error
+        }
+    }
+
     /// Result of the one-time Rust logger init; see `RustLog.initResult`.
     var rustLogInitResult: Int32? { RustLog.initResult }
 
@@ -195,6 +217,22 @@ class GoldenNuggetEngine {
         deviceVersion: String,
         isIPhone: Bool
     ) async throws {
+        try await loggedRun("apply") {
+            try await applyTweaksRun(selection: selection,
+                                     posterBoard: posterBoard,
+                                     statusBar: statusBar,
+                                     deviceVersion: deviceVersion,
+                                     isIPhone: isIPhone)
+        }
+    }
+
+    private func applyTweaksRun(
+        selection: TweakSelection,
+        posterBoard: PosterBoardSelection,
+        statusBar: StatusBarSelection,
+        deviceVersion: String,
+        isIPhone: Bool
+    ) async throws {
         AppLog.shared.memory.reset()
         warnIfPreviousCallStillRunning()
         clearCancel()
@@ -288,7 +326,7 @@ class GoldenNuggetEngine {
         var posterBoardInjectedOverAirlift = false
         if posterBoard.isActive && posterBoardMode == .airlift {
             log("PosterBoard: \(posterBoard.describe) — over AirLift, no backup")
-            try await applyPosterBoardOverAirlift(selection: posterBoard)
+            try await applyPosterBoardOverAirlift(selection: posterBoard, deviceVersion: version)
             posterBoardInjectedOverAirlift = true
         } else if posterBoard.isActive {
             log("PosterBoard: \(posterBoard.describe)")
@@ -379,10 +417,12 @@ class GoldenNuggetEngine {
     }
 
     /// Run the AirLift PosterBoard injection, reporting through the run log.
-    private func applyPosterBoardOverAirlift(selection: PosterBoardSelection) async throws {
+    private func applyPosterBoardOverAirlift(selection: PosterBoardSelection,
+                                             deviceVersion: String) async throws {
         try await PosterBoardAirlift.apply(
             selection: selection,
             structureVersion: PosterBoard.fallbackStructureVersion,
+            deviceVersion: deviceVersion,
             pairingPath: AppPaths.pairingFile.path,
             log: { AppLog.write($0) },
             progress: { overall in self.logProgress("posterboard airlift", overall) }
@@ -399,6 +439,12 @@ class GoldenNuggetEngine {
     /// `PosterBoardBackup.cachedDatabase(udid:)`, and an apply reuses nothing:
     /// it fetches its own, because a copy fetched before a reset is stale.
     func fetchPosterBoardDatabase() async throws {
+        try await loggedRun("posterboard database fetch") {
+            try await fetchPosterBoardDatabaseRun()
+        }
+    }
+
+    private func fetchPosterBoardDatabaseRun() async throws {
         AppLog.shared.memory.reset()
         warnIfPreviousCallStillRunning()
         clearCancel()
@@ -432,6 +478,13 @@ class GoldenNuggetEngine {
     ///     against it rather than resolved again over a second connection.
     func applyPosterBoardViaAirlift(_ selection: PosterBoardSelection,
                                     deviceVersion: String) async throws {
+        try await loggedRun("posterboard airlift apply") {
+            try await applyPosterBoardViaAirliftRun(selection, deviceVersion: deviceVersion)
+        }
+    }
+
+    private func applyPosterBoardViaAirliftRun(_ selection: PosterBoardSelection,
+                                               deviceVersion: String) async throws {
         AppLog.shared.memory.reset()
         warnIfPreviousCallStillRunning()
         clearCancel()
@@ -441,7 +494,7 @@ class GoldenNuggetEngine {
 
         try checkAirliftCanApply(posterBoard: selection, deviceVersion: deviceVersion)
         log("PosterBoard: \(selection.describe) — over AirLift, no backup")
-        try await applyPosterBoardOverAirlift(selection: selection)
+        try await applyPosterBoardOverAirlift(selection: selection, deviceVersion: deviceVersion)
         log("PosterBoard: injected over AirLift and resprung. No backup was taken, and no "
             + "tweak was delivered — the home page's Apply is what delivers those.")
     }
@@ -564,6 +617,10 @@ class GoldenNuggetEngine {
     /// page as the user had it — the reset is of the *device*, and the selection
     /// is what would put the tweaks back.
     func resetPages(pages: Set<ResetPage>) async throws {
+        try await loggedRun("page reset") { try await resetPagesRun(pages: pages) }
+    }
+
+    private func resetPagesRun(pages: Set<ResetPage>) async throws {
         AppLog.shared.memory.reset()
         warnIfPreviousCallStillRunning()
         clearCancel()

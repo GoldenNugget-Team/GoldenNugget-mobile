@@ -191,7 +191,13 @@ struct WallpaperDownloadsView: View {
     // MARK: - Grid
 
     private var grid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
+        // Three columns on a phone rather than the reference's two: with the
+        // preview now the wallpaper's own shape instead of a squat 150×200 box,
+        // two columns means two wallpapers per screenful and a 100-entry catalog
+        // takes a very long scroll. 108 is what three columns actually fit on the
+        // narrowest phone this builds for, so the grid does not collapse back to
+        // two wider ones.
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 108), spacing: 12)], spacing: 16) {
             ForEach(visible) { wallpaper in
                 WallpaperCard(wallpaper: wallpaper,
                               busy: importing == wallpaper.id,
@@ -348,6 +354,9 @@ private struct WallpaperCard: View {
 
     @State private var frames: WallpaperFrames?
     @State private var failed = false
+    /// The preview's own size, once it is known, so the box can be the
+    /// wallpaper's shape instead of a guess.
+    @State private var previewSize: CGSize?
 
     var body: some View {
         Button(action: onTap) {
@@ -367,6 +376,20 @@ private struct WallpaperCard: View {
         .buttonStyle(.plain)
         .disabled(busy)
         .task(id: wallpaper.previewURL) { await loadPreview() }
+    }
+
+    /// A phone wallpaper's shape — what almost every entry in both catalogs is,
+    /// and what the box falls back to before the bytes arrive.
+    private static let phonePreviewRatio: CGFloat = 844.0 / 390.0
+
+    private var previewRatio: CGFloat {
+        guard let size = previewSize, size.width > 0, size.height > 0 else {
+            return Self.phonePreviewRatio
+        }
+        // Clamped, because one catalog entry with a panorama's proportions must not
+        // make a card a thousand points tall. A landscape wallpaper then reads as a
+        // short wide strip, which is what it is.
+        return min(max(size.height / size.width, 0.35), 2.4)
     }
 
     private var preview: some View {
@@ -392,10 +415,15 @@ private struct WallpaperCard: View {
                 ProgressView().tint(.white)
             }
         }
-        // The reference's `PREVIEW_H`, and the same 150pt card width its grid
-        // asks for: a wallpaper is taller than it is wide, so a card that is not
-        // portrait-shaped crops the interesting half off.
-        .frame(height: 200)
+        // The reference draws the preview into a fixed 150×200 box with
+        // `Qt.KeepAspectRatio`, so a wallpaper shows whole inside it with empty
+        // bands above and below — a card two-thirds as wide as it is tall, holding
+        // a tall wallpaper. This sizes the box to the wallpaper instead, so the
+        // preview fills the card's width and shows the whole wallpaper with
+        // nothing letterboxed: the interesting half of a wallpaper is its top and
+        // bottom, and cropping those is what made these cards unreadable as
+        // previews.
+        .aspectRatio(1 / previewRatio, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
@@ -404,7 +432,10 @@ private struct WallpaperCard: View {
         if let image {
             Image(uiImage: image)
                 .resizable()
-                .scaledToFill()
+                // Fit, not fill: the box is already the image's shape, so the two
+                // agree — and where they do not (an animation whose frames differ
+                // in size) fit keeps the difference visible instead of cropping it.
+                .scaledToFit()
         }
     }
 
@@ -416,5 +447,11 @@ private struct WallpaperCard: View {
         }
         frames = await WallpaperFrameDecoder.decode(data)
         if frames == nil { failed = true }
+        // Read off the first frame rather than decoding twice: the frames are
+        // already in memory and their size is the card's shape.
+        if let first = frames?.images.first {
+            previewSize = CGSize(width: first.size.width * first.scale,
+                                 height: first.size.height * first.scale)
+        }
     }
 }

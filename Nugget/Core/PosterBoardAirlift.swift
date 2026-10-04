@@ -51,11 +51,15 @@ enum PosterBoardAirlift {
     ///     this path does not carry them.
     ///   - structureVersion: the store directory version. 61 for everything this
     ///     supports, matching `PosterBoard.fallbackStructureVersion`.
+    ///   - deviceVersion: the device's iOS version, for the legacy-conversion gate
+    ///     only. Same number, same gate and same conversion as the backup path —
+    ///     see the note at the conversion itself.
     static func apply(
         selection: PosterBoardSelection,
         structureVersion: Int,
+        deviceVersion: String,
         pairingPath: String,
-        log: @escaping (String) -> Void,
+        log: @escaping @Sendable (String) -> Void,
         progress: @escaping (Double) -> Void
     ) async throws {
         let packs = selection.tendies
@@ -111,6 +115,23 @@ enum PosterBoardAirlift {
                 } catch {
                     log("  ⚠️ could not unpack: \(error.localizedDescription)")
                     continue
+                }
+
+                // The legacy conversion, on this path too, and for the same reason
+                // the backup path runs it: both paths hand PosterBoard the *same*
+                // descriptor tree, so a pack converted in one and not the other
+                // installs differently depending only on which button was pressed.
+                // A pre-27 package injected unconverted is not a cosmetic
+                // difference — iOS 27 reads the converted (Clownfish) shape, so the
+                // wallpaper lands without the depth effect it was sold with.
+                //
+                // It has to sit here, before `findDescriptors`: `convertTree` stamps
+                // the family into the bundle's own descriptor and
+                // `renameDescriptorsToSkeleton` renames the bundles to the stock
+                // layout, and both change what the walk below sees.
+                if PosterBoard.shouldConvertLegacy(pack: pack, deviceVersion: deviceVersion,
+                                                  log: log) {
+                    PosterBoard.convertLegacyPack(pack.name, at: stage, log: log)
                 }
 
                 let descriptors = findDescriptors(in: stage,
