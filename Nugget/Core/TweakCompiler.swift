@@ -34,16 +34,43 @@ struct TweakPayload: Equatable {
 
     init(domain: String, relativePath: String, contents: Data) {
         self.domain = domain
-        self.relativePath = relativePath
+        self.relativePath = TweakPayload.manifestPath(relativePath)
         self.contents = contents
         self.source = nil
     }
 
     init(domain: String, relativePath: String, source: URL) {
         self.domain = domain
-        self.relativePath = relativePath
+        self.relativePath = TweakPayload.manifestPath(relativePath)
         self.contents = Data()
         self.source = source
+    }
+
+    /// A manifest row's `relativePath`, with no leading slash.
+    ///
+    /// Most producers get the shape for free: `TweakDomainMap.split` drops the
+    /// `/var/mobile/` prefix and leaves `Library/SpringBoard/…`, which is what the
+    /// device's own rows use (`ProtectiveBackup`'s prefixes are written the same
+    /// way).  Two producers instead hand over a path that is *already*
+    /// domain-relative and still carries the slash — the reference's
+    /// `FileToRestore.restore_path` (`/Library/SpringBoard/StatusBarOverrides.archive`,
+    /// from `status_bar_tweak.py`) reaches this port as
+    /// `StatusBarMechanism.restorePath`, and PosterBoard's container walk starts
+    /// from `restorePath: "/"`.
+    ///
+    /// The reference strips it at the boundary — `restore.py`:
+    /// `rel = f.restore_path.lstrip("/")` — and a row that keeps the slash is what
+    /// the device rejects with `MBErrorDomain/205 — File path is invalid:
+    /// HomeDomain:/Library/SpringBoard/StatusBarOverrides.archive`.  The
+    /// directory rows either producer builds are unaffected (splitting on "/"
+    /// drops the empty leading component), so only the file row carried the bug.
+    ///
+    /// Normalised here, in the one type every payload is built through, so no
+    /// producer can put the slash into a row.
+    static func manifestPath(_ relativePath: String) -> String {
+        var path = Substring(relativePath)
+        while path.first == "/" { path = path.dropFirst() }
+        return String(path)
     }
 
     var label: String { "\(domain)/\(relativePath)" }
