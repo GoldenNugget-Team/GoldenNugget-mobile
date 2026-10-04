@@ -37,6 +37,17 @@ struct WallpaperDownloadsView: View {
     /// a pack is coming down has nowhere to report itself.
     @State private var importing: String?
 
+    /// The imported pack awaiting a Convert / Install-as-is answer.
+    ///
+    /// A pack that arrives by download is converted exactly like one that arrives
+    /// through the PosterBoard page's picker — the reference asks on the way into
+    /// the tendie list, wherever the file came from — so the same question is put
+    /// here, through the same modifier.
+    @State private var legacyPrompt: LegacyConvertPrompt?
+    /// The device's iOS version, read once on appear for the same gate. Passed in
+    /// nowhere else: this page only asks, and the apply decides.
+    @State private var deviceVersion = ""
+
     /// What the grid shows: the catalog, filtered.
     ///
     /// The reference's `_apply_search`, verbatim in behaviour — a substring match
@@ -89,6 +100,12 @@ struct WallpaperDownloadsView: View {
         .task(id: LoadKey(source: source, category: category)) {
             await load()
         }
+        // Read once, for the import-time question. `PosterBoardView` reads the
+        // identity the same way — a lockdown call, so not in `body`.
+        .task {
+            deviceVersion = await DeviceIdentity.read().version
+        }
+        .legacyConvertPrompt($legacyPrompt, answer: answerLegacyPrompt)
     }
 
     // MARK: - Controls
@@ -274,6 +291,11 @@ struct WallpaperDownloadsView: View {
                 statusTone = .success
                 RunLog.shared.append("Wallpapers: imported \(pack.name) (\(pack.summary)) "
                     + "from \(wallpaper.sourceLabel)")
+                // Same question as on the PosterBoard page: the reference asks on
+                // the way into the tendie list, not per import route.
+                if let prompt = pack.legacyConvertPrompt(deviceVersion: deviceVersion) {
+                    legacyPrompt = prompt
+                }
             } catch {
                 fail("Could not import \(wallpaper.name): \(error.localizedDescription)")
             }
@@ -288,6 +310,22 @@ struct WallpaperDownloadsView: View {
         status = "Import failed"
         statusTone = .error
         RunLog.shared.append("Wallpapers: \(message)")
+    }
+
+    /// Store the Convert / Install-as-is answer for a downloaded pack.
+    ///
+    /// `settingAutoConvert` persists it, so the PosterBoard page's apply reads it
+    /// without this page and the selection only has to be refreshed for the pack
+    /// list to show.
+    private func answerLegacyPrompt(_ prompt: LegacyConvertPrompt, _ convert: Bool) {
+        legacyPrompt = nil
+        _ = prompt.pack.settingAutoConvert(convert)
+        selection.loadFromDisk()
+        RunLog.shared.append(convert
+            ? "Wallpapers: \(prompt.pack.name) will be converted to the modern format on Apply "
+                + "(legacy: \(prompt.families.joined(separator: ", ")))."
+            : "Wallpapers: \(prompt.pack.name) stays in its original legacy format "
+                + "(\(prompt.families.joined(separator: ", "))).")
     }
 }
 

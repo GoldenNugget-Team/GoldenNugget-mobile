@@ -57,6 +57,11 @@ struct PosterBoardView: View {
     /// set here.
     @State private var applyMode: PosterBoardApplyMode = .airlift
 
+    /// The imported pack awaiting a Convert / Install-as-is answer, if any. See
+    /// `LegacyConvertPromptModifier` for why the question is a value rather than
+    /// an immediate call.
+    @State private var legacyPrompt: LegacyConvertPrompt?
+
     var body: some View {
         List {
             deviceSection
@@ -97,6 +102,30 @@ struct PosterBoardView: View {
             applyMode = PosterBoardApplyModeSettings.current
             refreshDatabaseSummary()
         }
+        .legacyConvertPrompt($legacyPrompt, answer: answerLegacyPrompt)
+    }
+
+    // MARK: - The legacy-format answer
+
+    /// Store the Convert / Install-as-is answer and reload the selection, which is
+    /// what puts the new answer on the pack the apply reads.
+    ///
+    /// The reference assigns `auto_convert` on the tendie it just created; the pack
+    /// list here is re-read from disk, so the answer goes to
+    /// `PosterBoardPreferences.autoConvertAnswers` through
+    /// `settingAutoConvert` and the list is rebuilt from it.
+    private func answerLegacyPrompt(_ prompt: LegacyConvertPrompt, _ convert: Bool) {
+        legacyPrompt = nil
+        // `settingAutoConvert` writes the answer straight through, which is what
+        // matters here: the pack in the selection is a value read from the archive,
+        // and the apply re-reads it too.
+        _ = prompt.pack.settingAutoConvert(convert)
+        RunLog.shared.append(convert
+            ? "PosterBoard: \(prompt.pack.name) will be converted to the modern format on Apply "
+                + "(legacy: \(prompt.families.joined(separator: ", ")))."
+            : "PosterBoard: \(prompt.pack.name) stays in its original legacy format "
+                + "(\(prompt.families.joined(separator: ", "))).")
+        selection.loadFromDisk()
     }
 
     // MARK: - Device and database
@@ -236,7 +265,33 @@ struct PosterBoardView: View {
                     + "copied into this app, so removing one here removes the copy — "
                     + "the file you imported is untouched.")
             }
+            // Upstream's `auto_convert_legacy` checkbox, on by default. It gates
+            // both the import dialog and the apply-time rewrite, so it belongs
+            // here rather than in the apply card: turning it off is how a user
+            // says "push what I imported, as it is" for good.
+            Toggle("Convert legacy wallpapers to the modern format",
+                   isOn: Binding(get: { PosterBoardPreferences.autoConvertLegacy },
+                                 set: { PosterBoardPreferences.autoConvertLegacy = $0 }))
+            NativeNote(legacyConvertNote)
         }
+    }
+
+    private var legacyConvertNote: String {
+        var lines = [
+            "iOS 27 builds the depth effect only for the modern (“Clownfish”) layout, so a pack "
+                + "made before iOS 27 is rewritten when it is applied — otherwise it installs and "
+                + "looks flat, with no depth. The rewrite re-stamps the family, drops external "
+                + "scripts and republishes the planes, and it is best effort: it can change how a "
+                + "wallpaper looks. A pack holding nothing pre-27 is left alone either way.",
+        ]
+        if let atLeast27 = PosterBoard.compareVersion(identity.version, "27"), atLeast27 < 0 {
+            lines.append("This device is on iOS \(identity.version), which reads a legacy pack as "
+                + "it is, so nothing is converted here and no pack is asked about.")
+        }
+        if !PosterBoardPreferences.autoConvertLegacy {
+            lines.append("Conversion is off, so legacy packs are pushed with their original files.")
+        }
+        return lines.joined(separator: "\n\n")
     }
 
     private func packRow(_ pack: PosterBoardTendie) -> some View {
@@ -560,6 +615,12 @@ struct PosterBoardView: View {
                 selection.loadFromDisk()
                 pickError = nil
                 RunLog.shared.append("PosterBoard: imported \(pack.name) (\(pack.summary))")
+                // The reference asks here, once, before the pack joins the
+                // selection (`add_tendie` → `_ask_legacy_convert`), so the answer
+                // is in place before any apply can read it.
+                if let prompt = pack.legacyConvertPrompt(deviceVersion: identity.version) {
+                    legacyPrompt = prompt
+                }
             } catch {
                 pickError = error.localizedDescription
                 selection.loadFromDisk()

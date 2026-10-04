@@ -83,6 +83,8 @@
 		547AFD63F883C35F60A96328 /* TweakRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A77000F278E3D52579527931 /* TweakRow.swift */; };
 		1F4598565EB3ECC262843292 /* TweaksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB4799584FF11C9BF5BE59FF /* TweaksView.swift */; };
 		000FAF790458B28656C889EC /* WalletCardSkin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 298990634724C9BD09173CA1 /* WalletCardSkin.swift */; };
+		C0A9F31E7B24D4A9C6E51002 /* PosterBoardConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A9F31E7B24D4A9C6E51001 /* PosterBoardConverter.swift */; };
+		C0A9F31E7B24D4A9C6E51004 /* LegacyConvertPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0A9F31E7B24D4A9C6E51003 /* LegacyConvertPromptView.swift */; };
 		ECD7D52EB2E2A917AD10DA1B /* WallpaperCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB6025DBAF0F3EF2776275EA /* WallpaperCatalog.swift */; };
 		6221A776D615BE90DC7D1087 /* WallpaperDownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A229431CAFD897F1ECB6630 /* WallpaperDownloadsView.swift */; };
 		F8CA987268AFEEE27B32C442 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68FD81B29996DD807BDD0A8E /* WalletView.swift */; };
@@ -171,6 +173,8 @@
 		FB4799584FF11C9BF5BE59FF /* TweaksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TweaksView.swift; sourceTree = "<group>"; };
 		6AB24A4C7742CD2E32B8F55D /* Vendor */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Vendor; sourceTree = SOURCE_ROOT; };
 		298990634724C9BD09173CA1 /* WalletCardSkin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletCardSkin.swift; sourceTree = "<group>"; };
+		C0A9F31E7B24D4A9C6E51001 /* PosterBoardConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterBoardConverter.swift; sourceTree = "<group>"; };
+		C0A9F31E7B24D4A9C6E51003 /* LegacyConvertPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyConvertPromptView.swift; sourceTree = "<group>"; };
 		DB6025DBAF0F3EF2776275EA /* WallpaperCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperCatalog.swift; sourceTree = "<group>"; };
 		7A229431CAFD897F1ECB6630 /* WallpaperDownloadsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallpaperDownloadsView.swift; sourceTree = "<group>"; };
 		68FD81B29996DD807BDD0A8E /* WalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
@@ -233,6 +237,7 @@
 				B1C329362DD802CCA9CB45A2 /* PosterBoardAirlift.swift */,
 				B4E281A018DC76B5AFE0A1E3 /* PosterBoardApplyMode.swift */,
 				EA16FEAE810163E3FB58A973 /* PosterBoardBackup.swift */,
+				C0A9F31E7B24D4A9C6E51001 /* PosterBoardConverter.swift */,
 				24A6FCA64DAFCF3674497207 /* PosterBoardResources.swift */,
 				7CBD070C52DD7281009B60B4 /* PosterBoardStore.swift */,
 				08CCA12F39D94B614A61B482 /* PosterBoardTemplates.swift */,
@@ -323,6 +328,7 @@
 				A9376FB58D1DA358A075B8DD /* GoldenComponents.swift */,
 				F4432398FF02541D88F5E11B /* GoldenNuggetView.swift */,
 				85A3D093FF4C72DC8FA10411 /* GoldenTheme.swift */,
+				C0A9F31E7B24D4A9C6E51003 /* LegacyConvertPromptView.swift */,
 				F1405DB7C8287A4D6101F564 /* MediaView.swift */,
 				026A78189155F5FE77680B38 /* NativeUI.swift */,
 				0BE93548CC1372E18A63F5EB /* PasscodeThemeView.swift */,
@@ -512,6 +518,8 @@
 				1F4598565EB3ECC262843292 /* TweaksView.swift in Sources */,
 				000FAF790458B28656C889EC /* WalletCardSkin.swift in Sources */,
 				ECD7D52EB2E2A917AD10DA1B /* WallpaperCatalog.swift in Sources */,
+				C0A9F31E7B24D4A9C6E51002 /* PosterBoardConverter.swift in Sources */,
+				C0A9F31E7B24D4A9C6E51004 /* LegacyConvertPromptView.swift in Sources */,
 				6221A776D615BE90DC7D1087 /* WallpaperDownloadsView.swift in Sources */,
 				F8CA987268AFEEE27B32C442 /* WalletView.swift in Sources */,
 				637D690748869293AAB5B9C8 /* WireCensus.swift in Sources */,

@@ -216,10 +216,39 @@ struct PosterBoardSelection {
 enum PosterBoardPreferences {
     static let autoRefreshKey = "PosterBoardAutoRefresh"
     static let posterTypesKey = "PosterBoardTendiePosterTypes"
+    static let autoConvertLegacyKey = "PosterBoardAutoConvertLegacy"
+    static let autoConvertAnswersKey = "PosterBoardAutoConvertAnswers"
 
     static var autoRefresh: Bool {
         get { UserDefaults.standard.object(forKey: autoRefreshKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: autoRefreshKey) }
+    }
+
+    /// `PosterboardTweak.auto_convert_legacy`, on by default.
+    ///
+    /// When off, an imported pre-iOS 27 pack is pushed exactly as it shipped and
+    /// the import prompt never appears — which is what an iOS 26 device wants
+    /// anyway, since it reads legacy packages natively.
+    static var autoConvertLegacy: Bool {
+        get { UserDefaults.standard.object(forKey: autoConvertLegacyKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: autoConvertLegacyKey) }
+    }
+
+    /// The user's Convert / Install-as-is answer per pack, by file name.
+    ///
+    /// A pack is re-read from its archive on every launch, so the answer cannot
+    /// live on the pack the way it lives on upstream's `TendieFile.auto_convert`.
+    /// Missing means "never asked", which converts — the same default upstream
+    /// gets from `auto_convert is not False`, and the reason a pack imported from
+    /// the CLI or from a version predating the prompt still converts.
+    static var autoConvertAnswers: [String: Bool] {
+        get {
+            let raw = UserDefaults.standard.dictionary(forKey: autoConvertAnswersKey) as? [String: Bool] ?? [:]
+            return raw
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: autoConvertAnswersKey)
+        }
     }
 
     /// Which PosterBoard extension each imported pack is injected under, by file
@@ -324,6 +353,12 @@ extension PosterBoard {
                 String(format: "%03d-%@", index, sanitised(tendie.name)), conformingTo: .data)
             log("  → unpacking \(tendie.name) (\(tendie.summary))")
             try tendie.extract(to: destination)
+            // Each pack is converted in its own folder so the per-pack
+            // "convert / install as is" answer is honoured
+            // (`PosterboardTweak.apply_tweak`'s `extracted: list[tuple[str, bool]]`).
+            if shouldConvertLegacy(pack: tendie, deviceVersion: deviceVersion, log: log) {
+                convertLegacyPack(tendie.name, at: destination, log: log)
+            }
         }
 
         // 5. Walk what is on disk into payloads, staging one config item per
@@ -474,6 +509,70 @@ extension PosterBoard {
             if l != r { return l < r ? -1 : 1 }
         }
         return 0
+    }
+
+    /// Whether an extracted pack gets the legacy conversion, or is pushed as-is.
+    ///
+    /// Three gates, in this order:
+    ///
+    ///   - `PosterBoardPreferences.autoConvertLegacy` — upstream's
+    ///     `auto_convert_legacy` setting, on by default.
+    ///   - `pack.autoConvert != false` — the per-pack "Convert / Install as is"
+    ///     answer. `nil` means "never asked" and converts.
+    ///   - device major version `>= 27`, the cutoff that decides whether a package
+    ///     is legacy at all.
+    ///
+    /// The device check is the one deliberate divergence from the reference.
+    /// `PosterboardTweak.apply_tweak` gates only on the two booleans and converts
+    /// a never-asked pack regardless of version, while `_legacy_convert_supported`
+    /// gates the prompt and its own comment says "iOS 26 reads legacy packages as
+    /// they are: nothing is converted there and the prompt never appears". The
+    /// code does not do what the comment says. Honouring the comment matters more
+    /// than the letter here: a converted package is Clownfish-shaped, and Clownfish
+    /// is what 27 reads natively — rewriting an iOS 26 device's wallpaper into it
+    /// is the exact damage the gate exists to prevent. A 26 device that somehow
+    /// does get a modern pack pushes it unchanged and reads it fine.
+    static func shouldConvertLegacy(pack: PosterBoardTendie, deviceVersion: String,
+                                    log: @escaping @Sendable (String) -> Void) -> Bool {
+        guard PosterBoardPreferences.autoConvertLegacy else { return false }
+        guard pack.autoConvert != false else { return false }
+        guard let atLeast27 = compareVersion(deviceVersion, "27") else {
+            log("  → skipping legacy conversion of \(pack.name): PosterBoard needs the device's "
+                + "iOS version to tell a legacy wallpaper from a modern one (27 changed the "
+                + "format), and \"\(deviceVersion)\" is not a version. Read the device identity "
+                + "and try again.")
+            return false
+        }
+        return atLeast27 >= 0
+    }
+
+    /// The apply-time conversion for one extracted pack: `convert_tree` then
+    /// `rename_descriptors_to_skeleton`, with the reference's per-descriptor
+    /// reporting.
+    ///
+    /// Not `throws`. Upstream wraps each descriptor in `except Exception` and
+    /// prints the traceback, so one malformed wallpaper does not cost the user the
+    /// rest of the pack — here it does not cost them the pack at all, and the pack
+    /// still goes in as-is for whatever did convert. Same trade, quieter failure:
+    /// the log is already on screen next to the apply button that started this.
+    static func convertLegacyPack(_ name: String, at destination: URL,
+                                  log: @escaping @Sendable (String) -> Void) {
+        do {
+            let converted = try PosterBoardConverter.convertTree(
+                destination, screen: nil,
+                maxMultiplier: PosterBoardConverter.defaultMaxAdaptiveTimeMultiplier, dryRun: false)
+            for entry in converted where !entry.isDryRun {
+                log("    ↳ \(entry.convertedLine)")
+            }
+            for entry in PosterBoardConverter.renameDescriptorsToSkeleton(destination) {
+                log("    ↳ \(entry.renamedLine)")
+            }
+            if converted.isEmpty {
+                log("    ↳ \(name): nothing legacy to convert")
+            }
+        } catch {
+            log("    ↳ \(name): conversion failed, installing as-is — \(error)")
+        }
     }
 }
 

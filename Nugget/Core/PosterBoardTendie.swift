@@ -89,6 +89,16 @@ struct PosterBoardTendie: Identifiable, Hashable {
     /// Which extension this pack's descriptors are injected under. User-chosen,
     /// because the pack does not carry it; see `PosterBoardPosterType`.
     var posterType: PosterBoardPosterType
+    /// The user's answer to the legacy-format prompt: `true` convert, `false`
+    /// install as is, `nil` never asked.
+    ///
+    /// Upstream keeps this on the tendie object (`TendieFile.auto_convert`) and
+    /// honours it per extracted pack in `apply_tweak`, which is why each pack is
+    /// extracted into its own folder. Here the pack is a file on disk that is
+    /// re-read from its archive on every launch, so the answer is kept in
+    /// `PosterBoardPreferences.autoConvertAnswers` by file name and read back
+    /// here.
+    var autoConvert: Bool?
 
     /// The exact name `TendieFile` looks for inside a `container/` pack.
     static let databaseEntryName = "PBFPosterExtensionDataStoreSQLiteDatabase.sqlite3"
@@ -160,6 +170,47 @@ struct PosterBoardTendie: Identifiable, Hashable {
         self.isUnsafeContainer = unsafeContainer
         self.posterType = PosterBoardPreferences.posterTypes[url.lastPathComponent]
             ?? detected ?? .defaultForContainer(container)
+        self.autoConvert = PosterBoardPreferences.autoConvertAnswers[url.lastPathComponent]
+    }
+
+    /// Remember the legacy-format answer for this pack, and return it with the
+    /// answer set. Written immediately, like `settingPosterType`.
+    func settingAutoConvert(_ convert: Bool) -> PosterBoardTendie {
+        var copy = self
+        copy.autoConvert = convert
+        var answers = PosterBoardPreferences.autoConvertAnswers
+        answers[url.lastPathComponent] = convert
+        PosterBoardPreferences.autoConvertAnswers = answers
+        return copy
+    }
+
+    /// The families of the pre-iOS 27 packages inside this pack, read straight out
+    /// of the archive.
+    ///
+    /// Empty means nothing legacy is in there, or the pack cannot be opened.  The
+    /// pack was already opened successfully in `init`, so a throw here is a real
+    /// I/O failure — which is why `legacyConvertPrompt` swallows it and asks
+    /// nothing: an archive that cannot be read cannot be converted either, so
+    /// there is no question worth putting to the user, and the apply then fails on
+    /// the same read and says so.
+    func legacyFamilies() throws -> [String] {
+        try PosterBoardConverter.legacyFamilies(ofPack: url)
+    }
+
+    /// What to ask the user about this pack, or nil when there is nothing to ask.
+    ///
+    /// `PosterboardTweak._ask_legacy_convert`'s gates in its own order: the
+    /// setting, the device (iOS 27 is where the format changed), then whether the
+    /// archive holds a pre-27 package at all. The one addition is
+    /// `autoConvert != nil`, which is what "already answered" means — upstream
+    /// gets that for free because the flag only exists while the object that was
+    /// asked about is still in memory.
+    func legacyConvertPrompt(deviceVersion: String) -> LegacyConvertPrompt? {
+        guard PosterBoardPreferences.autoConvertLegacy, autoConvert == nil else { return nil }
+        guard let atLeast27 = PosterBoard.compareVersion(deviceVersion, "27"), atLeast27 >= 0
+        else { return nil }
+        guard let families = try? legacyFamilies(), !families.isEmpty else { return nil }
+        return LegacyConvertPrompt(pack: self, families: families)
     }
 
     /// Remember a poster type for this pack, and return the pack with it set.
@@ -220,6 +271,45 @@ struct PosterBoardTendie: Identifiable, Hashable {
             _ = try archive.extract(entry, to: target)
         }
     }
+}
+
+/// A pack waiting on the Convert / Install-as-is answer.
+///
+/// The reference's `prompt_legacy_convert` returns a `bool` straight into
+/// `TendieFile.auto_convert`; there is nothing to keep on screen afterwards.  A
+/// SwiftUI alert is presented from the view, so the pending question is a value
+/// the view holds, and the pack it is about travels with it.
+struct LegacyConvertPrompt: Identifiable {
+    let pack: PosterBoardTendie
+    /// The pre-iOS 27 families found inside, as the dialog spells them:
+    /// `", ".join(sorted(set(families)))`. Normalised here rather than in the
+    /// views, because the run log prints the same list.
+    let families: [String]
+
+    /// Two packages of the same family produce one entry, the way the reference's
+    /// `set()` does.
+    init(pack: PosterBoardTendie, families: [String]) {
+        self.pack = pack
+        self.families = Array(Set(families)).sorted()
+    }
+
+    var id: String { pack.url.lastPathComponent }
+
+    /// The dialog's `setText`: "<b>pack</b> uses the legacy A, B format."
+    var title: String {
+        "\(pack.name) uses the legacy \(families.joined(separator: ", ")) format."
+    }
+
+    /// The dialog's `setInformativeText`, verbatim.
+    static let message = "iOS 27 only applies the depth effect to wallpapers in the modern "
+        + "format, so a legacy wallpaper is rewritten on import. Pick “Install as is” to push "
+        + "the original files untouched instead."
+
+    /// `Convert (may break the wallpaper)` — the reference's accepted-role button,
+    /// and its default.
+    static let convertTitle = "Convert (may break the wallpaper)"
+    /// `Install as is` — the reference's rejected-role button.
+    static let asIsTitle = "Install as is"
 }
 
 /// The imported packs, as files in this app's container.
