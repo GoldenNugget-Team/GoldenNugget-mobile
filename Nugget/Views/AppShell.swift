@@ -21,6 +21,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
     case home
     case tweaks
     case posterBoard
+    case wallpaperDownloads
     case statusBar
     case wallet
     case passcode
@@ -36,6 +37,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
         case .home: "GoldenNugget"
         case .tweaks: "Tweaks"
         case .posterBoard: "PosterBoard"
+        case .wallpaperDownloads: "Download Wallpapers"
         case .statusBar: "Status Bar"
         case .wallet: "Wallet"
         case .passcode: "Passcode"
@@ -51,6 +53,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
         case .home: "house"
         case .tweaks: "slider.horizontal.3"
         case .posterBoard: "photo.artframe"
+        case .wallpaperDownloads: "square.and.arrow.down"
         case .statusBar: "antenna.radiowaves.left.and.right"
         case .wallet: "creditcard.fill"
         case .passcode: "lock.rectangle"
@@ -240,6 +243,8 @@ struct RootView: View {
                     TweaksView(selection: $tweakSelection)
                 case .posterBoard:
                     PosterBoardView(selection: $posterBoardSelection)
+                case .wallpaperDownloads:
+                    WallpaperDownloadsView(selection: $posterBoardSelection)
                 case .statusBar:
                     StatusBarView(selection: $statusBarSelection)
                 case .wallet:
