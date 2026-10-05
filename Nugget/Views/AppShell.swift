@@ -32,6 +32,22 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
+    /// Whether this destination gets a row of its own in the sidebar/menu.
+    ///
+    /// The wallpaper downloader is the one that does not.  It is a **sub-page of
+    /// PosterBoard**, not a section of its own: it edits the very selection the
+    /// PosterBoard page shows and the home page's `Apply` delivers, so a second
+    /// entry point to it in the sidebar is a duplicate row one level above the
+    /// page that owns it, and the page it duplicates is the one whose contents
+    /// (`Wallpaper packs`) it fills.  `PosterBoardView` pushes it with a
+    /// `NavigationLink` in that section, which is also where the desktop build
+    /// reaches its downloader from (`wallpaper_downloader.py`).
+    ///
+    /// The case itself stays — a destination has to exist to be pushed — only its
+    /// row goes, so the two shells (sidebar on a tablet, sheet on a phone) both
+    /// stop offering it without either needing to know about the other.
+    var showsInSidebar: Bool { self != .wallpaperDownloads }
+
     var title: String {
         switch self {
         case .home: "GoldenNugget"
@@ -350,7 +366,12 @@ private struct AppDestinationList: View {
 
     var body: some View {
         List {
-            ForEach(AppDestination.allCases) { destination in
+            // Filtered, not a hardcoded list: `allCases` is the enum's own
+            // exhaustiveness check, and dropping the row in `showsInSidebar`
+            // keeps the "every destination needs a title and an icon" obligation
+            // on the enum while letting one of them stay reachable only from the
+            // page that owns it.
+            ForEach(AppDestination.allCases.filter(\.showsInSidebar)) { destination in
                 Button { select(destination) } label: {
                     Label(destination.title, systemImage: destination.systemImage)
                         .fontWeight(destination == current ? .semibold : .regular)

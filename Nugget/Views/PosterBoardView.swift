@@ -227,8 +227,9 @@ struct PosterBoardView: View {
         Section("Wallpaper packs (\(selection.tendies.count))") {
             // The desktop build opens the wallpaper downloader from right here
             // (`wallpaper_downloader.py`, reached from this page's own button),
-            // so the entry point stays here too — the sidebar destination is the
-            // addition, for a phone where this page is three scrolls down.
+            // and the entry point stayed here when the sidebar row was dropped:
+            // the downloader edits this section's own selection, so the row in the
+            // packs list is the one place a reader is looking for it.
             NavigationLink(value: AppDestination.wallpaperDownloads) {
                 Label("Download Wallpapers", systemImage: "square.and.arrow.down")
             }
