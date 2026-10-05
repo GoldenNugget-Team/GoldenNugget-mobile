@@ -41,7 +41,7 @@ resources:
   # appearances) lives in Assets.car, and shipping it loose as well would add
   # ~500 KB of PNG for nothing.
   - build/assets/Assets.car
-  # In-app header logo (GoldenLogo). Same artwork as the app icon, under names
+  # In-app header logo (NativeLogo). Same artwork as the app icon, under names
   # no icon key can claim, so it can never shadow the iconstack on the home
   # screen -- which is what the light-only AppIcon*.png files were doing.
   - layout/Applications/GoldenNuggetMobile.app/Logo@2x.png

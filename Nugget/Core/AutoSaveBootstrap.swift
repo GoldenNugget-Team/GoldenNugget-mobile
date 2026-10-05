@@ -33,10 +33,4 @@ enum AutoSaveBootstrap {
         return GoldenNuggetAutosave.restore(into: &selection, identity: identity)
     }
 
-    /// Test hook: the guard is the whole point, so it has to be resettable.
-    static func resetForTesting() {
-        lock.lock()
-        applied = false
-        lock.unlock()
-    }
 }

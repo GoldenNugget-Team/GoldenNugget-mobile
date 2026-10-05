@@ -156,33 +156,6 @@ enum Airlift {
 
     // MARK: - Exploit
 
-    /// Hand the library a pairing record and a directory, and let it write there.
-    ///
-    /// - Parameters:
-    ///   - pairingPath: a pairing plist on this device. This app already has one
-    ///     — it is what the Minimuxer tunnel is built from — so AirLift's own
-    ///     self-pairing host (`al_pairing_run_host`, the Bonjour "pair with
-    ///     yourself" flow AirCard uses to bootstrap) is not used. Passing the
-    ///     record we already hold is the whole point of not re-pairing.
-    ///   - target: an absolute iOS path, e.g.
-    ///     `/var/mobile/Containers/Data/Application/<uuid>`.
-    /// - Returns: the JSON result string the library reports; free'd before return.
-    @discardableResult
-    static func runExploit(pairingPath: String, target: String) async throws -> String {
-        try await requireSupported()
-        // Off the main actor: the call blocks for the length of the operation,
-        // which is what the enum's doc comment is about.
-        return try await offMainActor {
-            var outJSON: UnsafeMutablePointer<CChar>?
-            var outError: UnsafeMutablePointer<CChar>?
-            let rc = al_exploit_run(pairingPath, target, logTrampoline, nil, &outJSON, &outError)
-            let json = take(outJSON)
-            let message = take(outError)
-            if rc == 0, let json { return json }
-            throw GoldenNuggetError(message ?? "AirLift returned \(rc) with no message.")
-        }
-    }
-
     /// Write every file in `sourceDir` into `targetDir` on the device.
     static func writeDir(pairingPath: String,
                          sourceDir: String,

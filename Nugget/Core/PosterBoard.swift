@@ -127,7 +127,6 @@ enum PosterBoardResetMode: String, CaseIterable, Identifiable, Hashable {
 struct PosterBoardConfigItem: Equatable {
     let uuid: String
     let extensionID: String
-    var posterID: Int = 0
     /// Whether this wallpaper becomes the selected one.  The reference sets it
     /// for every staged item, so the last one added wins.
     let setSelected: Bool

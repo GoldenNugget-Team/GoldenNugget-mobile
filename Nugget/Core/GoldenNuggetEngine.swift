@@ -38,9 +38,6 @@ class GoldenNuggetEngine {
 
     // MARK: - Logging facade
 
-    /// Every line this run produced, in order — the in-memory sink.
-    var pendingLog: [String] { AppLog.shared.memory.snapshot }
-
     /// Route engine log lines into the UI list.
     var onLog: ((String) -> Void)? {
         didSet { AppLog.shared.setUIHandler(onLog) }
@@ -72,15 +69,7 @@ class GoldenNuggetEngine {
         }
     }
 
-    /// Result of the one-time Rust logger init; see `RustLog.initResult`.
-    var rustLogInitResult: Int32? { RustLog.initResult }
-
-    /// Byte offset into `minimuxer.log` taken at the start of the current run.
-    var rustLogMark: UInt64? { RustLog.mark }
-
     // MARK: - Cancellation facade
-
-    var cancelRequested: Bool { CancelFlag.shared.isRequested }
 
     func requestCancel() { CancelFlag.shared.request() }
 
@@ -789,8 +778,8 @@ class GoldenNuggetEngine {
     /// default, but an abandoned call may never drain at all, which would turn
     /// "press Stop" into "press Stop, then force-quit the app" — a worse failure
     /// than the one it prevents. The state is logged instead, so it is never
-    /// invisible; flip it to `InFlightCall.waitUntilDrained(seconds:)` if that
-    /// trade ever looks wrong.
+    /// invisible; adding a drain wait here is the trade to revisit if that
+    /// ever looks wrong.
     ///
     /// Must run BEFORE `clearCancel()`: clearing first erases the signal the
     /// previous run is still waiting on.

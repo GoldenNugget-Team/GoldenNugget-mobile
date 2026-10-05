@@ -2,39 +2,6 @@ import CryptoKit
 import Foundation
 import Minimuxer
 
-/// The Lock Screen Footnote tweak, ported from GoldenNugget's
-/// "Lock Screen Footnote Text" (`src/tweaks/`).
-///
-/// Reference chain: `registry.py` defines it as a `BasicPlistTweak` against
-/// `FileLocation.footnote`, whose only consumer is the key `LockScreenFootnote`
-/// in `SharedDeviceConfiguration.plist`; the file is emitted as
-/// `plistlib.dumps({"LockScreenFootnote": text})` — a WHOLE-file replacement —
-/// and mapped to a backup domain by `path_mapping.py`:
-///
-///     /var/containers/Shared/SystemGroup/systemgroup.com.apple.configurationprofiles/...
-///       → SysSharedContainerDomain-systemgroup.com.apple.configurationprofiles
-///       +  Library/ConfigurationProfiles/SharedDeviceConfiguration.plist
-///
-/// The text shows at the bottom of the Lock Screen under the clock. Long text
-/// is cut off — keep it short. An empty value clears an existing footnote,
-/// which is also how GoldenNugget's "leave empty to remove" works.
-///
-/// `BackupInjector.injectSystemPlist` is the only delivery channel: it injects
-/// these bytes into the pulled protective backup's manifest. The domain, the
-/// path and the plist encoding are stated once, here.
-enum LockScreenFootnoteTweak {
-    static let domain = "SysSharedContainerDomain-systemgroup.com.apple.configurationprofiles"
-    static let relativePath = "Library/ConfigurationProfiles/SharedDeviceConfiguration.plist"
-
-    /// The whole-file plist for one footnote text. `text` may be empty (explicit
-    /// reset) — the caller decides whether to send the file at all.
-    static func contents(text: String) throws -> Data {
-        let plist: [String: Any] = ["LockScreenFootnote": text]
-        return try PropertyListSerialization.data(fromPropertyList: plist,
-                                                  format: .xml, options: 0)
-    }
-}
-
 /// Turns the backup the device just gave us into one the restore daemon will
 /// accept: prune `Manifest.db` down to what is actually on disk, then write the
 /// rows and payloads for the files this run is delivering.

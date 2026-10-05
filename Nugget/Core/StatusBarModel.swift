@@ -256,13 +256,6 @@ private func writeInt(_ buffer: inout [UInt8], _ field: StatusBarLayout.IntField
     }
 }
 
-private func writeDouble(_ buffer: inout [UInt8], _ field: StatusBarLayout.DoubleField, _ value: Double) {
-    let bits = value.bitPattern
-    for index in 0..<8 where field.offset + index < buffer.count {
-        buffer[field.offset + index] = UInt8((bits >> (8 * UInt64(index))) & 0xFF)
-    }
-}
-
 /// The user's status-bar overrides, as a set of typed fields.
 ///
 /// The port of the reference's `StatusBarTweak` *state*: every `override*` flag

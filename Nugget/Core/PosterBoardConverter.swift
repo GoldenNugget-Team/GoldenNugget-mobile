@@ -111,10 +111,6 @@ enum PosterBoardConverter {
     /// anything legacy.
     static let repackFamilies: Set<String> = ["Marble", "Lavender"]
 
-    enum ConversionAction: String {
-        case keep, repack, skip
-    }
-
     // MARK: - Regexes
 
     /// `NSRegularExpression` built once. The port has no other regex-heavy core
@@ -459,19 +455,6 @@ enum PosterBoardConverter {
         if descriptorDir.path.contains(mercuryProvider) { return true }
         guard let family = wallpaperFamily(descriptorDir) else { return false }
         return family.lowercased() == mercuryFamily.lowercased()
-    }
-
-    /// Whether a **device** descriptor should be repacked to Clownfish.
-    ///
-    /// Used by the rebuild flow only. The import path does not consult it:
-    /// `convertTree` converts every legacy descriptor it finds, which is what
-    /// upstream does on import too.
-    static func conversionAction(for descriptorDir: URL,
-                                 repackFamilies families: Set<String> = repackFamilies) -> ConversionAction {
-        if isMercury(descriptorDir) { return .skip }
-        if !isLegacyDescriptor(descriptorDir) { return .keep }
-        if let family = wallpaperFamily(descriptorDir), families.contains(family) { return .repack }
-        return .keep
     }
 
     // MARK: - Plane surgery

@@ -6,6 +6,12 @@
 > "judgeable by construction" changes (see the effect argument in §3). The on-device quantification
 > method is in §5.
 
+> **Note on the `GoldenComponents.swift` citations below.** That file has since been deleted as dead
+> code — the native screens never used the `Golden*` component library, and `RunLog`/`RunLogCard`
+> (`Nugget/Views/RunLog.swift`) are what actually carry the log view the audit is about. The
+> `file:line` references are therefore a snapshot of the code as it was on 2026-09-26; the findings
+> and the effects they had still stand.
+
 ## 1. Findings ranked (by real cost, not by line count)
 
 | # | Source | Mechanism | Cost | Status |

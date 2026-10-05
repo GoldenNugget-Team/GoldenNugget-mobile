@@ -124,12 +124,6 @@ struct TweakSpec: Sendable {
 
     /// Whether this tweak writes a whole dict rather than a single key.
     var writesWholeDict: Bool { multiValues != nil }
-
-    /// The keys this tweak contributes to its file, for the log line.
-    var writtenKeys: [String] {
-        if let multiValues { return multiValues.keys.sorted() }
-        return key.isEmpty ? [] : [key]
-    }
 }
 
 /// The subset of `packaging.version.Version` the registry's bounds need.

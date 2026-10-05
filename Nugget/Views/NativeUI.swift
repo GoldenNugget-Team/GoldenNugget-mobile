@@ -10,9 +10,14 @@ import UIKit
 // build, and every value is a Dynamic Type text style or a semantic system
 // colour so light and dark, and the user's text size, both work.
 //
-// The original `Golden*` component library is kept untouched in
-// `GoldenComponents.swift` / `GoldenTheme.swift` for reuse elsewhere; the
-// native screens do not depend on it.
+// The original `Golden*` design-system port — `GoldenComponents.swift` (the
+// component library) and `GoldenTheme.swift` (the palette, metrics and type
+// scale) — has been deleted as dead code: the native screens never used it, and
+// every value it carried now comes from the platform's own styles and semantic
+// colours. `GoldenTone` is the one survivor: the status-line tone slot the
+// screens still pass around, now resolved through `nativeColor` below.
+// `docs/ui-goldennugget.md` keeps the record of where the ported values came
+// from, for anyone who wants to re-derive them.
 
 /// A muted explanatory line: secondary, footnote, wraps rather than truncates.
 struct NativeNote: View {
@@ -123,7 +128,7 @@ struct NativeCollapsibleHeader: View {
 /// The app artwork at a chosen size, rounded like the home-screen icon.
 ///
 /// Self-contained on purpose: it loads the same `Logo@1x/@2x` bundle files the
-/// ported `GoldenLogo` did, but without depending on the old component library.
+/// ported `GoldenLogo` did, without depending on a component library for it.
 struct NativeLogo: View {
     var size: CGFloat = 72
 
@@ -156,6 +161,16 @@ struct NativeLogo: View {
            let image = UIImage(contentsOfFile: path) { return image }
         return nil
     }()
+}
+
+/// The tone slots the reference has named colors for.
+///
+/// The named colours themselves are gone with the rest of the design tokens
+/// (see `docs/ui-goldennugget.md`): the native screens resolve every tone through
+/// `nativeColor` below, which is what light mode, dark mode and the platform's
+/// own contrast rules expect.
+enum GoldenTone {
+    case primary, secondary, disabled, accent, success, error, warning
 }
 
 extension GoldenTone {

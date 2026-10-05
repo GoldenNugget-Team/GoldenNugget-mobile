@@ -6,9 +6,19 @@
 > Features and information architecture are **completely unchanged**: all bindings, actions, strings, logs, alerts, file pickers and share items stay exactly as they were;
 > only the colours, fonts, component styles, spacing and layout changed.
 
-Receiving side: `Nugget/Views/GoldenTheme.swift` (tokens), `Nugget/Views/GoldenComponents.swift` (components),
+Receiving side: `Nugget/Views/GoldenTheme.swift` (tokens), `Nugget/Views/NativeUI.swift` (components),
 `Nugget/Views/GoldenNuggetView.swift` (main page), `Nugget/Views/TweaksView.swift` (Tweaks page).
 Reference: the **iOS GUI** in `~/GoldenNugget` — that is the only place the GoldenNugget Mobile look was ever written down.
+
+> **Superseded (the design-system port itself).** This document is the record of the design-system
+> port, kept because it states where every token and metric came from. The ported code was later
+> deleted as dead code: the `Golden*` component library (`GoldenPage`, `GoldenCard`, `GoldenHeader`,
+> `GoldenLogo`, …) in `Nugget/Views/GoldenComponents.swift`, and with it `Nugget/Views/GoldenTheme.swift`
+> (palette, metrics, type scale) — the native screens never read either, they use `List`/`Form`,
+> Dynamic Type text styles and semantic colours. What survives is `GoldenTone` in
+> `Nugget/Views/NativeUI.swift`, the status-line tone slot, now resolved to platform colours by
+> `nativeColor`. Every name in the tables below is therefore history; the tables stay because they are
+> the only record of the reference values the port was built from.
 
 ---
 
