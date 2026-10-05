@@ -604,6 +604,11 @@ private struct PosterBoardBuilder {
     /// (see `PosterBoard`'s divergence note).
     static var configFileNames: [String] { PosterBoardResources.configConversion.keys.sorted() }
 
+    /// The descriptor's identity sidecar, `provider.descriptor.identifier` —
+    /// the first of the three identity fields the walk keeps in step, and the
+    /// one a third-party pack most often omits.
+    static let descriptorIdentifierFile = "com.apple.posterkit.provider.descriptor.identifier"
+
     mutating func walk(currentPath: URL,
                        restorePath: String,
                        isAdding: Bool = false,
@@ -631,7 +636,14 @@ private struct PosterBoardBuilder {
         var counter = 0
 
         for child in ordered {
-            if child.hasPrefix(".") || child == "__MACOSX" { continue }
+            // Finder/archive junk only, and **not** "anything starting with a
+            // dot": `.com.apple.posterkit.provider.contents.configurableOptions.plist`
+            // is a legitimate descriptor plist (Apple hides it with a leading
+            // dot) that carries `preferredRenderingConfiguration` — the poster
+            // editor reads it for depth. Skipping every dotfile drops it from the
+            // payload, and a descriptor that arrives without it has no depth
+            // controls to offer.
+            if child == "__MACOSX" || child == ".DS_Store" || child.hasPrefix("._") { continue }
             let childPath = currentPath.appendingPathComponent(child)
 
             if isAdding {
@@ -665,6 +677,24 @@ private struct PosterBoardBuilder {
                 let destination = joined(restorePath, folderName)
                 var childIsDirectory: ObjCBool = false
                 guard fm.fileExists(atPath: childPath.path, isDirectory: &childIsDirectory) else { continue }
+
+                // Third-party .tendies usually ship **without** the
+                // `provider.descriptor.identifier` sidecar. PosterKit then invents
+                // one that disagrees with `contents.userInfo` / `Wallpaper.plist`,
+                // and WallpaperKit traps building the view — so stamp it here, with
+                // the same randomized id the other two identity fields carry. The
+                // reference does this inside the `randomizeUUID` branch, i.e. only
+                // at the one level whose directories are being renamed, and never
+                // for Mercury (whose identifier is its own textual lookup key).
+                if randomizeUUID, let currentID, childIsDirectory.boolValue,
+                   !isMercury(restorePath),
+                   !fm.fileExists(atPath: childPath
+                       .appendingPathComponent(Self.descriptorIdentifierFile).path) {
+                    payloads.append(TweakPayload(domain: PosterBoard.domain,
+                                                 relativePath: joined(destination,
+                                                                      Self.descriptorIdentifierFile),
+                                                 contents: Data(String(currentID).utf8)))
+                }
 
                 if !childIsDirectory.boolValue {
                     if Self.configFileNames.contains(child) {
@@ -783,13 +813,21 @@ private struct PosterBoardBuilder {
         let fileURL = directory.appendingPathComponent(fileName)
         do {
             switch true {
-            case fileName == "com.apple.posterkit.provider.descriptor.identifier":
+            case fileName == Self.descriptorIdentifierFile:
                 return .bytes(Data(String(identifier).utf8))
             case fileName == "com.apple.posterkit.provider.contents.userInfo":
+                // Top level, and a **string**. `recursive: true` only ever
+                // *replaces* a key that is already there, and a third-party
+                // tendie's userInfo ships **without**
+                // `wallpaperRepresentingIdentifier` — so the key has to be
+                // added, not just overwritten, or WallpaperKit force-unwraps nil
+                // and traps (EXC_BREAKPOINT) in makeViewProvider. Stock
+                // descriptors hold the id as text, which is what the reference
+                // writes here.
                 return .bytes(try PosterBoardPlist.set(contentsOf: fileURL,
                                                        key: "wallpaperRepresentingIdentifier",
-                                                       value: identifier,
-                                                       recursive: true))
+                                                       value: String(identifier),
+                                                       recursive: false))
             case fileName.hasSuffix("Wallpaper.plist"):
                 // Top level only (`recursive=False`), then brought in line with
                 // the Configs (Marble) model iOS 26.4+ expects.

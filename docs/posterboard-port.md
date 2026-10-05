@@ -189,6 +189,20 @@ The port of `apply_tweak`. Three things matter:
    top-level `identifier` plus the Marble alignment (family/name forced to Lavender, the
    nested id synced with the top-level one). MercuryPoster is **skipped entirely** — its
    identifier is textual (`v6x.colorB`) and rewriting it breaks the lookup chain.
+   Two details of those rewrites are load-bearing rather than cosmetic, and both were
+   wrong here until the identity harness caught them (`scripts/posterboard-identity-check.swift`):
+
+   | Detail | Upstream | What the wrong version did |
+   |---|---|---|
+   | `wallpaperRepresentingIdentifier` is written at the **top level** (`recursive=False`) and as a **string** | `str(randomizedID)` | `recursive: true` **only ever replaces a key that already exists**, and a third-party tendie's `userInfo` ships **without** the key — so nothing was written at all (WallpaperKit force-unwraps nil and traps, `EXC_BREAKPOINT`, in `makeViewProvider`), *and* the nested `suggestionMetadata` copy of the key was overwritten with an integer |
+   | A descriptor with **no** `provider.descriptor.identifier` sidecar gets one, carrying the same id | stamped in `recursive_add`'s `randomizeUUID` branch | the sidecar was simply never created, so PosterKit invented an identifier that disagreed with the two plists |
+
+   The walk's junk skip is Finder junk (`.DS_Store`, `._*`, `__MACOSX`), **not** "anything
+   starting with a dot": `.com.apple.posterkit.provider.contents.configurableOptions.plist`
+   is a legitimate descriptor plist (Apple hides it with a leading dot) and carries
+   `preferredRenderingConfiguration`, which the poster editor reads for depth — skipping it
+   shipped a descriptor with no depth controls. (AirLift's `randomizeIdentifiers` is a
+   different path — a device-side rewrite, not an injected payload — and is unchanged.)
 3. **`update_for_family` emits XML** (`plistlib.dumps`'s default) while the reset
    preferences plist is **binary** (the reference asks for `FMT_BINARY` explicitly). The
    difference is the reference's, not a transcription slip.
@@ -318,6 +332,15 @@ scripts/typecheck.sh "" --first PosterBoard.swift
 scripts/sync-pbxproj-sources.py
 scripts/check-linked-symbols.py               # see §3.3: the gateway's C calls are a link-time contract
 python3 scripts/tweak-port-diff.py            # needs packaging; see docs/tweak-port.md §4.3
+
+# The PosterBoard identity harness (see §4 item 2) — no device, no SDK:
+#   cat Nugget/Core/PosterBoard.swift scripts/posterboard-identity-check.swift \
+#     > /tmp/pbcheck/main.swift
+#   && swiftc -swift-version 5 /tmp/pbcheck/main.swift -o /tmp/pbcheck/check
+#   && /tmp/pbcheck/check
+# Run it against `git show HEAD:Nugget/Core/PosterBoard.swift` too when a change here
+# claims to fix something: 7 of its assertions fail against the pre-fix file, which is
+# the only evidence that it can fail at all.
 ```
 
 **A gate that passes is not a gate that ran.**  `check-linked-symbols.py` is the one this port
@@ -349,6 +372,12 @@ new files therefore needs `--first`; this port was checked by excluding
 
 - **Differential test**: `tweak-port-diff.py` → 426 cases, every field equal (re-run after
   `TweakPayload` became "memory or disk"; the compile stage's behaviour is unchanged).
+- **Descriptor identity**: `posterboard-identity-check.swift` → 19 assertions over three
+  fixtures (a bare third-party Collections descriptor, a Mercury one, one that already
+  ships a sidecar). Verified in both directions: all pass on the current file, **7 fail**
+  on `git show HEAD:Nugget/Core/PosterBoard.swift` — the missing sidecar, the absent
+  `wallpaperRepresentingIdentifier`, its nested copy being clobbered with an integer, and
+  the hidden `configurableOptions.plist` being dropped.
 - **Blob shape**: `blob-shape-check.swift` → 34918 device blobs, 0 unreadable `Mode`, 0
   reference-valued scalars; the per-domain Digest rule holds.
 - **skip_setup / daemons**: both key-by-key harnesses pass.
