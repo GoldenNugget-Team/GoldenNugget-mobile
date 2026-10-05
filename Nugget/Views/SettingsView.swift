@@ -28,6 +28,16 @@ struct SettingsView: View {
     /// written by another thread while this page is open.
     @State private var logs = LogSizes()
 
+    /// The setup guide, as a full-screen cover.
+    ///
+    /// It is the same view the app opens with on a first launch, on purpose: a
+    /// second "getting started" page would be a second set of instructions to fall
+    /// out of step with the first, and the whole reason this row exists is that a
+    /// user who skipped the gate still needs it. A `NavigationLink` would have no
+    /// place to return to after "Finish setup", which on an already-set-up app
+    /// changes nothing the user can see.
+    @State private var showSetupGuide = false
+
     /// Sizes and existence of the two files a report is built from.
     private struct LogSizes: Equatable {
         var appBytes: UInt64 = 0
@@ -44,6 +54,7 @@ struct SettingsView: View {
         Form {
             aboutSection
             creditsSection
+            setupSection
             logsSection
             applySection
             developmentSection
@@ -53,6 +64,11 @@ struct SettingsView: View {
         // toggle, and a second button beside it is the duplicate-controls mess.
         .goldenSidebarButton()
         .navigationBarTitleDisplayMode(.inline)
+        .fullScreenCover(isPresented: $showSetupGuide) {
+            NavigationStack {
+                FirstRunView { showSetupGuide = false }
+            }
+        }
         .task {
             refreshLogs()
         }
@@ -122,6 +138,27 @@ struct SettingsView: View {
             Text(role)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.trailing)
+        }
+    }
+
+    // MARK: - Setup
+
+    /// The guide, reachable after the fact.
+    ///
+    /// Its own section rather than a row under Apply: those rows are switches a run
+    /// reads, and this one changes nothing about a run — it opens a screen. It
+    /// also sits above them, because it is the answer to "why is nothing
+    /// connecting", which is the question a user opens Settings with.
+    private var setupSection: some View {
+        Section("Setup") {
+            Button {
+                showSetupGuide = true
+            } label: {
+                Label("Setup guide", systemImage: "list.number")
+            }
+            NativeNote("Checks the two things this app needs before it can reach the "
+                + "device — the LocalDevVPN tunnel and a pairing record — and walks "
+                + "through both. This is the guide a first launch opens.")
         }
     }
 

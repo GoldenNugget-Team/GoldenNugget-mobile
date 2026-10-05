@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 import Minimuxer
 import Foundation
 
@@ -17,7 +16,7 @@ import Foundation
 /// the copy that goes stale is the one on the page they are reading.  The
 /// sections are reachable from the sidebar and from nowhere else.
 struct GoldenNuggetView: View {
-    @AppStorage("PairingFile") var pairingFileRaw: String?
+    @AppStorage(PairingRecord.Key.stored) var pairingFileRaw: String?
     // The tunnel addressing, persisted under the same keys `Tunnel` reads (see
     // `Tunnel.Key`), so the fields below and every probe are looking at one set
     // of values.  `@AppStorage` rather than `@State` because the tunnel is
@@ -206,7 +205,7 @@ struct GoldenNuggetView: View {
             await readDevice()
         }
         .onOpenURL { url in
-            guard Self.isPairingFileExtension(url.pathExtension) else { return }
+            guard PairingRecord.hasKnownExtension(url.pathExtension) else { return }
             importPairingFile(from: url)
         }
         // A wireless pairing that succeeded has already written the record to
@@ -448,7 +447,7 @@ struct GoldenNuggetView: View {
             tunnelDisclosure
         }
         .fileImporter(isPresented: $showPairingImporter,
-                      allowedContentTypes: Self.pairingFileTypes) { result in
+                      allowedContentTypes: PairingRecord.types) { result in
             switch result {
             case .success(let url):
                 importPairingFile(from: url)
@@ -721,61 +720,14 @@ struct GoldenNuggetView: View {
             + "disabled until the next import")
     }
 
-    /// Extensions accepted by the pairing-file picker and the `onOpenURL`
-    /// handler.  **One list**: the picker built its array from these names and
-    /// the URL handler hard-coded the same three again, so adding a fourth
-    /// would have worked in one path and silently not in the other.
-    static let pairingFileExtensions = ["mobiledevicepairing", "mobiledevicepair", "mobiledeviceconfig"]
-
-    static let pairingFileTypes: [UTType] = pairingFileExtensions.compactMap {
-        UTType(filenameExtension: $0, conformingTo: .data)
-    }
-
-    static func isPairingFileExtension(_ ext: String) -> Bool {
-        pairingFileExtensions.contains(ext.lowercased())
-    }
-
-    /// Whether the app is willing to hand these bytes to minimuxer.
+    /// The pairing record's format facts — the accepted extensions, the shape
+    /// rules, and the import contract — live in `PairingRecord`.
     ///
-    /// Deliberately **format-agnostic**: the pairing format belongs to the
-    /// library, not to this file.  A pairing record is one of two shapes —
-    /// `.rppairing` (`identifier`, `private_key`, `public_key`; iOS 17+
-    /// RemotePairing) or `.lockdown` (`UDID`, `SystemBUID`, `EscrowBag`, the
-    /// certificates) — and **only the second carries a `UDID`**.
-    ///
-    /// This used to require a non-empty top-level `UDID` outright, which is a
-    /// lockdown-only fact.  On an iOS 17+ device, where the pairing file is an
-    /// `.rppairing` record, that check rejected **every file the user could
-    /// possibly import**: the import (which checked nothing) accepted it and the
-    /// device paired fine, and then the restore path refused the very same bytes
-    /// on the next launch and reported "no pairing record" — the pairing file
-    /// "disappearing after a restart".  Exactly backwards, and invisible.
-    ///
-    /// So the app asserts only what it can assert alone: non-empty, a plist, a
-    /// non-empty top-level dictionary.  Whether it is a *recognised* record is
-    /// `PairingFileParser`'s answer, and the library gives it — naming the
-    /// missing keys — from `start()`, whose error this app already surfaces
-    /// (see `startMinimuxer`).  Do not reintroduce a key list here: a second
-    /// copy of the format's rules is what went wrong the first time.
-    static func usablePairingRecord(_ raw: String) -> Bool {
-        guard let data = raw.data(using: .utf8),
-              let obj = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
-              let dict = obj as? [String: Any]
-        else { return false }
-        return !dict.isEmpty
-    }
-
-    /// What a candidate record actually contains, for the log line — a rejected
-    /// record has to be diagnosable from the log alone, because the alternative
-    /// on a phone is "minimuxer did not start" with nothing to go on.
-    ///
-    /// Keys only, no verdict: this used to append `[UDID]` / `[no UDID]`, which
-    /// reads as a judgement about validity and is not one — an `.rppairing`
-    /// record is valid *without* a `UDID`.
-    private static func pairingSourceLabel(_ raw: String) -> String {
-        guard let keys = pairingFileTopLevelKeys(raw) else { return "not a parseable plist" }
-        return keys.isEmpty ? "(no keys)" : "keys: \(keys.sorted().joined(separator: ", "))"
-    }
+    /// They were this page's statics, which meant the setup guide had to either
+    /// reach into `GoldenNuggetView` for them or copy them. Both are worse than
+    /// one home for the format: a copy is a second rule set that can disagree with
+    /// the restore path, and reaching into a page's statics is a dependency from
+    /// a view to another view that has nothing to do with it.
 
     /// Make sure a usable pairing record exists on disk, and report whether one
     /// does.  Run on every launch, before `startMinimuxer()`.
@@ -820,18 +772,18 @@ struct GoldenNuggetView: View {
 
         for (source, rawOpt) in candidates {
             guard let raw = rawOpt?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { continue }
-            guard Self.usablePairingRecord(raw) else {
-                GoldenNuggetEngine.shared.log("pairing record rejected (\(source)): \(Self.pairingSourceLabel(raw))")
+            guard PairingRecord.usable(raw) else {
+                GoldenNuggetEngine.shared.log("pairing record rejected (\(source)): \(PairingRecord.sourceLabel(raw))")
                 continue
             }
             let onDisk = (try? String(contentsOf: dest, encoding: .utf8))?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if onDisk == raw {
-                GoldenNuggetEngine.shared.log("pairing record: \(source) (\(Self.pairingSourceLabel(raw)))")
+                GoldenNuggetEngine.shared.log("pairing record: \(source) (\(PairingRecord.sourceLabel(raw)))")
             } else {
                 do {
                     try raw.write(to: dest, atomically: true, encoding: .utf8)
-                    GoldenNuggetEngine.shared.log("pairing record re-imported from \(source) into \(dest.lastPathComponent) (\(Self.pairingSourceLabel(raw)))")
+                    GoldenNuggetEngine.shared.log("pairing record re-imported from \(source) into \(dest.lastPathComponent) (\(PairingRecord.sourceLabel(raw)))")
                 } catch {
                     GoldenNuggetEngine.shared.log("pairing record found (\(source)) but could not be written to Documents: \(error.localizedDescription)")
                 }
@@ -853,73 +805,18 @@ struct GoldenNuggetView: View {
         return false
     }
 
-    /// Import a pairing record the user picked.
+    /// Import a pairing record the user picked, and claim it for this page.
     ///
-    /// The contract is **validate → write → read back → only then claim it**,
-    /// and each step is here for a way the previous version failed.
+    /// The contract — validate → write → read back — is `PairingRecord`'s, not
+    /// this page's, and it moved out for a reason beyond tidiness: the setup guide
+    /// is a second way in, and a second copy of the acceptance rules is a second
+    /// chance to accept a file the restore path will later refuse. See
+    /// `PairingRecord.accept(contentsOf:)` for what each step defends against.
     ///
-    /// It read the file, wrote it out, and set `pairingFileRaw` /
-    /// `pairingFileURL` from whatever it happened to hold — without looking at
-    /// the content and without checking that the write landed.  Nothing threw
-    /// for content the *restore* path then refused, so a record that came back
-    /// empty or truncated (a document-picker URL that is an iCloud/other-app
-    /// placeholder read before it was materialised is the common one) was
-    /// written as a 0-byte file, reported as a success — the alert only fires on
-    /// a thrown error, and `write` does not throw for empty content — and read
-    /// back as "no pairing record" on the next launch.
-    ///
-    /// What it validates **with** matters as much as that it validates: see
-    /// `usablePairingRecord`.  Checking the format's rules here is what turned
-    /// a working import into a rejected one, so this defers the format verdict
-    /// to minimuxer.
+    /// What stays here is the half that is genuinely the page's: its own state,
+    /// the log line, and starting the core.
     func loadPairingFile(from url: URL) throws {
-        // Document-picker URLs are security-scoped: reading one without
-        // `startAccessingSecurityScopedResource` fails with "you don't have
-        // permission to view it".
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-
-        // Read bytes, not a string: an empty or missing file has to be
-        // distinguishable from a decode failure, and both have to be reported
-        // in words rather than as a bare Cocoa error.  minimuxer's parser takes
-        // text, so anything that is not UTF-8 (a binary plist, say) is refused
-        // here instead of being silently mangled on the way to disk.
-        let data = try Data(contentsOf: url)
-        guard let raw = String(data: data, encoding: .utf8) else {
-            throw GoldenNuggetError("\(url.lastPathComponent) is not UTF-8 text "
-                + "(\(data.count) bytes). A pairing file has to be an XML plist, which is what "
-                + "minimuxer parses — a binary plist has to be converted first.")
-        }
-
-        let record = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !record.isEmpty else {
-            throw GoldenNuggetError("\(url.lastPathComponent) is empty — nothing to import. "
-                + "If it lives in iCloud Drive, open it in Files once so it is downloaded, "
-                + "then import it again.")
-        }
-        guard Self.usablePairingRecord(record) else {
-            throw GoldenNuggetError("\(url.lastPathComponent) is not a property list "
-                + "(\(Self.pairingSourceLabel(record))). A pairing file has to be an XML plist — "
-                + "minimuxer parses nothing else.")
-        }
-
-        // Store the **normalised** form: it is what `reimportPairingFile()`
-        // compares against on the way back in and what minimuxer is handed, so
-        // keeping the untrimmed original would only ever differ by whitespace
-        // the restore path silently strips.
-        let dest = AppPaths.pairingFile
-        try record.write(to: dest, atomically: true, encoding: .utf8)
-
-        // Read it back.  A write that did not land is indistinguishable from one
-        // that did until the next launch reads it — which is exactly the delay
-        // that made this look like data loss instead of a failed import.
-        let onDisk = try String(contentsOf: dest, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard onDisk == record else {
-            throw GoldenNuggetError("The pairing file did not survive being written to "
-                + "\(dest.lastPathComponent): \(onDisk.count) of \(record.count) bytes came "
-                + "back. Import it again.")
-        }
+        let record = try PairingRecord.accept(contentsOf: url)
 
         // A successful import is the user's answer to an earlier reset, so the
         // persisted flag goes back down.  Leaving it up would import the record
@@ -928,9 +825,9 @@ struct GoldenNuggetView: View {
         // the other way.
         autoImportDisabled = false
         pairingFileRaw = record
-        pairingFileURL = dest.path
-        GoldenNuggetEngine.shared.log("pairing file imported: \(Self.pairingSourceLabel(record)) "
-            + "→ \(dest.lastPathComponent), \(record.count) bytes, read back OK")
+        pairingFileURL = AppPaths.pairingFile.path
+        GoldenNuggetEngine.shared.log("pairing file imported: \(PairingRecord.sourceLabel(record)) "
+            + "→ \(AppPaths.pairingFile.lastPathComponent), \(record.count) bytes, read back OK")
         startMinimuxer()
     }
 
@@ -1213,7 +1110,7 @@ struct GoldenNuggetView: View {
                     // `await` is load-bearing, not decorative: this runs on a
                     // `DispatchQueue.global` task while `View` is `@MainActor`,
                     // so it is the hop that keeps the call legal.
-                    if let keys = await Self.pairingFileTopLevelKeys(pairingFileRaw) {
+                    if let keys = await PairingRecord.topLevelKeys(pairingFileRaw) {
                         GoldenNuggetEngine.shared.log("pairing file top-level keys: \(keys.isEmpty ? "(empty)" : keys.sorted().joined(separator: ", "))")
                     } else {
                         GoldenNuggetEngine.shared.log("pairing file: NOT a parseable plist")
@@ -1256,23 +1153,6 @@ struct GoldenNuggetView: View {
                 }
             }
         }
-    }
-
-    /// The record's top-level keys, for the import and start diagnostics.
-    ///
-    /// Keys only — deliberately no judgement about which of them *should* be
-    /// there.  The required set differs per protocol (`.rppairing` needs
-    /// `identifier`/`private_key`/`public_key` and no `UDID`; `.lockdown` needs
-    /// `UDID` and the certificates), that rule lives in `PairingFileParser`, and
-    /// the copy of it that used to be here — "a top-level UDID string is
-    /// mandatory" — is exactly what rejected every valid iOS 17+ pairing file.
-    static func pairingFileTopLevelKeys(_ raw: String) -> [String]? {
-        guard let data = raw.data(using: .utf8) else { return nil }
-        guard let obj = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) else {
-            return nil
-        }
-        guard let dict = obj as? [String: Any] else { return nil }
-        return Array(dict.keys)
     }
 
     /// Route engine log lines into `RunLog`.

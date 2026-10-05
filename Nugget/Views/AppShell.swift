@@ -77,6 +77,14 @@ struct RootView: View {
     /// poll bound to a page would stop and restart as the user moves around.
     @Environment(\.scenePhase) private var scenePhase
 
+    /// The one-time setup gate.
+    ///
+    /// Observed rather than a second `@AppStorage` on the same key: the store is
+    /// the flag, so finishing the guide has to lift the gate in the same run that
+    /// set it. A mirror would have made the two disagree for exactly one frame —
+    /// the frame where the user is looking at the button they just pressed.
+    @ObservedObject private var firstRun = FirstRunSettings.shared
+
     /// The detail stack.  The single source of truth for what is showing: empty
     /// means home, which is also why the menu's "current" is `path.last ?? .home`
     /// and there is no second variable to keep in sync.
@@ -123,11 +131,19 @@ struct RootView: View {
     /// copy, and a button labelled "Reset pairing file" must not destroy it.
     /// A successful import clears the flag again (see `loadPairingFile`), so
     /// importing after a reset restores the normal launch behaviour.
-    @AppStorage("PairingFileAutoImportDisabled") private var autoImportDisabled = false
+    @AppStorage(PairingRecord.Key.autoImportDisabled) private var autoImportDisabled = false
 
     var body: some View {
         Group {
-            if width == .compact { compactShell } else { regularShell }
+            // The gate, not a sheet and not a pushed page: the app cannot do
+            // anything at all until both prerequisites are in place, so the shell
+            // behind it would be a menu of things that each fail identically.
+            // A sheet would leave that same shell one swipe away.
+            if firstRun.isComplete {
+                if width == .compact { compactShell } else { regularShell }
+            } else {
+                FirstRunView()
+            }
         }
         // The native screens resolve every colour and text style from the system,
         // so the app follows the device appearance.
@@ -138,8 +154,13 @@ struct RootView: View {
         // `.task(id:)` rather than an `onChange` because the id covers the first
         // appearance too — the app opens into `.active` and must start polling
         // without waiting for a change that may never come.
-        .task(id: scenePhase) {
-            guard scenePhase == .active else {
+        //
+        // The id carries the gate's state as well: while the guide is up there is
+        // no pairing and no tunnel, so a lockdown poll can only log a device that
+        // is not there yet — and finishing the guide has to start it, which a
+        // scenePhase-only id would not notice until the next foreground.
+        .task(id: firstRun.isComplete ? scenePhase : nil) {
+            guard scenePhase == .active, firstRun.isComplete else {
                 DeviceIdentityMonitor.shared.stop()
                 return
             }
