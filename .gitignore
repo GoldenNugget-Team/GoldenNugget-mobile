@@ -49,3 +49,9 @@ gn*.log
 # Ignoring them keeps a wording edit from showing up as a repo change; covers
 # the per-language files (RELEASE_NOTES.md, RELEASE_NOTES.en.md, …).
 RELEASE_NOTES*.md
+
+
+# Dev env shit
+.vscode
+.zed
+tasks.md

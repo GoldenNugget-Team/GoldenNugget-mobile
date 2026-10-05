@@ -106,13 +106,14 @@ Want to see your name here? Open [Pull Request](https://github.com/GoldenNugget-
 > ## Mobilegestalt
 > Don't even ask me for it. It will be NEVER implemented again. 
 
-## Requirements:
-1: LocalDevVpn (can be installed from App Store)\
-2: WiFi\
-3: Disabled Find My
+## Requirements to build:
+Xcode 26+ or xtool with iOS 26+ SDK\
+Rust (NeoSpring and airlift)\
+Swift 6+ (Untested with older, may work)
+macOS 15.6 Sequoia+ or Ubuntu 22.04+
 
 # Contributing and forking.
-See [CONTRIBUTING.md](https://github.com/awesomenull-dev/GoldenNugget/blob/main/CONTRIBUTING.md), want fork instead? Then see [FORKING.md](https://github.com/awesomenull-dev/GoldenNugget/blob/main/FORKING.md)
+See [CONTRIBUTING.md](https://github.com/GoldenNugget-Team/GoldenNugget-mobile/blob/main/CONTRIBUTING.md), want fork instead? Then see [FORKING.md](https://github.com/GoldenNugget-Team/GoldenNugget-mobile/blob/main/FORKING.md)
 
 ## Credits
 - [awesomenull] Lead developer
