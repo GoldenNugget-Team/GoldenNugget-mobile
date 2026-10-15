@@ -585,6 +585,8 @@ class GoldenNuggetEngine {
             if dev.skipAfcMedia {
                 log("development mode: skipping the AFC media pull (Dev.SkipAfcMedia)")
             } else {
+                clearProgress()
+                log("AFC media: collecting media files…")
                 await mediaBackup(deletingOriginals: false)
             }
         } else {
@@ -593,6 +595,8 @@ class GoldenNuggetEngine {
             prune = false
         }
 
+        clearProgress()
+        log("Pruning and injecting tweaks…")
         try await BackupInjector.pruneAndInject(
             backupRoot: backupRoot,
             udid: udid,
@@ -760,6 +764,7 @@ class GoldenNuggetEngine {
             // cost the user the tweak run they started.
             log("AFC media: FAILED — \(error.localizedDescription)")
         }
+        clearProgress()
     }
 
     // MARK: - Protective flow stages
@@ -789,6 +794,7 @@ class GoldenNuggetEngine {
             self.logProgress("backup progress", overall)
         }
         log("Protective backup complete.")
+        clearProgress()
         return backupRoot
     }
 
@@ -910,6 +916,8 @@ class GoldenNuggetEngine {
         let deviceDir = AppPaths.deviceDir(backupRoot: backupRoot, udid: udid)
         log(ManifestStore(deviceDir: deviceDir).auditAgainstDisk())
 
+        clearProgress()
+        log("Restoring backup… (this is the stage that finalizes on the device)")
         let code = try await ChannelRecovery.retry(
             label: label,
             attempts: 3,
