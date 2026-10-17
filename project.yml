@@ -111,10 +111,11 @@ settings:
     CURRENT_PROJECT_VERSION: 3
     MARKETING_VERSION: 9.6.0
     # The app icon is an Icon Composer document (`Assets.xcassets/AppIcon.icon`),
-    # not loose PNGs: it carries a `luminosity=dark` layer, so the system picks
-    # the dark artwork on a dark home screen and the light one otherwise.  Loose
-    # PNGs in the bundle root cannot express that — iOS only chooses between them
-    # by size — and one sitting there shadows the compiled rendition.
+    # not loose PNGs: it layers one glass image over an `automatic-gradient`
+    # fill, and actool expands that into the light/dark/tintable renditions the
+    # system picks between on a dark home screen and in tinting.  Loose PNGs in
+    # the bundle root cannot express that — iOS only chooses between them by
+    # size — and one sitting there shadows the compiled rendition.
     #
     # actool has to be given the document as an input; see the `sources` note
     # below.  Both builders then end up with the same car: Xcode runs actool over

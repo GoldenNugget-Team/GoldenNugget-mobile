@@ -4,6 +4,14 @@
 <dict>
 	<key>CFBundleIcons</key>
 	<dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>ScrappedIcon</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>ScrappedIcon</string>
+			</dict>
+		</dict>
 		<key>CFBundlePrimaryIcon</key>
 		<dict>
 			<key>CFBundleIconFiles</key>
@@ -16,6 +24,14 @@
 	</dict>
 	<key>CFBundleIcons~ipad</key>
 	<dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>ScrappedIcon</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>ScrappedIcon</string>
+			</dict>
+		</dict>
 		<key>CFBundlePrimaryIcon</key>
 		<dict>
 			<key>CFBundleIconFiles</key>
