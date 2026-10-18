@@ -284,11 +284,18 @@ extension PosterBoard {
     ///   - deviceVersion: the device's `ProductVersion`; the reset and refresh
     ///     preference plists grow two extra keys at 26.4 and the store layout
     ///     moved with them.
+    ///   - templates: the PosterBoard-domain templates, which are wallpaper
+    ///     sources and are extracted into `workingDirectory` alongside the
+    ///     packs so the single walk below finds them.  The reference does the
+    ///     same thing one expression earlier in `apply_tweak`
+    ///     (`len(tendies) == 0 and len(templates) == 0 and videoFile == None`
+    ///     is the early return, and `templates` is one of its three terms).
     ///   - workingDirectory: scratch space, wiped by the caller.  Video frames
     ///     and extracted packs are written here and referenced by path — they
     ///     are far too big to hold as `Data`.
     static func compile(
         selection: PosterBoardSelection,
+        templates: [TemplateFile] = [],
         structureVersion: Int,
         database: URL?,
         deviceVersion: String,
@@ -326,10 +333,12 @@ extension PosterBoard {
             return payloads
         }
 
-        // 3. Nothing but resets requested and none selected: the reference
-        //    returns here too (`len(tendies) == 0 and len(templates) == 0 and
-        //    videoFile == None`).
-        guard !selection.tendies.isEmpty || selection.video != nil else {
+        // 3. Nothing to do.  The reference's early return covers tendies,
+        //    templates and the video together — `len(tendies) == 0 and
+        //    len(templates) == 0 and videoFile == None` — so a template on its
+        //    own keeps this branch open, which is why `templates` is a term here
+        //    and not only in the walk below.
+        guard !selection.tendies.isEmpty || selection.video != nil || !templates.isEmpty else {
             log("PosterBoard: nothing selected.")
             return []
         }
@@ -338,9 +347,10 @@ extension PosterBoard {
         try? fm.removeItem(at: workingDirectory)
         try fm.createDirectory(at: workingDirectory, withIntermediateDirectories: true)
 
-        // 4. Generated video first, then the packs — the reference's order, and
-        //    it matters: a live-photo pack's descriptor is written by the video
-        //    step, and both are then found by the single walk below.
+        // 4. Generated video first, then the packs, then the templates — the
+        //    reference's order, and it matters: a live-photo pack's descriptor
+        //    is written by the video step, and all three are then found by the
+        //    single walk below.
         if let plan = selection.plan {
             try await PosterBoardVideo.generate(plan: plan,
                                                 outputDirectory: workingDirectory,
@@ -359,6 +369,19 @@ extension PosterBoard {
                 convertLegacyPack(tendie.name, at: destination, log: log)
             }
         }
+        // Templates go in after the packs, in their own folders under the same
+        // working directory, and are **not** legacy-converted: the reference
+        // appends them to `extracted` with `True` for the convert flag —
+        // unconditionally, whatever the answer was for any pack — so a template
+        // is always pushed through the conversion.
+        for (index, template) in templates.enumerated() {
+            let destination = workingDirectory.appendingPathComponent(
+                String(format: "t%03d-%@", index, sanitised(template.url.lastPathComponent)),
+                conformingTo: .data)
+            log("  → configuring template \(template.title) (\(template.summary))")
+            try template.extract(to: destination)
+            convertLegacyPack(template.title, at: destination, log: log)
+        }
 
         // 5. Walk what is on disk into payloads, staging one config item per
         //    added descriptor on the way.
@@ -367,27 +390,37 @@ extension PosterBoard {
         payloads.append(contentsOf: builder.payloads)
 
         // 6. The database.  A wallpaper that is not in it does not exist.
-        guard let database else {
+        //
+        //    A template that ships **descriptors** needs one exactly as a pack
+        //    does — the walk above stages a config item per descriptor it finds,
+        //    and those items are what the rows are built from.  A template that
+        //    ships none stages no items, and demanding a database for it would
+        //    make "apply this template to a device that has no wallpapers yet"
+        //    fail on a fetch whose result would not be used.
+        let stagedItems = builder.configs
+        if database == nil && !stagedItems.isEmpty {
             throw GoldenNuggetError(
                 "PosterBoard has no database to add these wallpapers to. Fetch the device's "
                 + "PosterBoard database first (the page's database card) — the store's "
                 + "database is what makes a wallpaper appear in the picker, and it cannot be "
                 + "synthesised: it carries the device's own row set.")
         }
-        let staged = try PosterBoardStore.stitch(database: database,
-                                                 items: builder.configs,
-                                                 workingDirectory: workingDirectory)
-        payloads.append(TweakPayload(domain: domain,
-                                     relativePath: storePath(version) + "/" + databaseFileName,
-                                     source: staged))
-        // The store runs in WAL mode. Replacing only the main file while a stale
-        // -wal/-shm stays behind makes the next open replay old frames over the
-        // fresh database — "database disk image is malformed", or random
-        // wallpaper breakage. Ship 0-byte companions so it starts clean.
-        for suffix in ["-wal", "-shm"] {
+        if let database {
+            let staged = try PosterBoardStore.stitch(database: database,
+                                                     items: stagedItems,
+                                                     workingDirectory: workingDirectory)
             payloads.append(TweakPayload(domain: domain,
-                                         relativePath: storePath(version) + "/" + databaseFileName + suffix,
-                                         contents: Data()))
+                                         relativePath: storePath(version) + "/" + databaseFileName,
+                                         source: staged))
+            // The store runs in WAL mode. Replacing only the main file while a stale
+            // -wal/-shm stays behind makes the next open replay old frames over the
+            // fresh database — "database disk image is malformed", or random
+            // wallpaper breakage. Ship 0-byte companions so it starts clean.
+            for suffix in ["-wal", "-shm"] {
+                payloads.append(TweakPayload(domain: domain,
+                                             relativePath: storePath(version) + "/" + databaseFileName + suffix,
+                                             contents: Data()))
+            }
         }
 
         // 7. Force refresh: upstream's `auto_refresh_posterboard`, on by default.

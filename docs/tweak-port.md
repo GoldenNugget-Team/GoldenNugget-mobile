@@ -96,17 +96,26 @@ silently dropped.
 | Icon Themes | needs a persistent icon resource library |
 | Daemons (incl. `ClearScreenTimeAgentPlist`) | force-disabling launchd daemons is the highest-risk item; and it needs a per-switch UI over 90 `INTERFACE_KEYS` |
 
+> **Amended 2026-10-18:** **Templates is now ported** — `.batter` files, all five option
+> types, a hand-written `.caml` XML engine, and both delivery routes (a PosterBoard-domain
+> template rides with the wallpapers; any other restores into its own `AppDomain-*`).
+> `Sparserestore-` templates are refused with the reason on screen, because this project's
+> sparse route was removed on 2026-09-19. It is a page of its own rather than a tab on
+> the PosterBoard page, precisely because a template need not be about wallpapers. See
+> **`docs/template-port.md`**. Its row above stays for the record: it is the state as of
+> 2026-09-24.
+>
 > **Amended 2026-09-27:** Daemons has since been ported — `TweakCatalogDaemons.swift`
 > (generated) plus `Nugget/Views/DaemonsView.swift`, the ScreenTime nullify included — so
 > the last row records the state as of 2026-09-24, not today. It is also the page a reset
 > can act on (§2.4).
 >
 > **Amended 2026-09-27:** so has **PosterBoard** — wallpaper packs, video wallpapers and
-> the store resets, Templates still excluded; see `docs/posterboard-port.md`. Its row
-> stays for the same reason, and it is still reported by a preset import: the reference
-> **itself** refuses to serialise wallpapers ("device-specific and heavy, so they must
-> not travel with a preset"), so there is nothing in a preset to carry. The reason text
-> now points at the PosterBoard page rather than at a missing port.
+> the store resets; see `docs/posterboard-port.md`. Its row stays for the same reason, and
+> it is still reported by a preset import: the reference **itself** refuses to serialise
+> wallpapers ("device-specific and heavy, so they must not travel with a preset"), so there
+> is nothing in a preset to carry. The reason text now points at the PosterBoard page
+> rather than at a missing port.
 
 ---
 

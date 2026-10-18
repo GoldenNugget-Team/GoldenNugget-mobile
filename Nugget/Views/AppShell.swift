@@ -22,6 +22,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
     case tweaks
     case presets
     case posterBoard
+    case templates
     case wallpaperDownloads
     case statusBar
     case wallet
@@ -55,6 +56,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
         case .tweaks: "Tweaks"
         case .presets: "Presets"
         case .posterBoard: "PosterBoard"
+        case .templates: "Templates"
         case .wallpaperDownloads: "Download Wallpapers"
         case .statusBar: "Status Bar"
         case .wallet: "Wallet"
@@ -72,6 +74,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
         case .tweaks: "slider.horizontal.3"
         case .presets: "tray.2"
         case .posterBoard: "photo.artframe"
+        case .templates: "slider.horizontal.below.rectangle"
         case .wallpaperDownloads: "square.and.arrow.down"
         case .statusBar: "antenna.radiowaves.left.and.right"
         case .wallet: "creditcard.fill"
@@ -129,6 +132,11 @@ struct RootView: View {
     /// **Apply on the home page**, so as page state it would be destroyed by the
     /// act of walking over to press it.
     @State private var statusBarSelection = StatusBarSelection()
+    /// The templates page's selection, hoisted for the same reason.  It is
+    /// delivered by the same Apply, and a template's option values are the most
+    /// expensive thing on any page to rebuild — a picker and a colour per
+    /// template, none of which the device knows anything about.
+    @State private var templateSelection = TemplateSelection()
     /// Launch auto-start bookkeeping, hoisted for the same reason as the
     /// selection: the flags guard a process-wide singleton
     /// (`startMinimuxer`'s lock rejects *concurrent* attempts only), so they
@@ -192,6 +200,11 @@ struct RootView: View {
         .task {
             posterBoardSelection.loadFromDisk()
             statusBarSelection.loadFromDisk()
+            // No device version here on purpose: this runs at launch, possibly
+            // before the tunnel is up, and a template that declares a version
+            // range would then be dropped for the whole session.  The Templates
+            // page re-reads with the version once it has one.
+            templateSelection.loadFromDisk()
         }
     }
 
@@ -271,6 +284,7 @@ struct RootView: View {
         GoldenNuggetView(tweakSelection: $tweakSelection,
                          posterBoardSelection: $posterBoardSelection,
                          statusBarSelection: $statusBarSelection,
+                         templateSelection: $templateSelection,
                          didAutoStart: $didAutoStart,
                          autoImportDisabled: $autoImportDisabled)
             .navigationDestination(for: AppDestination.self) { destination in
@@ -285,6 +299,8 @@ struct RootView: View {
                     PresetManagerView(selection: $tweakSelection)
                 case .posterBoard:
                     PosterBoardView(selection: $posterBoardSelection)
+                case .templates:
+                    TemplatesView(selection: $templateSelection)
                 case .wallpaperDownloads:
                     WallpaperDownloadsView(selection: $posterBoardSelection)
                 case .statusBar:

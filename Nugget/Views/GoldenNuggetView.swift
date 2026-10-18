@@ -67,6 +67,10 @@ struct GoldenNuggetView: View {
     /// The status-bar page's selection, hoisted for the same reason: it is edited
     /// on its own page and delivered by the Apply here.
     @Binding var statusBarSelection: StatusBarSelection
+    /// The templates page's selection, hoisted for the same reason and read here
+    /// for the same one: a `.batter` template's option values are edited on their
+    /// own page and delivered by the Apply here.
+    @Binding var templateSelection: TemplateSelection
     /// The pending debounced autosave, cancelled and replaced on every change.
     @State private var autosaveTask: Task<Void, Never>?
     /// The device line's data, from the shared monitor rather than as page state.
@@ -139,11 +143,13 @@ struct GoldenNuggetView: View {
     init(tweakSelection: Binding<TweakSelection>,
          posterBoardSelection: Binding<PosterBoardSelection>,
          statusBarSelection: Binding<StatusBarSelection>,
+         templateSelection: Binding<TemplateSelection>,
          didAutoStart: Binding<Bool>,
          autoImportDisabled: Binding<Bool>) {
         _tweakSelection = tweakSelection
         _posterBoardSelection = posterBoardSelection
         _statusBarSelection = statusBarSelection
+        _templateSelection = templateSelection
         _didAutoStart = didAutoStart
         _autoImportDisabled = autoImportDisabled
     }
@@ -704,22 +710,29 @@ struct GoldenNuggetView: View {
     private var paired: Bool { pairingFileURL != nil }
 
     /// Either source of work is enough: a run is worth starting when there are tweaks,
-    /// when there are wallpapers, or both.
+    /// when there are wallpapers, when there are templates, or any combination.
     private var canApply: Bool {
-        paired && !running && (tweakSelection.enabledCount > 0 || posterBoardSelection.isActive)
+        paired && !running && (tweakSelection.enabledCount > 0 || posterBoardSelection.isActive
+                               || templateSelection.usesDomains)
     }
 
     /// The button is named for what it will actually carry.  "Apply Tweaks" was the
     /// whole truth while the tweaks were the only thing an apply had; the PosterBoard
     /// selection now rides the same pass, and a button that under-reports its own
     /// payload is how a user ends up surprised by a wallpaper they forgot they picked.
+    ///
+    /// Templates are counted the same way, and with the same caveat made explicit:
+    /// `usesDomains`, not `isActive`, because a template that asks for sparserestore
+    /// has nothing this app can deliver — a run started for it alone would take a
+    /// full backup and change nothing.
     private var applyTitle: String {
-        switch (tweakSelection.enabledCount > 0, posterBoardSelection.isActive) {
-        case (true, true): return "Apply Tweaks & Wallpapers"
-        case (false, true): return "Apply Wallpapers"
-        case (true, false): return "Apply Tweaks"
-        case (false, false): return "Apply"
-        }
+        let names = [
+            tweakSelection.enabledCount > 0 ? "Tweaks" : nil,
+            posterBoardSelection.isActive ? "Wallpapers" : nil,
+            templateSelection.usesDomains ? "Templates" : nil,
+        ].compactMap { $0 }
+        if names.isEmpty { return "Apply" }
+        return "Apply " + names.joined(separator: " & ")
     }
 
     private var applyNote: String {
@@ -732,7 +745,24 @@ struct GoldenNuggetView: View {
                 + "so it takes one extra exchange.")
         } else {
             lines.append("Nothing is selected on the PosterBoard page, so this run carries "
-                + "only the tweaks.")
+                + "no wallpapers.")
+        }
+        if templateSelection.isActive {
+            if templateSelection.usesDomains {
+                lines.append("This run also delivers \(templateSelection.describe) from the "
+                    + "Templates page. A PosterBoard template rides along with the wallpapers; "
+                    + "any other one restores into the app container its `domain` names.")
+            } else {
+                lines.append("The only template selected asks for sparserestore, which this app "
+                    + "does not implement, so nothing is delivered from the Templates page and "
+                    + "this run is not started for it.")
+            }
+            let blocked = templateSelection.undeliverable
+            if !blocked.isEmpty {
+                lines.append("Left out of this run: "
+                    + blocked.map { "\($0.template.title) — \($0.reason)" }.joined(separator: "; ")
+                    + ".")
+            }
         }
         return lines.joined(separator: "\n\n")
     }
@@ -1028,6 +1058,7 @@ struct GoldenNuggetView: View {
         let snapshot = tweakSelection
         let wallpapers = posterBoardSelection
         let statusBar = statusBarSelection
+        let templates = templateSelection
         let device = identity
         Task {
             var text = ""
@@ -1038,6 +1069,7 @@ struct GoldenNuggetView: View {
                 try await GoldenNuggetEngine.shared.applyTweaks(selection: snapshot,
                                                                 posterBoard: wallpapers,
                                                                 statusBar: statusBar,
+                                                                templates: templates,
                                                                 deviceVersion: device.version,
                                                                 isIPhone: device.isIPhone)
                 text = "Applied. Reboot the device."

@@ -223,6 +223,7 @@ class GoldenNuggetEngine {
         selection: TweakSelection,
         posterBoard: PosterBoardSelection,
         statusBar: StatusBarSelection,
+        templates: TemplateSelection,
         deviceVersion: String,
         isIPhone: Bool
     ) async throws {
@@ -234,6 +235,7 @@ class GoldenNuggetEngine {
             try await applyTweaksRun(selection: selection,
                                      posterBoard: posterBoard,
                                      statusBar: statusBar,
+                                     templates: templates,
                                      deviceVersion: deviceVersion,
                                      isIPhone: isIPhone)
         }
@@ -250,6 +252,7 @@ class GoldenNuggetEngine {
         selection: TweakSelection,
         posterBoard: PosterBoardSelection,
         statusBar: StatusBarSelection,
+        templates: TemplateSelection,
         deviceVersion: String,
         isIPhone: Bool
     ) async throws {
@@ -304,10 +307,11 @@ class GoldenNuggetEngine {
             : SkipSetup.Build(payloads: [], warnings: [])
 
         guard !compiled.payloads.isEmpty || !skipSetup.payloads.isEmpty || posterBoard.isActive
-                || statusBar.isActive else {
+                || statusBar.isActive || templates.usesDomains else {
             throw GoldenNuggetError("Nothing to apply: no tweak is enabled (or every enabled one "
-                + "was skipped), skip setup is off, the status bar is untouched, and there is "
-                + "nothing selected on the PosterBoard page.")
+                + "was skipped), skip setup is off, the status bar is untouched, there is "
+                + "nothing selected on the PosterBoard page, and no template delivers through a "
+                + "backup domain.")
         }
         log("Tweaks: \(compiled.payloads.count) file(s) from \(compiled.locations.count) plist(s)")
         for location in compiled.locations { log("  → \(location.rawValue)") }
@@ -326,6 +330,53 @@ class GoldenNuggetEngine {
         let posterBoardMode = PosterBoardApplyModeSettings.current
         if posterBoard.isActive && posterBoardMode == .airlift {
             try checkAirliftCanApply(posterBoard: posterBoard, deviceVersion: deviceVersion)
+        }
+
+        // Templates, if the page has any.  Two routes, and which one a template
+        // takes is decided by its own `domain` — `templates_tweak.apply_tweak`
+        // makes the same split: a PosterBoard template rides the wallpapers, and
+        // everything else is walked here into payloads.
+        var templatePayloads: [TweakPayload] = []
+        var posterBoardTemplates: [TemplateFile] = []
+        if templates.isActive {
+            log("Templates: \(templates.describe)")
+            // The chosen files of `replace` options are cleared at the start of
+            // every apply: they are staged for **this** run, and a stale one from
+            // a previous apply would be delivered again with no way for the user
+            // to tell which run it belonged to.
+            try? FileManager.default.removeItem(at: AppPaths.templateChoices)
+            for entry in templates.undeliverable {
+                log("  ⚠️ \(entry.template.title) was not delivered: \(entry.reason)")
+            }
+            let deliverable = templates.templates.filter { !$0.requiresSparserestore }
+            let work = AppPaths.templatesWorkDirectory
+            try? FileManager.default.removeItem(at: work)
+            do {
+                try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+            } catch {
+                throw GoldenNuggetError("Could not create the template working directory "
+                    + "(\(work.lastPathComponent)): \(error.localizedDescription)")
+            }
+            for template in deliverable {
+                if template.isPosterBoard {
+                    // Left for `PosterBoard.compile`: its extracted tree has to
+                    // be walked by `PosterBoardBuilder`, which is what turns a
+                    // descriptor into a wallpaper.
+                    posterBoardTemplates.append(template)
+                    log("  → \(template.title): rides with the wallpapers (domain "
+                        + "\(template.domain))")
+                    continue
+                }
+                log("  → \(template.title): \(template.effectiveDomain)")
+                templatePayloads += try TemplateDelivery.payloads(
+                    for: template, into: work, log: { AppLog.write($0) })
+            }
+            if !templatePayloads.isEmpty {
+                let total = templatePayloads.reduce(0) { $0 + $1.byteCount }
+                log("Templates: \(templatePayloads.count) payload(s) ("
+                    + ByteCountFormatter.string(fromByteCount: Int64(total), countStyle: .file)
+                    + ")")
+            }
         }
 
         let udid = try await prepareRun()
@@ -348,27 +399,44 @@ class GoldenNuggetEngine {
             log("PosterBoard: \(posterBoard.describe) — over AirLift, no backup")
             try await applyPosterBoardOverAirlift(selection: posterBoard, deviceVersion: version)
             posterBoardInjectedOverAirlift = true
-        } else if posterBoard.isActive {
-            log("PosterBoard: \(posterBoard.describe)")
+        } else if posterBoard.isActive || !posterBoardTemplates.isEmpty {
+            // A PosterBoard template is a wallpaper source even when no pack and
+            // no video were picked, so it opens this branch by itself — the
+            // reference's `apply_tweak` does the same (`len(tendies) == 0 and
+            // len(templates) == 0 and videoFile == None` is the only early
+            // return, and `templates` is one of the three terms).
+            if posterBoard.isActive {
+                log("PosterBoard: \(posterBoard.describe)")
+            } else {
+                log("PosterBoard: \(posterBoardTemplates.count) template(s) and nothing else")
+            }
             var structureVersion = PosterBoard.fallbackStructureVersion
             var database: URL?
-            if posterBoard.fullReset || !posterBoard.resetModes.isEmpty {
-                // A reset needs no database, so it needs no fetch and no exchange.
-                log("PosterBoard: reset only — no database is needed, and none is fetched.")
+            let needsWallpapers = posterBoard.fullReset || !posterBoard.resetModes.isEmpty
+                || posterBoard.tendies.count > 0 || posterBoard.video != nil
+            if needsWallpapers {
+                if posterBoard.fullReset || !posterBoard.resetModes.isEmpty {
+                    // A reset needs no database, so it needs no fetch and no exchange.
+                    log("PosterBoard: reset only — no database is needed, and none is fetched.")
+                } else {
+                    let fetched = try await PosterBoardBackup.fetch(
+                        backupRoot: AppPaths.posterBoardFetchRoot, udid: udid,
+                        // The same fork `deliver` is about to take, from the same number.
+                        ios27: major >= 27 && !DevSettings.effective.forcePartialRestore,
+                        onProgress: { overall in
+                            self.logProgress("posterboard backup progress", overall)
+                        },
+                        log: { AppLog.write($0) })
+                    database = fetched.database
+                    structureVersion = fetched.structureVersion
+                }
             } else {
-                let fetched = try await PosterBoardBackup.fetch(
-                    backupRoot: AppPaths.posterBoardFetchRoot, udid: udid,
-                    // The same fork `deliver` is about to take, from the same number.
-                    ios27: major >= 27 && !DevSettings.effective.forcePartialRestore,
-                    onProgress: { overall in
-                        self.logProgress("posterboard backup progress", overall)
-                    },
-                    log: { AppLog.write($0) })
-                database = fetched.database
-                structureVersion = fetched.structureVersion
+                log("PosterBoard: templates only — no wallpaper was picked, so no database is "
+                    + "needed and none is fetched.")
             }
             posterBoardPayloads = try await PosterBoard.compile(
                 selection: posterBoard,
+                templates: posterBoardTemplates,
                 structureVersion: structureVersion,
                 database: database,
                 deviceVersion: version,
@@ -387,7 +455,7 @@ class GoldenNuggetEngine {
         // before the wallpapers — and it only actually matters for the two
         // skip-setup files, which land in the order they are appended.
         let payloads = skipSetup.payloads + compiled.payloads + statusBarPayloads
-            + posterBoardPayloads
+            + posterBoardPayloads + templatePayloads
 
         // Wallpapers-only run in AirLift mode: the injection already happened and
         // it resprings on its way out, so running the backup/restore tail here

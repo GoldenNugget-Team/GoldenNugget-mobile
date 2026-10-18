@@ -192,10 +192,19 @@ enum GoldenNuggetPresetImport {
     /// ("device-specific and heavy, so they must not travel with a preset"), so
     /// there is nothing in a preset to carry.  The feature *is* ported — it lives
     /// on the PosterBoard page, and the page is where a wallpaper is chosen.
+    ///
+    /// **`Templates` is the same shape of answer and needs the same sentence.**
+    /// The feature *is* ported (it has its own page, since 2026-10-18), but a
+    /// `.batter` is a file the user picks by hand, and what a preset carries for
+    /// it is a list of *asset names* — there is no store here that could resolve
+    /// a name to a template.  Saying "needs the template asset store" would read
+    /// as "not implemented", which is the one thing this map must not do.
     static let unported: [String: String] = [
         "PosterBoard": "wallpapers — the reference excludes them from presets; "
             + "use the PosterBoard page instead",
-        "Templates": "PosterBoard templates — needs the template asset store",
+        "Templates": "templates — a .batter file is chosen on the Templates page, "
+            + "not carried by a preset (the reference's own `templates` entry is a "
+            + "list of asset names this port has no store for)",
         "StatusBar": "Status Bar — needs the StatusBarOverrideData struct over CFFI",
         "IconThemes": "Icon Themes — needs the icon asset store",
         "ClearScreenTimeAgentPlist": "daemons page — a NullifyFileTweak writing a 0-byte plist",

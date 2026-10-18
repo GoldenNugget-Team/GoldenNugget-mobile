@@ -4,11 +4,14 @@ import UniformTypeIdentifiers
 /// The PosterBoard page: wallpaper packs, a video wallpaper, and the resets.
 ///
 /// The reference's own page has three tabs — Tendies, Templates, Video — plus a
-/// reset dialog.  Templates is not here, and its absence is deliberate: a
-/// `.template` is a different file format with its own options engine
-/// (`template_file.py` + `template_options/`), and upstream itself lists
-/// Templates and PosterBoard as two separate un-ported features.  What *is* here
-/// covers everything the other two tabs do, including the video method the reset
+/// reset dialog.  Templates is **not** here, and its absence is now a routing
+/// decision rather than a gap: a `.batter` template is not necessarily a
+/// wallpaper.  Only one whose `domain` is PosterBoard's rides along with the
+/// wallpapers below, and any other restores into some other app's container —
+/// putting those under a page called PosterBoard would say something false
+/// about them.  Since 2026-10-18 it has its own page (**Templates**), with its
+/// own options engine; see `docs/template-port.md`.  What *is* here covers
+/// everything the other two tabs do, including the video method the reset
 /// dialog exists to recover from.
 ///
 /// Three things this page says that the reference does not, all of them because

@@ -60,6 +60,26 @@ enum AppPaths {
     static let posterBoardFetchRoot = URL.documents
         .appendingPathComponent("PosterBoardFetch", conformingTo: .data)
 
+    /// `<Documents>/Templates/Work/` — where a `.batter` template's tree is
+    /// unpacked before its options rewrite it and the result becomes payloads.
+    ///
+    /// Separate from `PosterBoard.workDirectory` because a PosterBoard-domain
+    /// template is unpacked **into** that one (so the wallpaper walk finds it),
+    /// and mixing the two would have a template's own files picked up as a pack.
+    static let templatesWorkDirectory = URL.documents
+        .appendingPathComponent("Templates/Work", conformingTo: .data)
+
+    /// `<Documents>/TemplateChoices/` — where a `replace` option's picked file is
+    /// kept until the apply reads it.
+    ///
+    /// Its own directory because the files are transient by nature: a template's
+    /// chosen image belongs to one template and one apply, and keeping the ones
+    /// a user tried and abandoned would leave hundreds of megabytes behind with
+    /// nothing pointing at them.  It is emptied at the start of every apply,
+    /// which is also why a chosen file does not survive a relaunch.
+    static let templateChoices = URL.documents
+        .appendingPathComponent("TemplateChoices", conformingTo: .data)
+
     /// `<backupRoot>/<udid>/` — the per-device directory inside a backup root.
     static func deviceDir(backupRoot: URL, udid: String) -> URL {
         backupRoot.appendingPathComponent(udid)
