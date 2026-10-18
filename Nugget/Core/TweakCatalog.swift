@@ -34,6 +34,7 @@ enum TweakFileLocation: String, CaseIterable, Sendable {
     case uikit = "/var/Managed Preferences/mobile/com.apple.UIKit.plist"
     case disabledDaemons = "/var/db/com.apple.xpc.launchd/disabled.plist"
     case screentime = "/var/mobile/Library/Preferences/com.apple.ScreenTimeAgent.plist"
+    case accessibility = "/var/Managed Preferences/mobile/com.apple.Accessibility.plist"
 }
 
 /// A tweaks-page section.  Raw values match GoldenNugget's `Section` enum.
@@ -370,6 +371,48 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Disables HDR tone-mapping in the Solarium renderer. Can fix washed-out or over-bright Liquid Glass areas. Select this tweak to disable HDR.",
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
+        ),
+        TweakSpec(
+            id: "DisableIconShimmer",
+            section: .liquidGlass,
+            title: "Disable Icon Shimmer",
+            location: .accessibility,
+            key: "ReduceHighlightingEffectsEnabled",
+            value: .bool(true),
+            kind: .toggle,
+            minValue: 0.0,
+            maxValue: 999.0,
+            step: 1.0,
+            minVersion: "26.4",
+            maxVersion: nil,
+            iphoneOnly: false,
+            ipadOnly: false,
+            disabled: false,
+            detail: "Turns on the system 'Reduce Bright Effects' accessibility setting (iOS 26.4+), which tones down the Liquid Glass shimmer: the sweeping bright highlight that runs across Home Screen app icons and the flash on onscreen elements when you tap them. [Increases performance]",
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
+        ),
+        TweakSpec(
+            id: "DisableIconGlassOutline",
+            section: .liquidGlass,
+            title: "Disable Icon Glass Outline",
+            location: .globalPreferences,
+            key: "SBDisableIconOutline",
+            value: .bool(true),
+            kind: .toggle,
+            minValue: 0.0,
+            maxValue: 999.0,
+            step: 1.0,
+            minVersion: "26.0",
+            maxVersion: nil,
+            iphoneOnly: false,
+            ipadOnly: false,
+            disabled: false,
+            detail: "Removes the thin glass outline drawn around Home Screen app icons in the Liquid Glass icon style. Best-guess SpringBoard key (unverified on-device; may have no effect). [Increases performance]",
             multiValues: nil,
             reversibleBoolean: false,
             requiresDynamicIsland: false

@@ -1,14 +1,24 @@
 # Desktop synchronization — 2026-10-18
 
 Reference: `GoldenNugget-Team/GoldenNugget`, main commit
-`b4b8c65` (GoldenNugget 9.7 beta 1). The adjacent checkout was fetched and
-matched `origin/main` at synchronization time. Desktop sources were not modified.
+`3bcdd723c3b28fd42a76f82d9e3841350651653d` (GoldenNugget 9.7 beta 1),
+plus the adjacent checkout's local changes in `src/tweaks/registry.py`,
+`src/tweaks/tweak_names.py`, `src/tweaks/basic_plist_locations.py` and
+`src/devicemanagement/device_manager.py`. The checkout was fetched and its HEAD
+matched `origin/main`; the two new icon options are local desktop changes, not
+yet part of that commit. Desktop sources were not modified.
 
 ## Catalog and behavior
 
-- The generated registry contains all 134 desktop plist tweaks, including
+- The generated registry contains all 136 desktop plist tweaks, including
   experimental RSSI and the reversible Dynamic Island switch. Applying the
   latter while disabled writes `false`, matching `ReversibleBooleanPlistTweak`.
+- Liquid Glass includes Disable Icon Shimmer (iOS 26.4+) through managed
+  `com.apple.Accessibility.plist` / `ReduceHighlightingEffectsEnabled`, and
+  Disable Icon Glass Outline (iOS 26.0+) through `SBDisableIconOutline`.
+  The desktop's on-device verification caveat for the outline key is preserved
+  in its description. Internal reset also clears managed Accessibility
+  preferences, following the desktop's page assignment.
 - Dynamic Island hardware requirements are used by the list, preset import,
   preview, conflict check and compiler. Known models are generated from the
   desktop capability module rather than maintained independently.
@@ -91,8 +101,10 @@ rejection, malformed inputs, ownership, write precedence, portable roundtrips,
 checksums, activation and device-scoped reset history. `--live-index PATH` also
 checks a downloaded catalog without making the offline test depend on network.
 
-Validated: 715 differential compile cases (143 selections × five device
-profiles); 44 community/preset checks including the live index, plus Python
-decoding Swift's GN1 output; 31 protective-filter cases; nine tunnel endpoint
-cases. The existing daemon merge, status-bar layout, conflict and apply-preview
-harnesses pass. Release device IPA builds with Xcode 26.6/iOS 26.5 SDK.
+Validated for the icon-options sync: 1015 differential compile cases
+(145 selections × seven device profiles, including iOS 26.3 and 26.4), matching
+page-reset plans, all five generated catalogs, 43 offline community/preset
+checks plus Python decoding Swift's GN1 output, and 31 protective-filter cases.
+The earlier synchronization also validated the live catalog index, nine tunnel
+endpoint cases, and the daemon merge, status-bar layout, conflict and
+apply-preview harnesses. Release device IPA builds with Xcode 26.6/iOS 26.5 SDK.

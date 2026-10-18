@@ -43,12 +43,9 @@ enum ResetPage: String, CaseIterable, Identifiable, Sendable {
     /// no `FileLocation` case in the reference and so is the one path spelled
     /// out in `plan` rather than looked up from this list.
     ///
-    /// `internalOptions` carries seven files while the catalog's Internal
-    /// section only uses six of them: the reference nulls
-    /// `.GlobalPreferences.plist` in HomeDomain as well, and no tweak in this
-    /// port writes that copy. It is kept because the reference clears it, and
-    /// dropping it would make this a *different* reset rather than a port of
-    /// the same one.
+    /// `internalOptions` also clears the HomeDomain global-preferences mirror
+    /// and managed Accessibility preferences, following the desktop reset.
+    /// Accessibility includes the Liquid Glass "Disable Icon Shimmer" option.
     var locations: [TweakFileLocation] {
         switch self {
         case .statusBar:
@@ -57,7 +54,7 @@ enum ResetPage: String, CaseIterable, Identifiable, Sendable {
             return [.springboard, .uikit]
         case .internalOptions:
             return [.globalPreferences, .globalPreferencesHomeDomain, .appStore,
-                    .backboardd, .coreMotion, .pasteboard, .notes]
+                    .backboardd, .coreMotion, .pasteboard, .notes, .accessibility]
         case .daemons:
             return [.disabledDaemons]
         }

@@ -183,8 +183,8 @@ def build_cases(by_id) -> dict:
         "minPairingCompatibilityVersion": 1,
     }}
 
-    # Shared-plist merging: all 98 Liquid Glass tweaks land in one
-    # .GlobalPreferences.plist, which exercises the merge and the GP mirror.
+    # Section-wide merging exercises shared plists, the GP mirror and the
+    # separate managed Accessibility destination for icon shimmer.
     sections = {}
     from src.tweaks.registry import SPECS
     for spec in SPECS:
@@ -239,11 +239,12 @@ def main() -> int:
 
     binary = build_harness(args.verbose)
 
-    # Five device profiles so version/family/Dynamic Island gates are exercised, not just
-    # the happy path.
+    # Version/family/Dynamic Island gates, including both sides of the iOS 26.4
+    # boundary for the managed Accessibility icon-shimmer setting.
     profiles = [("27.0", "iPhone17,1", True), ("26.5", "iPad16,2", False),
                 ("27.0", "iPad16,2", False), ("26.5", "iPhone14,7", True),
-                ("26.0", "iPhone17,1", True)]
+                ("26.0", "iPhone17,1", True), ("26.3", "iPhone17,1", True),
+                ("26.4", "iPhone17,1", True)]
 
     failures = 0
     total = 0
