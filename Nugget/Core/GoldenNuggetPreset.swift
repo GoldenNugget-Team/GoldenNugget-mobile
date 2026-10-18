@@ -33,6 +33,8 @@ struct GoldenNuggetPreset {
         /// Entry fields this port has no home for (a posterboard `templates`
         /// list, a status bar `override_data`, …).  Reported, never guessed at.
         let ignoredPayloadKeys: [String]
+        var templatePaths: [String] = []
+        var templateStates: [[String: [String: Any]]] = []
     }
 
     struct Metadata {
@@ -112,7 +114,9 @@ struct GoldenNuggetPreset {
                          enabled: boolValue(entry["enabled"]) ?? false,
                          value: value.flatMap(tweakValue),
                          multiValues: multi,
-                         ignoredPayloadKeys: entry.keys.filter { !consumed.contains($0) }.sorted())
+                         ignoredPayloadKeys: entry.keys.filter { !consumed.contains($0) }.sorted(),
+                         templatePaths: entry["templates"] as? [String] ?? [],
+                         templateStates: entry["tweak_states"] as? [[String: [String: Any]]] ?? [])
         }
     }
 
@@ -223,6 +227,11 @@ enum GoldenNuggetPresetImport {
             return
         }
         for group in DaemonGroups.all {
+            guard let spec = TweakCatalog.byID["Daemon.\(group.name)"] else { continue }
+            if !entry.enabled {
+                selection.restore(enabled: false, value: nil, multiValues: nil, for: spec)
+                continue
+            }
             let wanted = group.labels.filter { label in
                 guard DaemonGroups.allowedKeys.contains(label) else { return false }
                 return values[label]?.display == "true"
@@ -230,8 +239,10 @@ enum GoldenNuggetPresetImport {
             // A group whose labels are all disabled is on. A group with none is
             // left off rather than forced off, so a partial preset does not
             // clear a choice the user made by hand.
-            if wanted.count == group.labels.count, let spec = TweakCatalog.byID["Daemon.\(group.name)"] {
+            if wanted.count == group.labels.count {
                 selection.restore(enabled: true, value: nil, multiValues: nil, for: spec)
+            } else if group.labels.allSatisfy({ values[$0] != nil }) {
+                selection.restore(enabled: false, value: nil, multiValues: nil, for: spec)
             }
         }
     }
@@ -240,7 +251,7 @@ enum GoldenNuggetPresetImport {
     static func apply(_ preset: GoldenNuggetPreset,
                       to selection: inout TweakSelection,
                       deviceVersion: String,
-                      isIPhone: Bool) -> TweakImportReport {
+                      isIPhone: Bool, deviceModel: String = "") -> TweakImportReport {
         var report = TweakImportReport()
         report.metadataLine = preset.metadata.summary
 
@@ -260,7 +271,7 @@ enum GoldenNuggetPresetImport {
                 }
                 continue
             }
-            guard spec.isCompatible(deviceVersion: deviceVersion, isIPhone: isIPhone) else {
+            guard spec.isCompatible(deviceVersion: deviceVersion, isIPhone: isIPhone, deviceModel: deviceModel) else {
                 report.skippedIncompatible.append(entry.id)
                 continue
             }

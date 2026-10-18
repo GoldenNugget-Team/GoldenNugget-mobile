@@ -38,7 +38,8 @@ guard arguments.count >= 4 else {
     exit(2)
 }
 let deviceVersion = arguments[2]
-let isIPhone = arguments[3] == "iphone"
+let deviceModel = arguments[3]
+let isIPhone = deviceModel.hasPrefix("iPhone") || deviceModel == "iphone"
 
 guard let casesData = arguments[1].data(using: .utf8),
       let cases = try? JSONSerialization.jsonObject(with: casesData) as? [String: [String: Any]] else {
@@ -90,7 +91,7 @@ func compileCase(_ tweaks: [String: Any]) -> [String: [String: String]] {
     }
     let result = TweakCompiler.compile(selection: selection,
                                        deviceVersion: deviceVersion,
-                                       isIPhone: isIPhone)
+                                       isIPhone: isIPhone, deviceModel: deviceModel)
     var out: [String: [String: String]] = [:]
     for payload in result.payloads {
         let plist = (try? PropertyListSerialization.propertyList(from: payload.contents,

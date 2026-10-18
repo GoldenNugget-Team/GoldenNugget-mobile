@@ -106,7 +106,10 @@ def make_reference_compiler(SPECS, FileLocation, BasicPlistTweak, AdvancedPlistT
     divergences applied so everything else must match the port exactly."""
     by_id = {spec.id.name: spec for spec in SPECS if not spec.disabled}
 
-    def compatible(spec, device_version, is_iphone):
+    def compatible(spec, device_version, is_iphone, model):
+        from src.devicemanagement.device_capabilities import has_dynamic_island
+        if spec.requires_dynamic_island and not has_dynamic_island(model):
+            return False
         # The reference's own gate, `src/gui/ios/compat.py:is_tweak_compatible`.
         if device_version and spec.min_version:
             from packaging.version import Version
@@ -122,20 +125,21 @@ def make_reference_compiler(SPECS, FileLocation, BasicPlistTweak, AdvancedPlistT
             return False
         return True
 
-    def compile_case(tweaks: dict, device_version: str, is_iphone: bool) -> dict:
+    def compile_case(tweaks: dict, device_version: str, is_iphone: bool, model: str) -> dict:
         other_tweaks: dict = {}
         for spec in SPECS:
             if spec.disabled:
                 continue
             name = spec.id.name
-            if name not in tweaks:
-                continue
-            if not compatible(spec, device_version, is_iphone):   # divergence 1
-                continue
             tweak = spec.factory() if spec.factory is not None \
                 else BasicPlistTweak(spec.location, spec.key, value=spec.value)
-            tweak.enabled = True
-            supplied = tweaks[name]
+            reversible = type(tweak).__name__ == "ReversibleBooleanPlistTweak"
+            if name not in tweaks and not reversible:
+                continue
+            if not compatible(spec, device_version, is_iphone, model):   # divergence 1
+                continue
+            tweak.enabled = name in tweaks
+            supplied = tweaks.get(name)
             if supplied is not None:
                 tweak.value = supplied
             other_tweaks = tweak.apply_tweak(other_tweaks)
@@ -235,9 +239,11 @@ def main() -> int:
 
     binary = build_harness(args.verbose)
 
-    # Three device profiles so the version/device gates are exercised, not just
+    # Five device profiles so version/family/Dynamic Island gates are exercised, not just
     # the happy path.
-    profiles = [("27.0", "iphone", True), ("26.5", "ipad", False), ("27.0", "ipad", False)]
+    profiles = [("27.0", "iPhone17,1", True), ("26.5", "iPad16,2", False),
+                ("27.0", "iPad16,2", False), ("26.5", "iPhone14,7", True),
+                ("26.0", "iPhone17,1", True)]
 
     failures = 0
     total = 0
@@ -251,7 +257,7 @@ def main() -> int:
 
         for name, tweaks in cases.items():
             total += 1
-            expected = tag_plists(compile_case(tweaks, version, is_iphone))
+            expected = tag_plists(compile_case(tweaks, version, is_iphone, model))
             actual = swift_output.get(name, {})
             if expected != actual:
                 failures += 1

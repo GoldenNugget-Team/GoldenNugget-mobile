@@ -21,6 +21,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
     case home
     case tweaks
     case presets
+    case community
     case posterBoard
     case templates
     case wallpaperDownloads
@@ -55,6 +56,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
         case .home: "GoldenNugget"
         case .tweaks: "Tweaks"
         case .presets: "Presets"
+        case .community: "Community Catalog"
         case .posterBoard: "PosterBoard"
         case .templates: "Templates"
         case .wallpaperDownloads: "Download Wallpapers"
@@ -73,6 +75,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
         case .home: "house"
         case .tweaks: "slider.horizontal.3"
         case .presets: "tray.2"
+        case .community: "square.grid.2x2"
         case .posterBoard: "photo.artframe"
         case .templates: "slider.horizontal.below.rectangle"
         case .wallpaperDownloads: "square.and.arrow.down"
@@ -297,6 +300,8 @@ struct RootView: View {
                     TweaksView(selection: $tweakSelection)
                 case .presets:
                     PresetManagerView(selection: $tweakSelection)
+                case .community:
+                    CommunityCatalogView()
                 case .posterBoard:
                     PosterBoardView(selection: $posterBoardSelection)
                 case .templates:

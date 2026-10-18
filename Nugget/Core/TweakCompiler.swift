@@ -31,12 +31,14 @@ struct TweakPayload: Equatable {
     /// `contents` is set.  The file has to still exist when the injector runs —
     /// the caller owns it, and this type never deletes it.
     let source: URL?
+    let owner: Int?
 
-    init(domain: String, relativePath: String, contents: Data) {
+    init(domain: String, relativePath: String, contents: Data, owner: Int? = nil) {
         self.domain = domain
         self.relativePath = TweakPayload.manifestPath(relativePath)
         self.contents = contents
         self.source = nil
+        self.owner = owner
     }
 
     init(domain: String, relativePath: String, source: URL) {
@@ -44,6 +46,7 @@ struct TweakPayload: Equatable {
         self.relativePath = TweakPayload.manifestPath(relativePath)
         self.contents = Data()
         self.source = source
+        self.owner = nil
     }
 
     /// A manifest row's `relativePath`, with no leading slash.
@@ -129,6 +132,23 @@ struct TweakPayloadUnavailable: Error, LocalizedError {
 /// tweaks write into the same `.GlobalPreferences.plist`, so emitting one file
 /// per tweak would leave only the last one standing.
 enum TweakCompiler {
+    /// Desktop applies community plists first, then merges built-in keys over
+    /// them. Whole-file collisions are rejected rather than sent twice.
+    static func merging(community: [TweakPayload], builtIn: [TweakPayload]) throws -> [TweakPayload] {
+        var result = community
+        for payload in builtIn {
+            if let index = result.firstIndex(where: { $0.domain == payload.domain && $0.relativePath == payload.relativePath }) {
+                guard var values = try PropertyListSerialization.propertyList(from: result[index].bytes(), options: [], format: nil) as? [String: Any],
+                      let overlay = try PropertyListSerialization.propertyList(from: payload.bytes(), options: [], format: nil) as? [String: Any] else {
+                    throw TweakPayloadUnavailable(payload: payload.label, file: payload.relativePath, reason: "Conflicting community file write")
+                }
+                values.merge(overlay) { _, builtIn in builtIn }
+                let data = try PropertyListSerialization.data(fromPropertyList: values, format: .xml, options: 0)
+                result[index] = TweakPayload(domain: payload.domain, relativePath: payload.relativePath, contents: data, owner: payload.owner)
+            } else { result.append(payload) }
+        }
+        return result
+    }
     struct Result {
         let payloads: [TweakPayload]
         /// Locations that produced a file, in write order — for the log.
@@ -146,7 +166,8 @@ enum TweakCompiler {
     static func compile(
         selection: TweakSelection,
         deviceVersion: String,
-        isIPhone: Bool
+        isIPhone: Bool,
+        deviceModel: String = ""
     ) -> Result {
         // Insertion-ordered, like Python's dict: the reference iterates
         // `basic_plists.items()` in first-write order and that is the order the
@@ -163,9 +184,11 @@ enum TweakCompiler {
         // rows, and compiling only the registry would drop the launchd
         // `disabled.plist` entirely.
         for spec in TweakCatalog.allWithDaemons where !spec.disabled {
-            guard selection.isOn(spec) else { continue }
-            guard spec.isCompatible(deviceVersion: deviceVersion, isIPhone: isIPhone) else {
-                skipped.append((spec.id, "not compatible with this device / iOS version"))
+            guard selection.isOn(spec) || spec.reversibleBoolean else { continue }
+            guard spec.isCompatible(deviceVersion: deviceVersion, isIPhone: isIPhone, deviceModel: deviceModel) else {
+                if selection.isOn(spec) {
+                    skipped.append((spec.id, "not compatible with this device / iOS version"))
+                }
                 continue
             }
 
@@ -205,7 +228,8 @@ enum TweakCompiler {
             }
             if plists[spec.location] == nil { order.append(spec.location) }
             var dict = plists[spec.location] ?? [:]
-            dict[spec.key] = selection.value(for: spec).plistObject
+            dict[spec.key] = spec.reversibleBoolean
+                ? selection.isOn(spec) : selection.value(for: spec).plistObject
             plists[spec.location] = dict
         }
 

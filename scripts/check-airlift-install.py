@@ -94,7 +94,10 @@ def read_archive(path: Path) -> dict[str, bytes]:
                 # The name length is padded to an even boundary, so it carries
                 # trailing NULs; strip them or every reported name is unreadable.
                 real = data[:length].decode("utf-8", "replace").rstrip("\x00").rstrip("/")
-                members[real] = data[length:]
+                # Apple's ar can encode the symbol index as a BSD long name.
+                # It is metadata even in this form, not an added object member.
+                if not real.startswith("__.SYMDEF"):
+                    members[real] = data[length:]
             elif name not in ("/", "/SYM64/", "//", "__.SYMDEF", "__.SYMDEF SORTED"):
                 members[name.rstrip("\x00").rstrip("/")] = data
     return members

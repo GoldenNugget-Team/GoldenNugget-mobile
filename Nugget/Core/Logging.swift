@@ -150,3 +150,20 @@ extension AppLog {
     /// Convenience for the many call sites that only want to emit a line.
     static func write(_ line: String) { shared.log(line) }
 }
+
+/// Old releases wrote complete pairing dictionaries into diagnostic files.
+/// Remove only logs containing those secret field dumps before enabling the
+/// append-only Rust sink, so an update cannot keep exporting previously leaked
+/// credentials. Pairing records themselves are never touched.
+enum PairingLogPrivacy {
+    static func removeLegacyDumps(at urls: [URL]) throws {
+        for url in urls {
+            guard FileManager.default.fileExists(atPath: url.path) else { continue }
+            let data = try Data(contentsOf: url)
+            guard let text = String(data: data, encoding: .utf8),
+                  text.contains("\"private_key\"") || text.contains("\"alt_irk\"") else { continue }
+            try Data("Old diagnostic log removed because it contained pairing secrets.\n".utf8)
+                .write(to: url, options: .atomic)
+        }
+    }
+}

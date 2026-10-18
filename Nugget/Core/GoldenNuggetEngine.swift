@@ -58,6 +58,8 @@ class GoldenNuggetEngine {
     /// why.
     private func loggedRun<T>(_ label: String,
                               _ body: () async throws -> T) async throws -> T {
+        try InFlightCall.shared.beginRun()
+        defer { InFlightCall.shared.endRun() }
         do {
             return try await body()
         } catch let failure as TransportFailure where failure.isCancellation {
@@ -111,6 +113,13 @@ class GoldenNuggetEngine {
             return cached
         }
 
+        do {
+            try PairingLogPrivacy.removeLegacyDumps(at: [AppPaths.rustLog, AppPaths.appLog])
+        } catch {
+            // Keep the sink disabled until its old secrets can be removed.
+            log("Could not remove legacy pairing secrets from diagnostic logs: \(error.localizedDescription)")
+            return -1
+        }
         let path = AppPaths.rustLog.path
 
         let rc: Int32
@@ -225,27 +234,34 @@ class GoldenNuggetEngine {
         statusBar: StatusBarSelection,
         templates: TemplateSelection,
         deviceVersion: String,
-        isIPhone: Bool
+        isIPhone: Bool,
+        deviceModel: String = "",
+        communityPayloads: [TweakPayload] = [],
+        communityPresetEntry: [String: Any]? = nil
     ) async throws {
         // `_prepare_rollback_preset` (`main_window_mixins.py:1090`): keep the
         // last successful apply available as a one-click rollback *before* the
         // next apply overwrites it.  Best-effort, like the reference.
-        GoldenNuggetPresets.prepareRollback()
         try await loggedRun("apply") {
+            GoldenNuggetPresets.prepareRollback()
             try await applyTweaksRun(selection: selection,
                                      posterBoard: posterBoard,
                                      statusBar: statusBar,
                                      templates: templates,
                                      deviceVersion: deviceVersion,
-                                     isIPhone: isIPhone)
+                                     isIPhone: isIPhone, deviceModel: deviceModel, communityPayloads: communityPayloads)
         }
         // `_save_last_applied_preset` (`main_window_mixins.py:1101`): a run
         // that returned is a successful apply — it becomes the rollback source
         // for the next one.  The model string is derived because the engine
         // does not carry a full identity; the snapshot is internal metadata.
         _ = GoldenNuggetPresets.saveLastApplied(selection: selection,
-                                                deviceModel: isIPhone ? "iPhone" : "iPad",
+                                                deviceModel: deviceModel.isEmpty ? (isIPhone ? "iPhone" : "iPad") : deviceModel,
                                                 iosVersion: deviceVersion)
+        if let entry = communityPresetEntry {
+            do { try GoldenNuggetPresets.attachTemplates(entry, to: GoldenNuggetPresets.lastAppliedName) }
+            catch { log("Template rollback snapshot could not be saved: \(error.localizedDescription)") }
+        }
     }
 
     private func applyTweaksRun(
@@ -254,10 +270,11 @@ class GoldenNuggetEngine {
         statusBar: StatusBarSelection,
         templates: TemplateSelection,
         deviceVersion: String,
-        isIPhone: Bool
+        isIPhone: Bool,
+        deviceModel: String = "",
+        communityPayloads: [TweakPayload] = []
     ) async throws {
         AppLog.shared.memory.reset()
-        warnIfPreviousCallStillRunning()
         clearCancel()
         clearProgress()
         let runStage = StageTimer("RUN apply")
@@ -265,7 +282,9 @@ class GoldenNuggetEngine {
 
         let compiled = TweakCompiler.compile(selection: selection,
                                              deviceVersion: deviceVersion,
-                                             isIPhone: isIPhone)
+                                             isIPhone: isIPhone, deviceModel: deviceModel)
+
+        let tweakPayloads = try TweakCompiler.merging(community: communityPayloads, builtIn: compiled.payloads)
 
         // The status bar is built here, on the version the page already read, and
         // for the same reason the plist compile is: a payload that cannot be built
@@ -306,14 +325,14 @@ class GoldenNuggetEngine {
             ? SkipSetup.build(supervised: false, organizationName: "")
             : SkipSetup.Build(payloads: [], warnings: [])
 
-        guard !compiled.payloads.isEmpty || !skipSetup.payloads.isEmpty || posterBoard.isActive
+        guard !tweakPayloads.isEmpty || !skipSetup.payloads.isEmpty || posterBoard.isActive
                 || statusBar.isActive || templates.usesDomains else {
             throw GoldenNuggetError("Nothing to apply: no tweak is enabled (or every enabled one "
                 + "was skipped), skip setup is off, the status bar is untouched, there is "
                 + "nothing selected on the PosterBoard page, and no template delivers through a "
                 + "backup domain.")
         }
-        log("Tweaks: \(compiled.payloads.count) file(s) from \(compiled.locations.count) plist(s)")
+        log("Tweaks: \(tweakPayloads.count) file(s) from \(compiled.locations.count) plist(s)")
         for location in compiled.locations { log("  → \(location.rawValue)") }
         for item in compiled.skipped { log("  ⚠️ skipped \(item.label): \(item.reason)") }
         if !skipSetup.payloads.isEmpty {
@@ -454,7 +473,7 @@ class GoldenNuggetEngine {
         // ahead of the tweaks, and `apply_classic_tweak` / `apply_ios27_tweak`
         // before the wallpapers — and it only actually matters for the two
         // skip-setup files, which land in the order they are appended.
-        let payloads = skipSetup.payloads + compiled.payloads + statusBarPayloads
+        let payloads = skipSetup.payloads + tweakPayloads + statusBarPayloads
             + posterBoardPayloads + templatePayloads
 
         // Wallpapers-only run in AirLift mode: the injection already happened and
@@ -479,6 +498,26 @@ class GoldenNuggetEngine {
             } else if posterBoard.isActive {
                 log("Reboot the device so the PosterBoard store picks the new wallpapers up.")
             }
+        }
+        do { try CommunityApplyRecord.record(communityPayloads, udid: udid) }
+        catch { log("Community apply history could not be saved: \(error.localizedDescription)") }
+    }
+
+    func resetCommunityTweaks() async throws {
+        try await loggedRun("community reset") {
+            clearCancel()
+            clearProgress()
+            let udid = try await prepareRun()
+            let version = try await resolvedDeviceVersion("")
+            let plan = try CommunityApplyRecord.resetPlan(udid)
+            for path in plan.remaining { log("Community file requires manual recovery: \(path)") }
+            guard !plan.payloads.isEmpty else {
+                throw GoldenNuggetError("No recorded Managed Preferences to reset. Other replaced files require manual recovery: \(plan.remaining.joined(separator: ", "))")
+            }
+            try await deliver(payloads: plan.payloads, udid: udid, version: version, label: "community reset") {
+                log("Community Managed Preferences reset. Reboot the device.")
+            }
+            try CommunityApplyRecord.didReset(udid)
         }
     }
 
@@ -534,7 +573,6 @@ class GoldenNuggetEngine {
 
     private func fetchPosterBoardDatabaseRun() async throws {
         AppLog.shared.memory.reset()
-        warnIfPreviousCallStillRunning()
         clearCancel()
         clearProgress()
         let stage = StageTimer("RUN posterboard database fetch")
@@ -574,7 +612,6 @@ class GoldenNuggetEngine {
     private func applyPosterBoardViaAirliftRun(_ selection: PosterBoardSelection,
                                                deviceVersion: String) async throws {
         AppLog.shared.memory.reset()
-        warnIfPreviousCallStillRunning()
         clearCancel()
         clearProgress()
         let stage = StageTimer("RUN posterboard airlift apply")
@@ -714,7 +751,6 @@ class GoldenNuggetEngine {
 
     private func resetPagesRun(pages: Set<ResetPage>) async throws {
         AppLog.shared.memory.reset()
-        warnIfPreviousCallStillRunning()
         clearCancel()
         clearProgress()
         let runStage = StageTimer("RUN page reset")
@@ -869,33 +905,6 @@ class GoldenNuggetEngine {
     // MARK: - Shared run plumbing
     //
     // The sequence below is order-sensitive, so it lives in one place.
-
-    /// A run must not start on top of one that was cancelled but is still
-    /// running, and this makes that state visible.
-    ///
-    /// A blocking FFI call cannot be interrupted, so Stop only walks away from
-    /// it — and `clearCancel()` at the top of a run clears the very flag that
-    /// was going to make the abandoned call unwind. A second mobilebackup2
-    /// exchange started in that window is two sessions on one RSD adapter, which
-    /// is the hazard `InFlightCall` exists to record.
-    ///
-    /// This WARNS rather than blocks, deliberately. Blocking is the safer
-    /// default, but an abandoned call may never drain at all, which would turn
-    /// "press Stop" into "press Stop, then force-quit the app" — a worse failure
-    /// than the one it prevents. The state is logged instead, so it is never
-    /// invisible; adding a drain wait here is the trade to revisit if that
-    /// ever looks wrong.
-    ///
-    /// Must run BEFORE `clearCancel()`: clearing first erases the signal the
-    /// previous run is still waiting on.
-    private func warnIfPreviousCallStillRunning() {
-        guard InFlightCall.shared.isBusy else { return }
-        log("⚠️ a previous device call is still running "
-            + "(\(InFlightCall.shared.abandonedDescription)) — starting a new run on top of it. "
-            + "If that call was cancelled it may still hold the session, so a failure from here that "
-            + "looks like a device problem may be two sessions sharing one RSD adapter: force-quit "
-            + "the app, then run again.")
-    }
 
     /// Everything a run does before touching the device.
     ///

@@ -92,13 +92,13 @@ struct ApplyPreview {
                       statusBar: StatusBarSelection,
                       skipSetupEnabled: Bool,
                       deviceVersion: String,
-                      isIPhone: Bool) throws -> ApplyPreview {
+                      isIPhone: Bool, deviceModel: String = "", communityPayloads: [TweakPayload] = []) throws -> ApplyPreview {
         let compiled = TweakCompiler.compile(selection: selection,
                                              deviceVersion: deviceVersion,
-                                             isIPhone: isIPhone)
+                                             isIPhone: isIPhone, deviceModel: deviceModel)
         var rows: [Row] = []
         var notes: [String] = []
-        for payload in compiled.payloads {
+        for payload in try TweakCompiler.merging(community: communityPayloads, builtIn: compiled.payloads) {
             rows.append(Row(label: payload.label, byteCount: payload.byteCount))
         }
         for skipped in compiled.skipped {
@@ -123,10 +123,10 @@ struct ApplyPreview {
 
         let conflicts = TweakConflicts.current(in: selection,
                                                deviceVersion: deviceVersion,
-                                               isIPhone: isIPhone)
+                                               isIPhone: isIPhone, deviceModel: deviceModel)
         return ApplyPreview(rows: rows,
                             totalBytes: rows.reduce(0) { $0 + $1.byteCount },
-                            selectedCount: selection.enabledCount,
+                            selectedCount: selection.enabledCount + communityPayloads.count,
                             conflicts: conflicts,
                             notes: notes)
     }

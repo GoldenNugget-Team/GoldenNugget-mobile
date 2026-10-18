@@ -45,10 +45,11 @@ enum Diagnostics {
         // the tunnel.
         let udid = try? await minimuxer.core.fetchUDID()
         lines.append("  lockdown fetchUDID: \(udid.flatMap { $0 } ?? "FAILED")")
-        if case .success(let ready) = await minimuxer.core.isReady(withNetworkCheck: true) {
+        switch await minimuxer.core.isReady(withNetworkCheck: true) {
+        case .success(let ready):
             lines.append("  isReady: \(ready)")
-        } else {
-            lines.append("  isReady: FAILED")
+        case .failure(let error):
+            lines.append("  isReady: FAILED — \(minimuxer.core.describeError(error))")
         }
         lines.append("  rust log: \(logStatus)")
         // Wire liveness: how many DeviceLink messages this run actually moved.

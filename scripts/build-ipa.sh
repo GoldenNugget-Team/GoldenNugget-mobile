@@ -70,7 +70,7 @@ cp -R "$APP_PATH" build/Payload/GoldenNuggetMobile.app
 # `ASSETCATALOG_COMPILER_STANDALONE_ICON_BEHAVIOR = none` does NOT suppress them:
 # measured with --standalone-icon-behavior default/all/none, an icon stack emits
 # the same two files every time (the setting governs .appiconset icons).
-rm -f build/Payload/GoldenNuggetMobile.app/AppIcon*.png
+rm -f build/Payload/GoldenNuggetMobile.app/AppIcon*.png(N)
 
 # Strip symbol tables out of the *copy* we are about to package, not out of
 # DerivedData — the unstripped product stays available for debugging.  This

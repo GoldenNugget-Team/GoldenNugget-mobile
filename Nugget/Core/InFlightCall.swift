@@ -1,46 +1,36 @@
 import Foundation
 
-// "We stopped waiting for it" and "it stopped running" are two different facts.
-//
-// The retry ladder used to treat them as one, and that is the root of the worst
-// class of failure this app has: a Rust read blocked on a socket cannot be
-// interrupted, so `StallGuard` can only abandon the *wait* — the call keeps
-// running on `DispatchQueue.global()` (see `withFFIDispatch`) and keeps using
-// the shared RSD adapter.  `ChannelRecovery` then immediately called
-// `recover(level:)`, whose first statement is `invalidateConnection()`, i.e.
-// freeing that adapter out from under a call that is still using it — and then
-// started a second mobilebackup2 operation on the same session.
-//
-// This type records the second fact so the ladder can act on it.
-//
-// CURRENT WIRING (2026-09-20)
-//
-//   * `StallGuard.run` calls `enter()` / `defer leave()` around the guarded call,
-//     and `noteAbandoned(label:)` on the one path that abandons it (the operator's
-//     cancel).  So `isBusy` is now truthful.
-//   * `GoldenNuggetEngine.warnIfPreviousCallStillRunning()` reads it at the start of a
-//     run and logs the state — it does NOT block, and nothing waits for a drain.
-//
-// The absence of a drain wait is deliberate rather than forgotten.  With the
-// automatic timeouts gone (see `StallGuard`), a cancel is the only way a call is
-// abandoned, and an abandoned FFI read may never drain at all — so gating the next
-// run on it would turn "press Stop" into "press Stop, then force-quit the app".
-// Warning keeps the dangerous window visible without adding that failure.  The
-// other half of the original hazard — `recover()` invalidating the adapter
-// underneath a call still in flight — is closed by the same change that removed
-// the timeouts: the retry ladder can now only be entered by an error the FFI
-// actually threw, and a cancel is `failFast`.
-
-/// Tracks whether a device call is still in flight after having been abandoned.
-///
-/// `depth` is normally 0 or 1 (one long operation at a time), but it is a
-/// counter rather than a flag so that a retry which somehow overlaps a
-/// not-yet-drained attempt can never clear the gate early.
+/// Separates a user-visible run from its blocking device calls. Cancelling a
+/// wait cannot stop Rust; a new run must not reuse its session or backup tree
+/// until the last abandoned call has actually returned.
 final class InFlightCall: @unchecked Sendable {
     static let shared = InFlightCall()
 
     private let lock = NSLock()
     private var depth = 0
+    private var runActive = false
+
+    enum Failure: Error, LocalizedError {
+        case busy
+        var errorDescription: String? {
+            "A previous device operation is still running. Wait for it to finish; if a cancelled operation remains blocked, restart the app before trying again."
+        }
+    }
+
+    /// Reserve the entire run, including preparation before its first FFI call.
+    func beginRun() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !runActive && depth == 0 else { throw Failure.busy }
+        runActive = true
+    }
+
+    func endRun() {
+        lock.lock()
+        runActive = false
+        lock.unlock()
+    }
+
     private var abandoned = false
     private var abandonedLabel: String?
 

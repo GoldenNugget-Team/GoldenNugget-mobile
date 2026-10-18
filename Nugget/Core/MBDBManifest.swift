@@ -142,8 +142,8 @@ enum MBDBManifest {
             let contents = try payload.bytes()
             rows.append(Row(domain: payload.domain, path: payload.relativePath,
                             isDirectory: false,
-                            owner: rowOwner(for: payload.domain),
-                            group: rowOwner(for: payload.domain),
+                            owner: payload.owner.map(UInt32.init) ?? rowOwner(for: payload.domain),
+                            group: payload.owner.map(UInt32.init) ?? rowOwner(for: payload.domain),
                             hash: hash(contents), size: UInt64(contents.count)))
         }
         return rows

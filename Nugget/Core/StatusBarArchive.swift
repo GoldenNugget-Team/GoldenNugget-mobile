@@ -83,7 +83,7 @@ final class StatusBarArchiveCellularEntry: NSObject, NSCoding {
     /// `containsValue(forKey:)` first, which is the only safe way to ask "absent"
     /// rather than "nil".
     convenience init(coder: NSCoder) {
-        self.init(string: nil, badge: nil, displayValue: 4)
+        self.init(string: nil, badge: nil, displayValue: 0)
         if coder.containsValue(forKey: "string") {
             string = coder.decodeObject(forKey: "string") as? String
         }
@@ -220,13 +220,13 @@ enum StatusBarArchive {
     ///
     /// `status` 5 is "connected" and `enabled` true is what makes the entry
     /// render at all; `displayValue` is the bar count (the user's value wins) and
-    /// `type` 10 is 5G. `badgeString` and `suffixString` stay null unless the
-    /// user sets a badge.
+    /// `type` and unset bars stay zero: SpringBoard replaces the whole entry,
+    /// so a carrier-name edit must not fabricate 5G or a full signal.
     static let entryDefaults: [String: EntryValue] = [
         "badgeString": .null,
         "callForwardingEnabled": .value(false),
         "displayRawValue": .value(0),
-        "displayValue": .value(4),
+        "displayValue": .value(0),
         "enabled": .value(true),
         "isBootstrapCellular": .value(false),
         "lowDataModeActive": .value(false),
@@ -236,7 +236,7 @@ enum StatusBarArchive {
         "sosAvailable": .value(false),
         "status": .value(5),
         "suffixString": .null,
-        "type": .value(10),
+        "type": .value(0),
         "wifiCallingEnabled": .value(false),
     ]
 
@@ -303,7 +303,7 @@ enum StatusBarArchive {
 
     /// Clamp a bar count into the drawable range, or the verified default.
     private static func clampBars(_ value: Int?) -> Int {
-        guard let value else { return 4 }
+        guard let value else { return 0 }
         return max(0, min(maxBars, value))
     }
 
@@ -316,13 +316,9 @@ enum StatusBarArchive {
     /// for it: a Swift unarchiver substitutes this app's own classes for the
     /// names it was given, so "it decoded" says nothing about what was written.
     /// These are the names SpringBoard will look up.
-    /// Read one keyed-archiver UID out of a decoded plist.
-    ///
-    /// A plist UID is not a plain integer. `PropertyListSerialization` reads one as
-    /// a `CFKeyedArchiverUID`, which bridges to `NSNumber` on Darwin. On Linux it
-    /// comes back as swift-corelibs' own `_NSKeyedArchiverUID`, which bridges to
-    /// neither `NSNumber` nor `Int` — it is an opaque class wrapping a single
-    /// `value` field, reachable only by reflection. Darwin never takes that branch.
+    /// Read a keyed-archiver UID. The XML projection below represents native
+    /// CFKeyedArchiverUID objects as CF$UID dictionaries on Darwin as well as
+    /// corelibs, without relying on their private Swift reflection layout.
     private static func uid(_ value: Any?) -> Int? {
         guard let value else { return nil }
         // `dict[key]` hands back `Any?`, so the UID arrives wrapped in an extra
@@ -331,6 +327,9 @@ enum StatusBarArchive {
         while Mirror(reflecting: unwrapped).displayStyle == .optional,
               let some = Mirror(reflecting: unwrapped).children.first {
             unwrapped = some.value
+        }
+        if let dict = unwrapped as? [String: Any], let number = dict["GoldenNuggetUID"] as? NSNumber {
+            return number.intValue
         }
         if let number = unwrapped as? NSNumber { return number.intValue }
         if let int = unwrapped as? Int { return int }
@@ -343,25 +342,33 @@ enum StatusBarArchive {
     }
 
     static func archivedClassNames(of payload: Data) -> [String?] {
+        guard let binary = try? PropertyListSerialization.propertyList(from: payload, format: nil),
+              let xml = try? PropertyListSerialization.data(fromPropertyList: binary, format: .xml, options: 0),
+              let text = String(data: xml, encoding: .utf8),
+              // Foundation turns CF$UID dictionaries back into opaque native
+              // UIDs even when reading XML. Rename this diagnostic projection's
+              // key before parsing; the actual archive is never rewritten.
+              let projection = text.replacingOccurrences(of: "<key>CF$UID</key>",
+                                                         with: "<key>GoldenNuggetUID</key>").data(using: .utf8),
+              let plist = try? PropertyListSerialization.propertyList(from: projection, format: nil),
+              let archive = plist as? [String: Any] else { return [nil, nil, nil] }
         func className(_ keyPath: [String]) -> String? {
-            guard let plist = try? PropertyListSerialization.propertyList(from: payload, format: nil),
-                  let archive = plist as? [String: Any],
-                  archive["$archiver"] as? String == "NSKeyedArchiver",
+            guard archive["$archiver"] as? String == "NSKeyedArchiver",
                   let objects = archive["$objects"] as? [Any],
                   let top = archive["$top"] as? [String: Any],
                   let rootKey = uid(top[NSKeyedArchiveRootObjectKey]),
-                  rootKey < objects.count
+                  rootKey >= 0, rootKey < objects.count
             else { return nil }
             var current = objects[rootKey]
             for key in keyPath {
                 guard let dict = current as? [String: Any],
                       let next = uid(dict[key]),
-                      next < objects.count else { return nil }
+                      next >= 0, next < objects.count else { return nil }
                 current = objects[next]
             }
             guard let dict = current as? [String: Any],
                   let classKey = uid(dict["$class"]),
-                  classKey < objects.count,
+                  classKey >= 0, classKey < objects.count,
                   let classDef = objects[classKey] as? [String: Any]
             else { return nil }
             return classDef["$classname"] as? String

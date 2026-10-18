@@ -1,0 +1,195 @@
+diff --git a/ffi/src/tunnel_provider.rs b/ffi/src/tunnel_provider.rs
+index 58dd1f8..4d9ba34 100644
+--- a/ffi/src/tunnel_provider.rs
++++ b/ffi/src/tunnel_provider.rs
+@@ -29,6 +29,55 @@ struct PinCtx(*mut c_void);
+ unsafe impl Send for PinCtx {}
+ unsafe impl Sync for PinCtx {}
+ 
++/// Keep remote connections unchanged on desktop. On iOS the pairing peer can
++/// be the device running the app, reached initially through LocalDevVPN.
++fn tunnel_hosts(peer: std::net::IpAddr) -> Vec<std::net::IpAddr> {
++    #[allow(unused_mut)]
++    let mut hosts = vec![peer];
++    #[cfg(target_os = "ios")]
++    {
++        add_tunnel_host(&mut hosts, std::net::Ipv4Addr::LOCALHOST.into());
++        // getifaddrs owns the sockaddr pointers until freeifaddrs. Only use
++        // active IPv4 Wi-Fi/Ethernet addresses, never cellular or VPN routes.
++        unsafe {
++            let mut head: *mut libc::ifaddrs = std::ptr::null_mut();
++            if libc::getifaddrs(&mut head) == 0 {
++                let mut current = head;
++                while let Some(interface) = current.as_ref() {
++                    if !interface.ifa_addr.is_null() && !interface.ifa_name.is_null()
++                        && interface.ifa_flags & libc::IFF_UP as u32 != 0
++                        && (*interface.ifa_addr).sa_family as i32 == libc::AF_INET
++                        && CStr::from_ptr(interface.ifa_name).to_bytes().starts_with(b"en")
++                    {
++                        let addr = &*(interface.ifa_addr as *const libc::sockaddr_in);
++                        add_tunnel_host(&mut hosts, std::net::Ipv4Addr::from(
++                            addr.sin_addr.s_addr.to_ne_bytes()
++                        ).into());
++                    }
++                    current = interface.ifa_next;
++                }
++                libc::freeifaddrs(head);
++            }
++        }
++    }
++    hosts
++}
++
++#[cfg(any(target_os = "ios", test))]
++fn add_tunnel_host(hosts: &mut Vec<std::net::IpAddr>, host: std::net::IpAddr) {
++    if !hosts.contains(&host) && !host.is_unspecified() && !host.is_multicast() {
++        hosts.push(host);
++    }
++}
++
++async fn dial_tunnel(addr: std::net::SocketAddr) -> Result<tokio::net::TcpStream, IdeviceError> {
++    tokio::time::timeout(
++        std::time::Duration::from_millis(750),
++        tokio::net::TcpStream::connect(addr),
++    ).await.map_err(|_| IdeviceError::Timeout)?
++        .map_err(|e| IdeviceError::InternalError(e.to_string()))
++}
++
+ /// Shared logic: given a connected & paired `RemotePairingClient`, create
+ /// the TLS-PSK tunnel and return adapter + handshake.
+ async fn finish_tunnel(
+@@ -39,13 +88,53 @@ async fn finish_tunnel(
+ ) -> Result<(idevice::tcp::handle::AdapterHandle, RsdHandshake), IdeviceError> {
+     use idevice::remote_pairing::connect_tls_psk_tunnel_native;
+ 
+-    let tunnel_port = rpc.create_tcp_listener().await?;
+-    let mut tunnel_addr = connect_addr;
+-    tunnel_addr.set_port(tunnel_port);
+-    let tunnel_stream = run_global_timeout(|| tokio::net::TcpStream::connect(tunnel_addr))
+-        .await
+-        .map_err(|e| IdeviceError::InternalError(format!("TLS tunnel: {e}")))?;
+-    let tunnel = connect_tls_psk_tunnel_native(tunnel_stream, rpc.encryption_key()).await?;
++    // A loopback VPN may forward the pairing service without forwarding the
++    // ephemeral listener. Try local addresses as well on iOS, where the peer
++    // can be this very device. Each attempt and the whole dial are bounded.
++    let hosts = tunnel_hosts(connect_addr.ip());
++    let tunnel = tokio::time::timeout(std::time::Duration::from_secs(10), async {
++        let mut port = rpc.create_tcp_listener().await?;
++        let mut failures = Vec::new();
++        for host in hosts {
++            let addr = std::net::SocketAddr::new(host, port);
++            tracing::info!("tunnel dial: connecting to {addr}");
++            let stream = match dial_tunnel(addr).await {
++                Ok(stream) => stream,
++                Err(e) => {
++                    tracing::warn!("tunnel dial: {addr}: {e}");
++                    failures.push(format!("{addr}: {e}"));
++                    continue;
++                }
++            };
++            match tokio::time::timeout(
++                std::time::Duration::from_secs(3),
++                connect_tls_psk_tunnel_native(stream, rpc.encryption_key()),
++            ).await {
++                Ok(Ok(tunnel)) => {
++                    tracing::info!("tunnel dial: TLS/CDTunnel established through {addr}");
++                    return Ok(tunnel);
++                }
++                result => {
++                    let reason = match result {
++                        Ok(Err(e)) => format!("TLS/CDTunnel: {e}"),
++                        Err(_) => "TLS/CDTunnel timed out".to_string(),
++                        Ok(Ok(_)) => unreachable!(),
++                    };
++                    tracing::warn!("tunnel dial: {addr}: {reason}");
++                    failures.push(format!("{addr}: {reason}"));
++                    // An accepted connection can consume the listener. Ask
++                    // for a fresh one before attempting the next address.
++                    port = rpc.create_tcp_listener().await?;
++                }
++            }
++        }
++        Err(IdeviceError::InternalError(format!(
++            "TLS tunnel: no address completed the handshake [{}]",
++            failures.join("; ")
++        )))
++    }).await.map_err(|_| IdeviceError::InternalError(
++        "TLS tunnel: 10s connection budget exhausted".into()
++    ))??;
+ 
+     let client_ip: std::net::IpAddr = tunnel
+         .info
+@@ -65,11 +154,13 @@ async fn finish_tunnel(
+     adapter.set_mss(mtu.saturating_sub(60));
+     let mut adapter = adapter.to_async_handle();
+ 
+-    let rsd_stream = adapter
+-        .connect(rsd_port)
+-        .await
+-        .map_err(|e| IdeviceError::InternalError(format!("{e}")))?;
+-    let handshake = RsdHandshake::new(rsd_stream).await?;
++    let handshake = tokio::time::timeout(std::time::Duration::from_secs(5), async {
++        let rsd_stream = adapter.connect(rsd_port).await
++            .map_err(|e| IdeviceError::InternalError(format!("{e}")))?;
++        RsdHandshake::new(rsd_stream).await
++    }).await.map_err(|_| IdeviceError::InternalError(
++        "TLS tunnel: RSD handshake timed out after 5s".into()
++    ))??;
+ 
+     Ok((adapter, handshake))
+ }
+@@ -265,7 +356,9 @@ pub unsafe extern "C" fn tunnel_create_remotexpc(
+         rpc.connect(rpf, async || get_pin(pin_callback, &ctx))
+             .await?;
+ 
+-        finish_tunnel(&mut rpc, socket_addr).await
++        finish_tunnel(&mut rpc, socket_addr).await.inspect_err(|e| {
++            tracing::warn!("tunnel dial failed: {e}");
++        })
+     });
+ 
+     match res {
+@@ -334,7 +427,9 @@ pub unsafe extern "C" fn tunnel_create_rppairing(
+         rpc.connect(rpf, async || get_pin(pin_callback, &ctx))
+             .await?;
+ 
+-        finish_tunnel(&mut rpc, socket_addr).await
++        finish_tunnel(&mut rpc, socket_addr).await.inspect_err(|e| {
++            tracing::warn!("tunnel dial failed: {e}");
++        })
+     });
+ 
+     match res {
+@@ -434,3 +529,32 @@ fn get_pin(cb: Option<extern "C" fn(*mut c_void) -> *const c_char>, ctx: &PinCtx
+     }
+     "000000".to_string()
+ }
++
++#[cfg(test)]
++mod tunnel_dial_tests {
++    use super::*;
++
++    #[test]
++    fn candidates_preserve_peer_and_drop_duplicates() {
++        let peer = "10.7.0.1".parse().unwrap();
++        let local = "127.0.0.1".parse().unwrap();
++        let mut hosts = vec![peer];
++        for host in [peer, local, local, "0.0.0.0".parse().unwrap(), "224.0.0.1".parse().unwrap()] {
++            add_tunnel_host(&mut hosts, host);
++        }
++        assert_eq!(hosts, vec![peer, local]);
++    }
++
++    #[tokio::test]
++    async fn dial_reports_refusal_and_accepts_open_port() {
++        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
++        let local = listener.local_addr().unwrap();
++        // Reserve a different port, then close it, for an immediate refusal.
++        let closed = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
++        let unavailable = closed.local_addr().unwrap();
++        drop(closed);
++        assert!(dial_tunnel(unavailable).await.is_err());
++        let stream = dial_tunnel(local).await.unwrap();
++        assert_eq!(stream.peer_addr().unwrap(), local);
++    }
++}

@@ -32,6 +32,25 @@ import IDevice
 ///   * symlinks are **skipped**, never followed: following one could escape the
 ///     Media tree and duplicate content.
 enum AfcMediaBackup {
+    // The Media page and an apply can both call this store. Reserve the whole
+    // transfer so journal appends/compaction and Clear cannot race each other.
+    private static let transferLock = NSLock()
+    private static var transferActive = false
+
+    private static func beginTransfer() throws {
+        transferLock.lock()
+        defer { transferLock.unlock() }
+        guard !transferActive else {
+            throw GoldenNuggetError("A media transfer is still running. Wait for it to finish before changing the media store.")
+        }
+        transferActive = true
+    }
+
+    private static func endTransfer() {
+        transferLock.lock()
+        transferActive = false
+        transferLock.unlock()
+    }
     /// The bulk media trees, matching the reference's `AFC_MEDIA_TREES`.
     static let trees = ["DCIM", "PhotoStreamsData"]
 
@@ -135,6 +154,8 @@ enum AfcMediaBackup {
         deletingOriginals: Bool,
         onProgress: ((String) -> Void)? = nil
     ) async throws -> Manifest {
+        try beginTransfer()
+        defer { endTransfer() }
         let gateway = try await gateway()
         try FileManager.default.createDirectory(at: storeRoot, withIntermediateDirectories: true)
 
@@ -142,7 +163,11 @@ enum AfcMediaBackup {
         onProgress?("AFC media: \(survey.files.count) file(s), "
             + "\(ByteCountFormatter.string(fromByteCount: survey.bytes, countStyle: .file))")
 
-        var manifest = Manifest()
+        // The store outlives one pull. In particular, deleted originals will
+        // never appear in another survey, so their existing rows must survive.
+        var manifest = try read()
+        var indices: [String: Int] = [:]
+        for (index, row) in manifest.entries.enumerated() { indices[row.source] = index }
         var done: Int64 = 0
 
         for entry in survey.files {
@@ -165,6 +190,7 @@ enum AfcMediaBackup {
                     try handle.write(contentsOf: chunk)
                     written += Int64(chunk.count)
                 }
+                try handle.synchronize()
                 try handle.close()
             } catch {
                 try? handle.close()
@@ -186,11 +212,30 @@ enum AfcMediaBackup {
                     + "\(entry.size), wrote \(copied) / \(written). Original kept.")
             }
 
-            try? FileManager.default.removeItem(at: destination)
-            try FileManager.default.moveItem(at: partial, to: destination)
+            if FileManager.default.fileExists(atPath: destination.path) {
+                _ = try FileManager.default.replaceItemAt(destination, withItemAt: partial)
+            } else {
+                try FileManager.default.moveItem(at: partial, to: destination)
+            }
+
+            // Commit the verified copy BEFORE removing its original. Even if
+            // deletion succeeds and the process dies immediately afterwards,
+            // push() can still find and restore the copy (regardless of deleted).
+            let saved = Entry(source: entry.path, storedAs: relative, size: entry.size,
+                              modified: entry.modified, deleted: false)
+            let savedIndex: Int
+            if let index = indices[entry.path] {
+                savedIndex = index
+                manifest.entries[index] = saved
+            } else {
+                savedIndex = manifest.entries.count
+                manifest.entries.append(saved)
+                indices[entry.path] = savedIndex
+            }
+            try appendJournal(saved)
 
             var deleted = false
-            if deletingOriginals {
+            if deletingOriginals && entry.size <= inlineWriteLimit {
                 do {
                     try await gateway.afcDelete(path: entry.path)
                     deleted = true
@@ -201,9 +246,11 @@ enum AfcMediaBackup {
                 }
             }
 
-            manifest.entries.append(Entry(
-                source: entry.path, storedAs: relative, size: entry.size,
-                modified: entry.modified, deleted: deleted))
+            if deletingOriginals && entry.size > inlineWriteLimit {
+                onProgress?("AFC media: original kept for \(relative) — exceeds the 64 MiB restore limit")
+            }
+            manifest.entries[savedIndex].deleted = deleted
+            if deleted { try appendJournal(manifest.entries[savedIndex]) }
 
             done += entry.size
             onProgress?("AFC media: \(relative) — "
@@ -224,6 +271,8 @@ enum AfcMediaBackup {
     /// store once the device reports the same size back for the path it came
     /// from.
     static func push(onProgress: ((String) -> Void)? = nil) async throws {
+        try beginTransfer()
+        defer { endTransfer() }
         let manifest = try read()
         let gateway = try await gateway()
         var restored = 0
@@ -253,7 +302,7 @@ enum AfcMediaBackup {
                 .attributesOfItem(atPath: local.path)[.size] as? NSNumber)??.int64Value ?? 0
             guard size <= Self.inlineWriteLimit else {
                 onProgress?("AFC push: \(entry.storedAs) is \(size) byte(s) — too large "
-                    + "to write over AFC (limit \(Self.inlineWriteLimit)); left on the device")
+                    + "to write over AFC (limit \(Self.inlineWriteLimit)); local copy kept")
                 skipped += 1
                 continue
             }
@@ -298,11 +347,14 @@ enum AfcMediaBackup {
 
     /// Empty the store, once the originals are back and verified on the device.
     static func clear() throws {
+        try beginTransfer()
+        defer { endTransfer() }
         let fm = FileManager.default
         if fm.fileExists(atPath: storeRoot.path) { try fm.removeItem(at: storeRoot) }
         // The manifest lives inside the store, so the line above normally takes
         // it. Kept for the case where only the file is there.
         if fm.fileExists(atPath: manifestURL.path) { try fm.removeItem(at: manifestURL) }
+        invalidateCache()
     }
 
     // MARK: - Internals
@@ -330,10 +382,68 @@ enum AfcMediaBackup {
         return gateway
     }
 
+    /// Small append-only records avoid rewriting a whole photo-library index
+    /// twice per file. Each verified copy is fsynced here before its deletion.
+    static var journalURL: URL { storeRoot.appendingPathComponent("afc-media.journal") }
+
+    private static func appendJournal(_ entry: Entry) throws {
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: journalURL.path) {
+            guard fm.createFile(atPath: journalURL.path, contents: nil) else {
+                throw GoldenNuggetError("AFC media: could not create the recovery journal. Originals kept.")
+            }
+        }
+        let handle = try FileHandle(forUpdating: journalURL)
+        defer { try? handle.close() }
+        let end = try handle.seekToEnd()
+        if end > 0 {
+            try handle.seek(toOffset: end - 1)
+            if try handle.read(upToCount: 1)?.first != 0x0a {
+                // Discard a killed append before adding another record; without
+                // this, its partial JSON would swallow the next complete row.
+                var cursor = end
+                var boundary: UInt64 = 0
+                while cursor > 0 {
+                    let start = cursor > 4096 ? cursor - 4096 : 0
+                    try handle.seek(toOffset: start)
+                    let chunk = try handle.read(upToCount: Int(cursor - start)) ?? Data()
+                    if let index = chunk.lastIndex(of: 0x0a) {
+                        boundary = start + UInt64(chunk.distance(from: chunk.startIndex, to: index)) + 1
+                        break
+                    }
+                    cursor = start
+                }
+                try handle.truncate(atOffset: boundary)
+            }
+        }
+        try handle.seekToEnd()
+        var data = try JSONEncoder().encode(entry)
+        data.append(0x0a)
+        try handle.write(contentsOf: data)
+        try handle.synchronize()
+        invalidateCache()
+    }
+
     private static func write(_ manifest: Manifest) throws {
         let data = try JSONEncoder().encode(manifest)
         try FileManager.default.createDirectory(at: storeRoot, withIntermediateDirectories: true)
         try data.write(to: manifestURL, options: .atomic)
+        let handle = try FileHandle(forWritingTo: manifestURL)
+        defer { try? handle.close() }
+        try handle.synchronize()
+        // The complete index is durable first. Replaying a surviving journal
+        // after a crash is idempotent because its records replace by source.
+        if FileManager.default.fileExists(atPath: journalURL.path) {
+            try FileManager.default.removeItem(at: journalURL)
+        }
+        invalidateCache()
+    }
+
+    private static func invalidateCache() {
+        cacheLock.lock()
+        cachedKey = ""
+        cachedManifest = nil
+        cacheLock.unlock()
     }
 
     /// The decoded store manifest, memoised on the file's own identity.
@@ -361,11 +471,30 @@ enum AfcMediaBackup {
         }
         cacheLock.unlock()
 
-        let manifest: Manifest
-        if let data = try? Data(contentsOf: manifestURL) {
-            manifest = (try? JSONDecoder().decode(Manifest.self, from: data)) ?? Manifest()
+        var manifest: Manifest
+        if FileManager.default.fileExists(atPath: manifestURL.path) {
+            // A damaged journal must never be mistaken for an empty store and
+            // overwritten by a new destructive pull.
+            manifest = try JSONDecoder().decode(Manifest.self, from: Data(contentsOf: manifestURL))
         } else {
             manifest = Manifest()
+        }
+        if FileManager.default.fileExists(atPath: journalURL.path) {
+            let journal = try Data(contentsOf: journalURL)
+            var indices: [String: Int] = [:]
+            for (index, row) in manifest.entries.enumerated() { indices[row.source] = index }
+            let lines = journal.split(separator: 0x0a, omittingEmptySubsequences: true)
+            for (index, line) in lines.enumerated() {
+                // A killed append's final unterminated row never authorized
+                // deletion. The next append repairs it before writing again.
+                if index == lines.count - 1 && journal.last != 0x0a { break }
+                let entry = try JSONDecoder().decode(Entry.self, from: Data(line))
+                if let existing = indices[entry.source] { manifest.entries[existing] = entry }
+                else {
+                    indices[entry.source] = manifest.entries.count
+                    manifest.entries.append(entry)
+                }
+            }
         }
         cacheLock.lock()
         cachedKey = key
@@ -376,11 +505,13 @@ enum AfcMediaBackup {
 
     /// `"<size>:<mtime>"`, or `"<absent>"` when there is no manifest yet.
     private static func manifestCacheKey() -> String {
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: manifestURL.path),
-              let size = attrs[.size] as? Int,
-              let modified = attrs[.modificationDate] as? Date else {
-            return "<absent>"
-        }
-        return "\(size):\(modified.timeIntervalSince1970)"
+        [manifestURL, journalURL].map { url in
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  let size = attrs[.size] as? Int,
+                  let modified = attrs[.modificationDate] as? Date else {
+                return "\(url.path):<absent>"
+            }
+            return "\(url.path):\(size):\(modified.timeIntervalSince1970)"
+        }.joined(separator: "|")
     }
 }

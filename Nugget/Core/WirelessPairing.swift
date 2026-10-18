@@ -137,7 +137,22 @@ final class WirelessPairing: NSObject, ObservableObject, NetServiceDelegate {
         generation += 1
         let runGeneration = generation
         let savedAltIRK = UserDefaults.standard.string(forKey: Self.hostAltIRKKey)
-        let outPath = AppPaths.pairingFile.path(percentEncoded: false)
+        // Rust cannot cancel its accept/handshake. Give every run its own file
+        // so a superseded run cannot overwrite the currently trusted record.
+        let stage = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pairing-\(UUID().uuidString)", isDirectory: true)
+        let stagedRecord = stage.appendingPathComponent("pairingfile.mobiledevicepairing")
+        do {
+            try FileManager.default.createDirectory(at: stage, withIntermediateDirectories: true)
+            if FileManager.default.fileExists(atPath: AppPaths.pairingFile.path) {
+                try FileManager.default.copyItem(at: AppPaths.pairingFile, to: stagedRecord)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: stage)
+            phase = .failed(error.localizedDescription)
+            return
+        }
+        let outPath = stagedRecord.path(percentEncoded: false)
 
         GoldenNuggetEngine.shared.log("wireless pair: advertising as \(Self.hostName)/\(MinimuxerConstants.defaultHostModel), "
             + "record → \(AppPaths.pairingFile.lastPathComponent)")
@@ -169,6 +184,7 @@ final class WirelessPairing: NSObject, ObservableObject, NetServiceDelegate {
                 result = .failure(error)
             }
             DispatchQueue.main.async {
+                defer { try? FileManager.default.removeItem(at: stage) }
                 self?.finish(result, generation: runGeneration)
             }
         }
@@ -209,17 +225,25 @@ final class WirelessPairing: NSObject, ObservableObject, NetServiceDelegate {
 
     /// Handle the run's terminal result.  Main thread.
     private func finish(_ result: Result<AirliftPairing.Paired, Swift.Error>, generation runGeneration: Int) {
+        guard runGeneration == generation else { return }
         stopAdvertising()
         endBackgroundTask()
-        guard runGeneration == generation else { return }
 
         switch result {
         case .success(let paired):
+            do {
+                let record = try Data(contentsOf: URL(fileURLWithPath: paired.pairingFilePath))
+                try record.write(to: AppPaths.pairingFile, options: .atomic)
+            } catch {
+                phase = .failed(error.localizedDescription)
+                GoldenNuggetEngine.shared.log("wireless pair: could not save record — \(error.localizedDescription)")
+                return
+            }
             if !paired.hostAltIRKHex.isEmpty {
                 UserDefaults.standard.set(paired.hostAltIRKHex, forKey: Self.hostAltIRKKey)
             }
             phase = .paired
-            generatedRecordPath = paired.pairingFilePath
+            generatedRecordPath = AppPaths.pairingFile.path(percentEncoded: false)
             GoldenNuggetEngine.shared.log("wireless pair: completed — \(paired.deviceName) "
                 + "(\(paired.deviceModel)) → \(paired.pairingFilePath)")
         case .failure(let error):

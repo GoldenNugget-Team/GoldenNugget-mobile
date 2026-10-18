@@ -84,7 +84,7 @@ NLIST_64_SIZE = 16
 
 
 def ar_tool() -> str:
-    """Locate llvm-ar; GNU binutils `ar` and `nm` cannot read Mach-O objects."""
+    """Locate LLVM or Apple's ar; GNU binutils cannot read Mach-O objects."""
     for candidate in (
         os.environ.get("LLVM_AR"),
         "llvm-ar",
@@ -95,7 +95,11 @@ def ar_tool() -> str:
         found = shutil.which(candidate) or (candidate if Path(candidate).is_file() else None)
         if found:
             return found
-    sys.exit("llvm-ar not found; set LLVM_AR to its path")
+    if xcrun := shutil.which("xcrun"):
+        result = subprocess.run([xcrun, "--find", "ar"], capture_output=True, text=True)
+        if result.returncode == 0 and Path(result.stdout.strip()).is_file():
+            return result.stdout.strip()
+    sys.exit("no Mach-O ar found; set LLVM_AR to its path")
 
 
 def symtab_of(data: bytes) -> tuple[int, int, int] | None:
@@ -165,6 +169,10 @@ def extract(archive: Path, dest: Path) -> dict[str, Path]:
     if result.returncode != 0:
         sys.exit(f"llvm-ar failed to unpack {archive}: "
                  f"{result.stderr.decode(errors='replace').strip()}")
+    # Apple's ar also extracts its symbol index, sometimes with mode 000.
+    # It is archive metadata, not a Mach-O member to scan or re-archive.
+    for path in dest.glob("__.SYMDEF*"):
+        path.unlink()
     return {p.name: p for p in dest.iterdir() if p.is_file()}
 
 

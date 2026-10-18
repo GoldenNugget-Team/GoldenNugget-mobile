@@ -244,7 +244,7 @@ struct TweaksView: View {
     private var visibleSpecs: [TweakSpec] {
         TweakCatalog.all.filter {
             $0.section != .daemons
-                && $0.isCompatible(deviceVersion: identity.version, isIPhone: identity.isIPhone)
+                && $0.isCompatible(deviceVersion: identity.version, isIPhone: identity.isIPhone, deviceModel: identity.productType)
                 && matchesSearch($0)
         }
     }
@@ -307,7 +307,7 @@ struct TweaksView: View {
             let preset = try GoldenNuggetPreset.parse(data)
             let report = GoldenNuggetPresetImport.apply(preset, to: &selection,
                                                         deviceVersion: identity.version,
-                                                        isIPhone: identity.isIPhone)
+                                                        isIPhone: identity.isIPhone, deviceModel: identity.productType)
             // The log is the durable half of the report: the sheet can be
             // dismissed, the run log cannot.
             for line in report.logLines { GoldenNuggetEngine.shared.log(line) }

@@ -69,27 +69,12 @@ enum TweakValue: Equatable, Sendable {
             case .string(let s): return .bool((s as NSString).boolValue)
             }
         case .number:
-            // Whichever numeric case the registry default uses is the one the
-            // device was always meant to see.
-            switch spec.value {
-            case .double:
-                switch self {
-                case .int(let i): return .double(Double(i))
-                case .double(let d): return .double(d)
-                case .bool(let b): return .double(b ? 1 : 0)
-                case .string(let s): return .double(Double(s) ?? 0)
-                }
-            default:
-                switch self {
-                case .int(let i): return .int(i)
-                case .double(let d): return d == d.rounded() ? .int(Int(d)) : .double(d)
-                case .bool(let b): return .int(b ? 1 : 0)
-                case .string(let s):
-                    if let i = Int(s) { return .int(i) }
-                    if let d = Double(s) { return .double(d) }
-                    return .int(0)
-                }
-            }
+            // Imports obey the same finite/range/type rules as the editor.
+            // Int(Double) traps for large JSON numbers before any later clamp.
+            let raw: String
+            if case .bool(let b) = self { raw = b ? "1" : "0" }
+            else { raw = display }
+            return spec.numberValue(from: raw) ?? spec.value
         case .text:
             return .string(display)
         }
@@ -121,6 +106,9 @@ struct TweakSpec: Sendable {
     let disabled: Bool
     let detail: String?
     let multiValues: [String: TweakValue]?
+    /// ReversibleBooleanPlistTweak writes false on a subsequent disabled apply.
+    var reversibleBoolean: Bool = false
+    var requiresDynamicIsland: Bool = false
 
     /// Whether this tweak writes a whole dict rather than a single key.
     var writesWholeDict: Bool { multiValues != nil }
@@ -175,9 +163,12 @@ extension TweakSpec {
     /// `deviceVersion` is the device's `ProductVersion` (`27.0`), read from
     /// lockdown; `isIPhone` is `ProductType.hasPrefix("iPhone")`, which is how
     /// the reference derives it (`src/gui/ios/tweaks.py:107`).
-    func isCompatible(deviceVersion: String, isIPhone: Bool) -> Bool {
+    func isCompatible(deviceVersion: String, isIPhone: Bool, deviceModel: String = "") -> Bool {
         if disabled { return false }
+        if deviceVersion.isEmpty && deviceModel.isEmpty { return true }
         if !deviceVersion.isEmpty {
+            guard let range = deviceVersion.range(of: "[0-9]+(\\.[0-9]+){0,3}", options: .regularExpression) else { return false }
+            let deviceVersion = String(deviceVersion[range])
             if let minVersion,
                let cmp = TweakVersion.compare(deviceVersion, minVersion), cmp < 0 { return false }
             if let maxVersion,
@@ -185,6 +176,7 @@ extension TweakSpec {
         }
         if ipadOnly && isIPhone { return false }
         if iphoneOnly && !isIPhone { return false }
+        if requiresDynamicIsland && !TweakDeviceCapabilities.hasDynamicIsland(deviceModel) { return false }
         return true
     }
 
@@ -200,7 +192,8 @@ extension TweakSpec {
         guard !trimmed.isEmpty, let parsed = Double(trimmed), parsed.isFinite else { return nil }
         let clamped = Swift.min(Swift.max(parsed, minValue), maxValue)
         if case .double = value { return .double(clamped) }
-        return .int(Int(clamped.rounded()))
+        guard let integer = Int(exactly: clamped.rounded()) else { return nil }
+        return .int(integer)
     }
 
     /// The units line under a `.number` editor.

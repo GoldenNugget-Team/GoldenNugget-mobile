@@ -47,7 +47,7 @@ enum TweakConflicts {
     static func find(in selection: TweakSelection,
                      specs: [TweakSpec],
                      deviceVersion: String,
-                     isIPhone: Bool) -> [TweakConflict] {
+                     isIPhone: Bool, deviceModel: String = "") -> [TweakConflict] {
         // location → [(id, payload)], in first-write order.
         var writers: [TweakFileLocation: [(id: String, payload: [String: Any]?)]] = [:]
         var conflicts: [TweakConflict] = []
@@ -57,7 +57,7 @@ enum TweakConflicts {
             // current_conflicts drops what HotLoad hides; the reference's UI
             // hides the same set.  This port never renders an incompatible tweak,
             // so filtering them here reports what the user can actually see.
-            guard spec.isCompatible(deviceVersion: deviceVersion, isIPhone: isIPhone) else { continue }
+            guard spec.isCompatible(deviceVersion: deviceVersion, isIPhone: isIPhone, deviceModel: deviceModel) else { continue }
 
             // `isinstance(tweak, NullifyFileTweak)` → None, else
             // `apply_tweak({})[file_location]`: a whole-dict writer contributes
@@ -113,9 +113,9 @@ enum TweakConflicts {
     /// (`tweak_conflicts.py:63`), run against the whole catalog.
     static func current(in selection: TweakSelection,
                         deviceVersion: String,
-                        isIPhone: Bool) -> [TweakConflict] {
+                        isIPhone: Bool, deviceModel: String = "") -> [TweakConflict] {
         find(in: selection, specs: TweakCatalog.allWithDaemons,
-             deviceVersion: deviceVersion, isIPhone: isIPhone)
+             deviceVersion: deviceVersion, isIPhone: isIPhone, deviceModel: deviceModel)
     }
 
     private static func byID(_ id: String, in specs: [TweakSpec]) -> TweakSpec? {

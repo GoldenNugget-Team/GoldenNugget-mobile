@@ -181,13 +181,19 @@ def emit(output: list[str], FileLocation, SPECS, Kind, Section) -> None:
         w(f"            ipadOnly: {'true' if spec.ipad_only else 'false'},")
         w(f"            disabled: {'true' if spec.disabled else 'false'},")
         w(f"            detail: {swift_string(spec.description) if spec.description else 'nil'},")
-        if spec.factory is not None:
+        instance = spec.factory() if spec.factory is not None else None
+        reversible = instance is not None and type(instance).__name__ == "ReversibleBooleanPlistTweak"
+        if instance is not None and not reversible:
+            if type(instance).__name__ != "AdvancedPlistTweak" or not isinstance(instance.value, dict):
+                die(f"unsupported factory for {spec.id.name}: {type(instance).__name__}")
             w("            multiValues: [")
-            for key, value in spec.factory().value.items():
+            for key, value in instance.value.items():
                 w(f"                {swift_string(key)}: {swift_value(value)},")
-            w("            ]")
+            w("            ],")
         else:
-            w("            multiValues: nil")
+            w("            multiValues: nil,")
+        w(f"            reversibleBoolean: {'true' if reversible else 'false'},")
+        w(f"            requiresDynamicIsland: {'true' if spec.requires_dynamic_island else 'false'}")
         w(f"        ),")
     w("    ]")
     w("")
@@ -219,6 +225,13 @@ def main() -> int:
 
     lines: list[str] = []
     emit(lines, FileLocation, SPECS, Kind, Section)
+    import runpy
+    capabilities = runpy.run_path(str(Path(args.goldennugget) / "src/devicemanagement/device_capabilities.py"))
+    lines += ["", "/// Known Dynamic Island models, generated from desktop device_capabilities.py.",
+              "enum TweakDeviceCapabilities {", "    static func hasDynamicIsland(_ model: String) -> Bool {",
+              "        let models: Set<String> = ["]
+    lines += [f"            {swift_string(model)}," for model in sorted(capabilities["_DYNAMIC_ISLAND_MODELS"])]
+    lines += ["        ]", "        return models.contains(model.trimmingCharacters(in: .whitespacesAndNewlines))", "    }", "}", ""]
     generated = "\n".join(lines)
 
     if args.check:

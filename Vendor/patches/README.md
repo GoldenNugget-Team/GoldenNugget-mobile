@@ -114,6 +114,36 @@ If everything under `HomeDomain` shows as drained, the `device_name` handed to
 the callback is the bare domain and the path rules in
 `ProtectiveBackup.isProtectiveFile` never fire.
 
+## LocalDevVPN and wireless pairing
+
+`idevice-ffi/local_tunnel.patch` fixes the connection after pair-verify. The
+pairing service can answer through the VPN peer while the ephemeral TCP port
+returned by `createListener` is only reachable directly on the device. On iOS,
+the tunnel dial now tries the pairing peer, loopback, then active Wi-Fi/Ethernet
+IPv4 addresses, dropping duplicate addresses. Desktop keeps the original peer.
+
+TCP attempts take at most 750 ms each, TLS/CDTunnel handshakes at most 3 s,
+and the whole listener/dial phase at most 10 s. A failed TLS attempt gets a new
+listener before trying another address; RSD inside the tunnel has a separate
+5 s limit. Rust logs each attempted address and the final failure, so a tunnel
+failure is distinguishable from a rejected pairing record.
+
+The patch must be applied to **IDevice**, whose C entry point Minimuxer calls.
+Changing AirliftFFI's copy alone leaves the linked IDevice implementation in
+use. After installing a rebuilt IDevice archive, re-run
+`scripts/dedupe-airlift-archive.py` against it before linking the app.
+
+## Pairing log privacy
+
+`idevice-ffi/redact_pairing.patch` removes the RemotePairing dictionary dump,
+which included the host's Ed25519 private key and altIRK at Debug level. The
+same change is applied to AirliftFFI's vendored reader. File logging can remain
+at Debug for transport diagnostics without including those credentials.
+
+Rebuild/install IDevice first, then AirliftFFI with `--install` so deduplication
+runs against the updated IDevice archive. Verify the linked results with
+`python3 scripts/check-pairing-log-privacy.py --archives`.
+
 ## Rebuilding
 
 ```

@@ -65,7 +65,7 @@ struct PresetManagerView: View {
             await deviceMonitor.refresh()
             refresh()
         }
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json, .data, .zip]) { result in
             switch result {
             case .success(let url): importPreset(from: url)
             case .failure(let error): setMessage(error.localizedDescription, .error)
@@ -252,6 +252,8 @@ struct PresetManagerView: View {
             return
         }
         let stored = GoldenNuggetPresets.sanitize(name)
+        do { try CommunityTemplateStore.shared.saveSelection(in: stored) }
+        catch { setMessage(error.localizedDescription, .error); return }
         setMessage("Preset \"\(stored)\" saved.", .success)
         newName = ""
         newDescription = ""
@@ -329,11 +331,17 @@ struct PresetManagerView: View {
     /// `PresetManager.load_preset`'s observable effect, ported: apply the parsed
     /// preset to the live selection, keep it as the autosave, and log the report.
     private func apply(_ preset: GoldenNuggetPreset, label: String) {
+        do { try CommunityTemplateStore.shared.loadPreset(preset) }
+        catch { setMessage(error.localizedDescription, .error); return }
         var mutable = selection
-        let report = GoldenNuggetPresetImport.apply(preset, to: &mutable,
+        var report = GoldenNuggetPresetImport.apply(preset, to: &mutable,
                                                     deviceVersion: identity.version,
-                                                    isIPhone: identity.isIPhone)
+                                                    isIPhone: identity.isIPhone, deviceModel: identity.productType)
         selection = mutable
+        if preset.entries.contains(where: { $0.id == "Templates" }) {
+            report.skippedUnported.removeAll { $0.id == "Templates" }
+            report.applied.append("Templates")
+        }
         _ = GoldenNuggetAutosave.save(selection, identity: identity)
         for line in report.logLines { GoldenNuggetEngine.shared.log(line) }
         loadReport = report
@@ -350,9 +358,10 @@ struct PresetManagerView: View {
             return
         }
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(GoldenNuggetPresets.sanitize(info.name)).json")
+            .appendingPathComponent("\(GoldenNuggetPresets.sanitize(info.name)).gnpreset")
         do {
-            try data.write(to: url, options: .atomic)
+            guard let document = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw CommunityError("Invalid preset.") }
+            try PortablePreset.export(document, to: url)
             share = ShareItem(url: url)
         } catch {
             setMessage("Failed to export preset: \(error.localizedDescription)", .error)
@@ -387,7 +396,7 @@ struct PresetManagerView: View {
     private func importPreset(from url: URL) {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        let (ok, result) = GoldenNuggetPresets.importPreset(from: url, newName: nil)
+        let (ok, result) = PortablePreset.importFile(url)
         if ok {
             refresh()
             selectedName = result

@@ -12,6 +12,15 @@ import Foundation
 /// shape); this file is the folder's bookkeeping: names, metadata, import
 /// validation, and the internal `__LastApplied`/`__Rollback` snapshots.
 enum GoldenNuggetPresets {
+    static func attachTemplates(_ entry: [String: Any], to name: String) throws {
+        let file = fileURL(for: name)
+        guard var document = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any] else {
+            throw GoldenNuggetError("Cannot read the saved preset.")
+        }
+        var tweaks = document["tweaks"] as? [String: Any] ?? [:]
+        tweaks["Templates"] = entry; document["tweaks"] = tweaks
+        try JSONSerialization.data(withJSONObject: document, options: [.prettyPrinted, .sortedKeys]).write(to: file, options: .atomic)
+    }
     /// `PRESETS_DIR_NAME` (`preset_manager.py:22`).
     static let directoryName = "Presets"
     /// Internal snapshot names (`main_window_mixins.py:1090`): the last
@@ -167,12 +176,13 @@ enum GoldenNuggetPresets {
         // allWithDaemons, not all: the daemons live in a separate catalog
         // collection, so iterating `all` would write a preset that silently
         // omitted every daemon group.
-        for spec in TweakCatalog.allWithDaemons where spec.id != "PosterBoard" {
+        for spec in TweakCatalog.allWithDaemons where spec.id != "PosterBoard" && !spec.id.hasPrefix("Daemon.") {
             var entry: [String: Any] = [
                 // `type(tweak).__name__`.  A spec that writes a whole dict is
                 // the reference's `AdvancedPlistTweak`, everything else is a
                 // `BasicPlistTweak` (`tweak_classes.py:59`, `:115`).
-                "type": spec.writesWholeDict ? "AdvancedPlistTweak" : "BasicPlistTweak",
+                "type": spec.writesWholeDict ? "AdvancedPlistTweak"
+                    : (spec.reversibleBoolean ? "ReversibleBooleanPlistTweak" : "BasicPlistTweak"),
                 "enabled": selection.isOn(spec),
             ]
             if spec.writesWholeDict {
@@ -188,6 +198,17 @@ enum GoldenNuggetPresets {
             }
             tweaks[spec.id] = entry
         }
+        // Desktop has one Daemons enum entry, not the mobile UI's group IDs.
+        // A GN1 code carrying Daemon.* would otherwise lose every daemon on desktop.
+        var daemonValues: [String: Any] = Dictionary(uniqueKeysWithValues: DaemonGroups.allowedKeys.map { ($0, false) })
+        var daemonsEnabled = false
+        for spec in TweakCatalog.daemonSpecs where selection.isOn(spec) {
+            daemonsEnabled = true
+            for (key, value) in selection.multiValues(for: spec) ?? [:] where DaemonGroups.allowedKeys.contains(key) {
+                daemonValues[key] = value.plistObject
+            }
+        }
+        tweaks["Daemons"] = ["type": "AdvancedPlistTweak", "enabled": daemonsEnabled, "value": daemonValues]
 
         let now = Int(Date().timeIntervalSince1970)
         let metadata: [String: Any] = [

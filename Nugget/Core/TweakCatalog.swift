@@ -76,7 +76,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Forces the older Solarium rendering path instead of the newer one. Useful for troubleshooting or for devices where the current Solarium engine misbehaves on iOS 26.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "IgnoreSolariumLinkedOnCheck",
@@ -95,7 +97,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Ignores the compile-time (linked-on) SDK version check for Solarium, allowing Liquid Glass features to run that would otherwise be gated by the SDK an app was built with.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "ForceSolariumIntelligence",
@@ -114,7 +118,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Forces the experimental Solarium 'Intelligence' rendering features (adaptive, machine-driven effects) on iOS 27 where they are not enabled by default.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "ForceEnhancedSpeculars",
@@ -133,7 +139,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables the enhanced specular (highlight and reflection) rendering pass that is normally only used on the most capable devices.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "UISolariumFallback",
@@ -152,7 +160,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Forces UIKit to use the fallback Solarium path when rendering UI. Can fix broken or glitchy system UI on some iOS 27 devices.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "IgnoreSolariumHardwareCheck",
@@ -171,7 +181,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Disables the hardware capability check for Solarium, enabling Liquid Glass effects on devices officially considered too weak.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "IgnoreSolariumOptOut",
@@ -190,7 +202,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Ignores the system opt-out flag for Solarium, re-enabling Liquid Glass on devices or firmware that have it switched off.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "DisallowGlassButtons",
@@ -209,7 +223,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Prevents the Liquid Glass material from being applied to system buttons, keeping the old solid button style.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "DisallowGlassLockScreen",
@@ -228,7 +244,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Prevents the Liquid Glass material from being applied to the Lock Screen, keeping the old lock screen look.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "DisableSpecularEverywhere",
@@ -247,7 +265,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Disables the specular (glossy reflection) rendering everywhere, removing the shiny glass highlight from Liquid Glass surfaces.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NoLiquidClock",
@@ -266,7 +286,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Renders the Lock Screen clock in the old solid style instead of with the Liquid Glass / dew effect.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NoLiquidDock",
@@ -285,7 +307,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Renders the Home Screen dock in the old solid style instead of with the Liquid Glass material.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "DisableSpecularMotion",
@@ -304,7 +328,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Disables the motion-based specular effect on the Lock Screen, so the moving light reflection no longer shifts as you tilt your device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "DisableOuterRefraction",
@@ -323,7 +349,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Disables the outer refraction (the liquid bending of content at the glass edge) for a cleaner, less distorted look.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "DisableSolariumHDR",
@@ -342,7 +370,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Disables HDR tone-mapping in the Solarium renderer. Can fix washed-out or over-bright Liquid Glass areas. Select this tweak to disable HDR.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "DisableWidgetSpecular",
@@ -361,7 +391,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Removes the specular (glossy highlight) pass from Home Screen widget icons, so they no longer catch a moving highlight.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "DisableDockSpecular",
@@ -380,7 +412,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Removes the specular highlight from the Home Screen dock, leaving the glass material without its glossy sheen.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "DisableFolderSpecular",
@@ -399,7 +433,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Removes the specular highlight from Home Screen folder backgrounds.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "ExcludeClearGlassShadows",
@@ -418,7 +454,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Drops every shadow the Clear Glass material casts. Useful when the shadows make light wallpapers look muddy.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "ExcludeDockShadow",
@@ -437,7 +475,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Removes the drop shadow under the Home Screen dock.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "ExcludeSearchShadow",
@@ -456,7 +496,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Removes the drop shadow under the Home Screen search field.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "UseFlatIconsEverywhere",
@@ -475,7 +517,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Draws Home Screen icons in the flat style instead of the glass/3D look.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "GlassContainerLogging",
@@ -494,7 +538,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables glass container debug logging (com.apple.SwiftUI UserDefaults key).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FlexiGlassMacOS",
@@ -513,7 +559,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables FlexiGlass on the macOS-side rendering path (com.apple.SwiftUI UserDefaults key).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FlexiGlassMacOSPointer",
@@ -532,7 +580,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables the pointer variant of FlexiGlass on the macOS-side path (com.apple.SwiftUI UserDefaults key).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "InvisibilitySuppressesGlass",
@@ -551,7 +601,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "When enabled, invisible views suppress the glass effect applied to them (com.apple.UIKit UserDefaults key).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "EnableGlassEffectBridgeLayers",
@@ -570,7 +622,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables glass effect bridge layers (bare UserDefaults key, read via NSGlobalDomain fallback).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "EnableGaussianGlassEffectBridgeLayers",
@@ -589,7 +643,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables gaussian glass effect bridge layers (bare UserDefaults key, read via NSGlobalDomain fallback).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "UnifiedSystemBackgroundColorsEnabled",
@@ -608,7 +664,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables unified system background colors across the system (bare UserDefaults key, read via NSGlobalDomain fallback).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "UnaryGlassContainerEnabled",
@@ -627,7 +685,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables the unary glass container (bare UserDefaults key, read via NSGlobalDomain fallback).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "EnableSolariumCompactChrome",
@@ -646,7 +706,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables compact chrome in the Solarium renderer (UIKit debug cluster, bare UserDefaults key).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "DisableSolariumCompactChrome",
@@ -665,7 +727,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Disables compact chrome in the Solarium renderer (UIKit debug cluster, bare UserDefaults key).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SolariumIncreasedDiffusion",
@@ -684,7 +748,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Increases the diffusion / legibility axis of the glass recipe, orthogonal to the tint amount.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SolariumUseDisplayAngle",
@@ -703,7 +769,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Uses the display angle to drive glass highlights.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SolariumTintMask",
@@ -722,7 +790,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables the Solarium tint mask.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SolariumBackgroundFilter",
@@ -741,7 +811,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables the Solarium background filter.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SolariumHighlightWhite",
@@ -760,7 +832,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "White point of the glass highlight (0.0 to 1.0). Defaults to 1.0 (full white). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SolariumLiveTuning",
@@ -779,7 +853,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables the Solarium live tuning switch — allows real-time glass parameter changes.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SolariumHierarchicalStyle",
@@ -798,7 +874,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Sets the Solarium hierarchical glass style level (integer 0–10). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "GlassHierarchicalStyle",
@@ -817,7 +895,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Alternative entry for the hierarchical glass style level (integer 0–10). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "GlassVisualDebug",
@@ -836,7 +916,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Overlays glass visual debug information on screen (debug/tuning key).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "GlassVisualWarnings",
@@ -855,7 +937,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Shows glass visual warnings overlay (debug/tuning key).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "BlurFillExperiment",
@@ -874,7 +958,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables the blur fill experiment path (debug/tuning key, exact behavior unknown).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "AdaptiveGlassHysteresisDarkRange",
@@ -893,7 +979,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Adaptive glass hysteresis dark range — list of floating-point thresholds. Type inferred as Array<Number>; written as text for this test UI, so may be ignored by the framework. Unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "AdaptiveGlassHysteresisLightRange",
@@ -912,7 +1000,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Adaptive glass hysteresis light range — list of floating-point thresholds. Type inferred as Array<Number>; written as text for this test UI, so may be ignored by the framework. Unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "CalistogaLargeRefraction",
@@ -931,7 +1021,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables the large refraction effect (Calistoga = internal code name for the glass material).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "CalistogaRegularClearer",
@@ -950,7 +1042,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Makes the regular tier glass render clearer (Calistoga).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "CalistogaBackdropMarginIncludesBlur",
@@ -969,7 +1063,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Backdrop margin calculation includes the blur extent (Calistoga).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "CalistogaAllowLumaTracking",
@@ -988,7 +1084,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Allows luminance (luma) tracking to drive glass adaptation (Calistoga).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "CalistogaSidebarAccentOpacity",
@@ -1007,7 +1105,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Opacity of the sidebar accent under the glass material (0.0–1.0, Calistoga). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "CalistogaPerceptualBackdropScale",
@@ -1026,7 +1126,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Perceptual backdrop scale factor for the glass material (0.0–2.0, Calistoga). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "CalistogaKeyboardGlass",
@@ -1045,7 +1147,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Applies the glass material to the keyboard (Calistoga).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "CalistogaCameraGlass",
@@ -1064,7 +1168,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Applies the glass material to the camera surface (Calistoga).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FloatingContentViewSpecularHighlightOpacity",
@@ -1083,7 +1189,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Opacity of the specular highlight on floating content views (0 = off, 1 = full). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FloatingContentViewUnfocusedBorderOpacity",
@@ -1102,7 +1210,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Opacity of the unfocused border on floating content views. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FloatingContentViewUnfocusedBorderWidth",
@@ -1121,7 +1231,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Width of the unfocused border on floating content views. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FloatingContentViewEnableBackgroundFills",
@@ -1140,7 +1252,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables background fills on floating content views.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FloatingContentViewDebugBackgroundFills",
@@ -1159,7 +1273,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables debug background fills on floating content views (debug variant of the above).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FloatingContentViewPunchoutShadow",
@@ -1178,7 +1294,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables punchout shadow on floating content views.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FloatingContentViewModifyTransformMode",
@@ -1197,7 +1315,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Transform mode for floating content view stacking (integer). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FloatingContentViewOverrideRotationX",
@@ -1216,7 +1336,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Forced X-axis rotation for floating content views (degrees). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FloatingContentViewOverrideRotationY",
@@ -1235,7 +1357,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Forced Y-axis rotation for floating content views (degrees). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FloatingContentViewOverrideTranslationX",
@@ -1254,7 +1378,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Forced X-axis translation for floating content views (points). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FloatingContentViewOverrideTranslationY",
@@ -1273,7 +1399,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Forced Y-axis translation for floating content views (points). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FloatingContentViewModifyRotationStrength",
@@ -1292,7 +1420,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Multiplier for the rotation applied to floating content views. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FloatingContentViewModifyTranslationStrength",
@@ -1311,7 +1441,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Multiplier for the translation applied to floating content views. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FocusSpecularHighlightMaxSize",
@@ -1330,7 +1462,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Maximum size of the focus specular highlight (0–1). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FocusSpecularHighlightScaleFactor",
@@ -1349,7 +1483,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Scale factor of the focus specular highlight. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FocusSpecularHighlightSensitivity",
@@ -1368,7 +1504,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Sensitivity of the focus specular highlight to focus changes. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FocusSpecularHighlightNormalizedPositionX",
@@ -1387,7 +1525,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Normalized X position of the focus specular highlight (0–1). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "FocusSpecularHighlightNormalizedPositionY",
@@ -1406,7 +1546,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Normalized Y position of the focus specular highlight (0–1). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImageRenderingEnabled",
@@ -1425,7 +1567,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables the new stacked image rendering pipeline for Home Screen icons (3D parallax layering).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImageFiltersEnabled",
@@ -1444,7 +1588,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables image filters in the stacked image rendering pipeline.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImage3DTransformsEnabled",
@@ -1463,7 +1609,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables 3D transforms in the stacked image rendering pipeline.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImage3DTransformedGlassLayer",
@@ -1482,7 +1630,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables the 3D-transformed glass layer in the stacked image rendering pipeline.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImageSpecularEnabled",
@@ -1501,7 +1651,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables specular highlights on stacked images.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImageSpecularOpacity",
@@ -1520,7 +1672,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Opacity of specular highlights on stacked images (0 = off). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImageRadiosityEnabled",
@@ -1539,7 +1693,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables radiosity (color bleed from nearby surfaces) in the stacked image pipeline.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImageForceAdjustMotionForSize",
@@ -1558,7 +1714,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Forces the stacked image motion adjustment to adapt to icon size.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImageForceDefaultScaleSizeIncrease",
@@ -1577,7 +1735,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Forces the default scale size increase in the stacked image rendering.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImageInnerParallaxScale",
@@ -1596,7 +1756,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Inner parallax scale of the stacked image (0–1). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImageAsymmetricScale",
@@ -1615,7 +1777,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Asymmetric scale of the stacked image (controls non-uniform X/Y scaling). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImageProgressiveScale",
@@ -1634,7 +1798,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Progressive scale of the stacked image across depth layers. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImageAdditionalTranslation",
@@ -1653,7 +1819,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Additional translation applied to stacked images (points). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NewStackedImageFocusedAdditionalScaleAmount",
@@ -1672,7 +1840,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Additional scale applied to the focused stacked image. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "StackedImageContainerDefaultMaxDepth",
@@ -1691,7 +1861,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Default maximum depth of the stacked image container (points). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "StackedImageContainerDefaultRotationX",
@@ -1710,7 +1882,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Default X-axis rotation of the stacked image container (degrees). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "StackedImageContainerDefaultRotationY",
@@ -1729,7 +1903,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Default Y-axis rotation of the stacked image container (degrees). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "StackedImageContainerDefaultTranslationX",
@@ -1748,7 +1924,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Default X-axis translation of the stacked image container (points). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "StackedImageContainerDefaultTranslationY",
@@ -1767,7 +1945,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Default Y-axis translation of the stacked image container (points). Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "StackedImageContainerModifyMaxDepthStrength",
@@ -1786,7 +1966,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Multiplier for the maximum depth modification of the stacked image container. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "StackedImageContainerModifyRotationStrength",
@@ -1805,7 +1987,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Multiplier for the rotation modification of the stacked image container. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "StackedImageContainerModifyTranslationStrength",
@@ -1824,7 +2008,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Multiplier for the translation modification of the stacked image container. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "StackedImageContainerModifyInnerParallaxScaleStrength",
@@ -1843,7 +2029,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Multiplier for the inner parallax scale modification of the stacked image container. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "StackedImageContainerModifyTransformMinWidth",
@@ -1862,7 +2050,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Minimum width threshold for triggering stacked image container transforms. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "StackedImageContainerModifyTransformMaxWidth",
@@ -1881,7 +2071,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Maximum width threshold for stacked image container transforms. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "StackedImageContainerModifyTransformMinHeight",
@@ -1900,7 +2092,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Minimum height threshold for triggering stacked image container transforms. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "StackedImageContainerModifyTransformMaxHeight",
@@ -1919,7 +2113,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Maximum height threshold for stacked image container transforms. Type inferred; unverified on-device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "LockScreenFootnote",
@@ -1938,7 +2134,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Sets custom text shown at the bottom of the Lock Screen below the time. Long text is cut off — keep it short. Leave empty to remove.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "WatchOSCompatibility",
@@ -1965,7 +2163,9 @@ enum TweakCatalog {
                 "lastRestoreIdentifier_state": .int(0),
                 "AdvertisingIdentifierSeed": .string("85E70251-1960-4DA0-A321-B68AC118FAB5"),
                 "minPairingCompatibilityVersion": .int(1),
-            ]
+            ],
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "AirDropDisableTimeLimit",
@@ -1984,7 +2184,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Unlocks the hidden 'Everyone' AirDrop receiving option that would normally be limited to a 10-minute time window.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SBDontLockAfterCrash",
@@ -2003,7 +2205,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Prevents the screen from locking right after a respring — the phone won't ask for a passcode immediately after the UI reloads.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SBDontDimOrLockOnAC",
@@ -2022,7 +2226,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Stops the display from auto-dimming while the device is connected to a charger.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SBHideLowPowerAlerts",
@@ -2041,7 +2247,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Suppresses the 'Low Battery — 20% / 10%' system alerts.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SBHideACPower",
@@ -2060,7 +2268,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Hides the charging status from the Lock Screen while the device is plugged into AC power.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SBNeverBreadcrumb",
@@ -2079,7 +2289,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Disables the 'Return to <App>' breadcrumb button that appears in the status bar after opening a link from another app.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SBShowSupervisionTextOnLockScreen",
@@ -2098,7 +2310,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Shows the device-supervision text on the Lock Screen, like the '<Device> is supervised by <org>' label seen on MDM-managed devices.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "AirplaySupport",
@@ -2117,7 +2331,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Adds extended-display AirPlay support for Stage Manager so apps and external displays can use the feature more broadly.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SBMinimumLockscreenIdleTime",
@@ -2136,7 +2352,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Sets how many minutes of inactivity before the Lock Screen turns the display off. 0 = never auto-lock.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SBAlwaysShowSystemApertureInSnapshots",
@@ -2155,12 +2373,14 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Forces the Dynamic Island to appear in screenshots instead of being hidden or shrunk while the screenshot is taken.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: true
         ),
         TweakSpec(
             id: "HideDICompletely",
             section: .springboard,
-            title: "Hide Dynamic Island Completely",
+            title: "Disable Dynamic Island",
             location: .springboard,
             key: "SBSuppressDynamicIslandCompletely",
             value: .bool(true),
@@ -2173,8 +2393,10 @@ enum TweakCatalog {
             iphoneOnly: true,
             ipadOnly: false,
             disabled: false,
-            detail: "Suppresses the Dynamic Island cutout completely so it is never drawn. Can make the screen look odd on devices with a pill cutout.",
-            multiValues: nil
+            detail: "Disables the Dynamic Island on supported hardware. The setting is written as both on and off so you can undo it later.",
+            multiValues: nil,
+            reversibleBoolean: true,
+            requiresDynamicIsland: true
         ),
         TweakSpec(
             id: "SBShowAuthenticationEngineeringUI",
@@ -2193,7 +2415,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Shows a red/green authentication progress indicator on the Lock Screen while Face ID or passcode checks are running (engineering debug UI).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "UseFloatingTabBar",
@@ -2212,7 +2436,9 @@ enum TweakCatalog {
             ipadOnly: true,
             disabled: false,
             detail: "Uses the old fixed tab bar style instead of the floating tab bar on iPad. Select this tweak to disable the floating tab bar.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SBDisableIconParallax",
@@ -2231,7 +2457,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Stops Home Screen icons from shifting with the device tilt (the parallax effect). Pair with Disable Icon Page-Control Parallax for a fully static Home Screen.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SBHideSearchAffordance",
@@ -2250,7 +2478,30 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Removes the search button below the icons on the Home Screen (the faint search bar/icon above the Dock). Enabled when the switch is ON.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
+        ),
+        TweakSpec(
+            id: "SBShowRSSI",
+            section: .internalOptions,
+            title: "Show RSSI (Experimental)",
+            location: .springboard,
+            key: "SBShowRSSI",
+            value: .bool(true),
+            kind: .toggle,
+            minValue: 0.0,
+            maxValue: 999.0,
+            step: 1.0,
+            minVersion: "26.5",
+            maxVersion: nil,
+            iphoneOnly: false,
+            ipadOnly: false,
+            disabled: false,
+            detail: "Requests the SpringBoard RSSI (signal strength) debug indicator. Preference reading was verified in the iOS 26.5 simulator and the key is present in iOS 27.0.1. A visible indicator and support on physical devices are not yet verified.",
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SBBuildNumber",
@@ -2269,7 +2520,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Displays the iOS build number (e.g. 21A5284a) in the status bar next to the iOS version.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "RTL",
@@ -2288,7 +2541,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Forces a right-to-left layout for the entire system, mirroring the UI as if your primary language were RTL.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "LTR",
@@ -2307,7 +2562,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Forces a left-to-right layout across the whole system regardless of the RTL language setting.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "SBIconVisibility",
@@ -2326,7 +2583,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Reveals hidden or disabled Home Screen icons, including internal placeholder icons that are normally not drawn.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "iMessageDiagnosticsEnabled",
@@ -2345,7 +2604,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables the iMessage engineering debug menu / diagnostics inside the Messages app.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "IDSDiagnosticsEnabled",
@@ -2364,7 +2625,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables the Continuity engineering debug diagnostics in Settings (Apple ID and related sections).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "VCDiagnosticsEnabled",
@@ -2383,7 +2646,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables FaceTime / VoIP engineering debug diagnostics.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "AccessoryDeveloperEnabled",
@@ -2402,7 +2667,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Adds a hidden Accessory Developer settings page to the Settings app for testing accessories.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "DisableSecondsHand",
@@ -2421,7 +2688,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Stops the animated second hand on the Clock app's Home Screen icon.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "DisableSearchingWebsites",
@@ -2440,7 +2709,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Removes website / web search results from Spotlight search suggestions.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "ShowButtonHints",
@@ -2459,7 +2730,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Shows the side button / action button hint labels in screenshots (engineering debug UI).",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "AppStoreDebug",
@@ -2478,7 +2751,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Enables the hidden debug gesture in the App Store app, used to dump store data and inspect the store backend.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "NotesDebugMode",
@@ -2497,7 +2772,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Turns on the Notes app debug menu for engineering debugging.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "BKDigitizerVisualizeTouches",
@@ -2516,7 +2793,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Visually marks every touch point on the screen with debugging information as you touch. Great for diagnosing touch issues.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "BKHideAppleLogoOnLaunch",
@@ -2535,7 +2814,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Hides the Apple logo animation during respring, showing a black screen instead until the UI comes back.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "EnableWakeGestureHaptic",
@@ -2554,7 +2835,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Plays a Taptic Engine vibration when the device wakes via the raise-to-wake gesture.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "PlaySoundOnPaste",
@@ -2573,7 +2856,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Plays a sound every time content is pasted anywhere on the device.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
         TweakSpec(
             id: "AnnounceAllPastes",
@@ -2592,7 +2877,9 @@ enum TweakCatalog {
             ipadOnly: false,
             disabled: false,
             detail: "Shows a system notification whenever an app reads the pasteboard, acting as a privacy indicator for system-level pastes.",
-            multiValues: nil
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false
         ),
     ]
 
@@ -2607,5 +2894,29 @@ enum TweakCatalog {
 
     static func inSection(_ section: TweakSection) -> [TweakSpec] {
         all.filter { $0.section == section }
+    }
+}
+
+
+/// Known Dynamic Island models, generated from desktop device_capabilities.py.
+enum TweakDeviceCapabilities {
+    static func hasDynamicIsland(_ model: String) -> Bool {
+        let models: Set<String> = [
+            "iPhone15,2",
+            "iPhone15,3",
+            "iPhone15,4",
+            "iPhone15,5",
+            "iPhone16,1",
+            "iPhone16,2",
+            "iPhone17,1",
+            "iPhone17,2",
+            "iPhone17,3",
+            "iPhone17,4",
+            "iPhone18,1",
+            "iPhone18,2",
+            "iPhone18,3",
+            "iPhone18,4",
+        ]
+        return models.contains(model.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 }

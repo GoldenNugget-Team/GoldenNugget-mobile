@@ -21,7 +21,8 @@
 //       Nugget/Core/TweakCatalog.swift Nugget/Core/TweakCatalogDaemons.swift \
 //       Nugget/Core/TweakDomainMap.swift Nugget/Core/TweakCompiler.swift \
 //       Nugget/Core/StatusBarModel.swift Nugget/Core/StatusBarArchive.swift \
-//       Nugget/Core/StatusBarSelection.swift Nugget/Core/SkipSetup.swift \
+//       Nugget/Core/StatusBarSelection.swift Nugget/Core/SkipSetupCatalog.swift \
+//       Nugget/Core/SkipSetup.swift Nugget/Views/Extensions/Extensions.swift \
 //       Nugget/Core/TweakConflicts.swift Nugget/Core/ApplyPreview.swift \
 //       scripts/apply-preview-check.swift > /tmp/previewcheck/main.swift \
 //     && xcrun swiftc -O /tmp/previewcheck/main.swift -o /tmp/previewcheck/check \

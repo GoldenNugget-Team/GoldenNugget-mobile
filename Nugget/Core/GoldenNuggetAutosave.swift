@@ -95,7 +95,7 @@ enum GoldenNuggetAutosave {
         guard let preset = load() else { return nil }
         let report = GoldenNuggetPresetImport.apply(preset, to: &selection,
                                                     deviceVersion: deviceVersion,
-                                                    isIPhone: isIPhone)
+                                                    isIPhone: isIPhone, deviceModel: deviceModel)
         // Purge, exactly as the reference does after loading.
         save(selection, deviceModel: deviceModel, iosVersion: deviceVersion)
         return report

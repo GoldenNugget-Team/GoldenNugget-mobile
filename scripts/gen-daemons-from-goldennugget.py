@@ -18,10 +18,9 @@ Two facts the reference is careful about and this file has to carry:
   * `INTERFACE_KEYS` is the whitelist. Every daemon outside it must never reach
     the plist, a preset or the apply pass -- upstream says disabling those
     "broke whole apps on iOS 26.5".
-  * 40 daemons are interface-visible but only 34 have a switch. The other six
-    (AppleAds, CrashReports, Diagnostics, Feedback, SettingsStats, Shazam) are
-    reachable only through the one-tap Recommended set, which is why they are
-    emitted with `showsSwitch: false`.
+  * Switch rows are read from the desktop GUI. Interface groups without a
+    row remain available through presets/recommended selection and are emitted
+    with `showsSwitch: false`.
 
 Usage:
     scripts/gen-daemons-from-goldennugget.py [--goldennugget <path>]
@@ -29,6 +28,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import sys
 from pathlib import Path
@@ -36,58 +36,10 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 OUTPUT = REPO / "Nugget/Core/TweakCatalogDaemons.swift"
 
-# Section titles and per-daemon switch labels, copied from
-# src/gui/ios/daemons.py.  The reference builds these lists inline in the
-# widget constructor; there is no table to import.
-MAIN = [
-    ("thermalmonitord", "Disable thermalmonitord"),
-    ("OTA", "Disable OTA"),
-    ("UsageTrackingAgent", "Disable UsageTrackingAgent"),
-    ("GameCenter", "Disable Game Center"),
-    ("ATWAKEUP", "Disable ATWAKEUP"),
-    ("Tips", "Disable Tips Services"),
-    ("VPN", "VPN Icon"),
-    ("ChineseLAN", "Disable Chinese WLAN Service"),
-    ("HealthKit", "Disable HealthKit"),
-    ("AirPrint", "Disable AirPrint"),
-    ("AssistiveTouch", "Disable Assistive Touch"),
-    ("iCloud", "Disable iCloud"),
-    ("InternetTethering", "Disable Internet Tethering (Hotspot)"),
-    ("PassBook", "Disable Passbook"),
-    ("Spotlight", "Disable Spotlight"),
-    ("NanoTimeKit", "Disable NanoTimeKit (Apple Watch Face Sync)"),
-    ("VoiceControl", "Disable Voice Control"),
-    ("FollowUp", "Follow Up"),
-    ("Location", "Location Services"),
-]
-
-ANALYTICS = [
-    ("WifiAnalytics", "Disable Wi-Fi Analytics"),
-    ("AnalyticsHelper", "Disable System Analytics"),
-    ("CallAnalytics", "Disable Call Analytics (RTC Reporting)"),
-    ("CoreDuet", "Disable CoreDuet (Battery/Usage Statistics)"),
-    ("Insight", "Disable Insight"),
-    ("Metrics", "Disable Metrics"),
-    ("MediaExperience", "Disable Media Experience Analytics"),
-    ("Symptomsd", "Disable Symptom Diagnostics"),
-    ("StatisticalDiagnostic", "Disable Statistical Diagnostics"),
-    ("WirelessDiagnostics", "Disable Wireless Diagnostics"),
-    ("DuetHeuristic", "Disable Duet Heuristic"),
-    ("DuetExpert", "Disable Duet Expert"),
-    ("Decisiond", "Disable Decisiond"),
-    ("Triald", "Disable Triald (A/B Experiment Telemetry)"),
-    ("Sociald", "Disable Sociald"),
-]
-
-# The one-tap set, from the reference's comment: "Pure
-# analytics/tracking/logging -- nothing boot-critical".
-RECOMMENDED = [
-    "AnalyticsHelper", "AppleAds", "CallAnalytics", "CoreDuet", "CrashReports",
-    "Decisiond", "Diagnostics", "DuetExpert", "DuetHeuristic", "Feedback",
-    "FollowUp", "Insight", "MediaExperience", "Metrics", "SettingsStats",
-    "Shazam", "Sociald", "StatisticalDiagnostic", "Symptomsd", "Triald",
-    "UsageTrackingAgent", "WifiAnalytics", "WirelessDiagnostics",
-]
+# Filled from the desktop GUI's literal row tables by load_reference().
+MAIN: list[tuple[str, str]] = []
+ANALYTICS: list[tuple[str, str]] = []
+RECOMMENDED: list[str] = []
 
 # `TweakID.ClearScreenTimeAgentPlist` is a NullifyFileTweak: it does not write
 # the ScreenTime plist, it writes a 0-byte file over it. The port's registry
@@ -107,13 +59,41 @@ def swift_string(value: str) -> str:
 
 
 def load_reference(root: Path):
+    global MAIN, ANALYTICS, RECOMMENDED, SECTIONS
+    # Read literal row data without importing Qt or constructing the desktop UI.
+    tree = ast.parse((root / "src/gui/ios/daemons.py").read_text())
+    tables = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.For) or not isinstance(node.iter, ast.List):
+            continue
+        rows = []
+        for item in node.iter.elts:
+            if not isinstance(item, ast.Tuple) or len(item.elts) != 2:
+                break
+            title, daemon = item.elts
+            if not (isinstance(title, ast.Call) and len(title.args) == 2
+                    and isinstance(title.args[1], ast.Constant) and isinstance(title.args[1].value, str)
+                    and isinstance(daemon, ast.Attribute) and isinstance(daemon.value, ast.Name)
+                    and daemon.value.id == "Daemon"):
+                break
+            rows.append((daemon.attr, title.args[1].value))
+        else:
+            if rows:
+                tables.append((node.lineno, rows))
+    tables.sort()
+    if len(tables) != 2:
+        raise ValueError("Expected two desktop daemon switch tables; update the generator")
+    MAIN, ANALYTICS = (table[1] for table in tables)
+    SECTIONS = {"main": MAIN, "analytics": ANALYTICS}
     sys.path.insert(0, str(root))
     from src.tweaks.daemons_tweak import (  # noqa: E402
         DANGEROUS_KEYS,
         INTERFACE_DAEMONS,
         INTERFACE_KEYS,
         Daemon,
+        RECOMMENDED_ANALYTICS,
     )
+    RECOMMENDED = [daemon.name for daemon in RECOMMENDED_ANALYTICS]
     return Daemon, INTERFACE_DAEMONS, INTERFACE_KEYS, DANGEROUS_KEYS
 
 
@@ -141,7 +121,7 @@ def emit(Daemon, INTERFACE_DAEMONS, INTERFACE_KEYS, DANGEROUS_KEYS) -> list[str]
     w("/// One switch on the Daemons page: a named group of launchd labels that")
     w("/// are disabled together.")
     w("///")
-    w("/// `showsSwitch` is false for the six interface-visible groups upstream")
+    w("/// `showsSwitch` is false for interface-visible groups upstream")
     w("/// gives no switch of its own (AppleAds, CrashReports, Diagnostics,")
     w("/// Feedback, SettingsStats, Shazam). They stay in the catalog -- they are")
     w("/// part of `INTERFACE_DAEMONS` and the Recommended set turns them on --")
@@ -178,7 +158,7 @@ def emit(Daemon, INTERFACE_DAEMONS, INTERFACE_KEYS, DANGEROUS_KEYS) -> list[str]
             w(f"            isRecommended: {str(name in RECOMMENDED).lower()},")
             w(f"            showsSwitch: true")
             w("        ),")
-    # The six without a switch, appended so `all` stays complete for the
+    # Groups without a switch, appended so `all` stays complete for the
     # compiler and the Recommended set. They carry an empty section on purpose:
     # nothing renders them individually.
     for name in sorted(interface):

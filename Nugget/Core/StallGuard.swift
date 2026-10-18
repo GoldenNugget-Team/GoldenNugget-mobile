@@ -108,6 +108,9 @@ enum StallGuard {
         _ body: @escaping () async throws -> T
     ) async throws -> T {
         let once = OnceResumer<T>()
+        // Account before scheduling either racer: cancellation can otherwise
+        // finish the wait before the body task has registered its live call.
+        InFlightCall.shared.enter()
         return try await withCheckedThrowingContinuation { cont in
             once.attach(cont)
             Task {
@@ -115,7 +118,6 @@ enum StallGuard {
                 // that keeps running, so "the block finished" and "we stopped
                 // waiting for it" are two different facts — and a caller about to
                 // start the next run needs to know which one it is looking at.
-                InFlightCall.shared.enter()
                 defer { InFlightCall.shared.leave() }
                 do { once.resume(.success(try await body())) }
                 catch { once.resume(.failure(error)) }

@@ -1,0 +1,13 @@
+diff --git a/idevice/src/remote_pairing/rp_pairing_file.rs b/idevice/src/remote_pairing/rp_pairing_file.rs
+index 1ac87c4..63fe06d 100644
+--- a/idevice/src/remote_pairing/rp_pairing_file.rs
++++ b/idevice/src/remote_pairing/rp_pairing_file.rs
+@@ -89,7 +89,7 @@ impl RpPairingFile {
+     /// Parse from plist bytes (XML or binary).
+     pub fn from_bytes(bytes: &[u8]) -> Result<Self, IdeviceError> {
+         let mut p: Dictionary = plist::from_bytes(bytes)?;
+-        debug!("Read dictionary for rppairingfile: {p:#?}");
++        debug!("Reading RemotePairing record (secret fields omitted)");
+ 
+         let public_key = match p
+             .remove("public_key")

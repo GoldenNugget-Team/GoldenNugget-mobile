@@ -93,7 +93,7 @@ struct StatusBarView: View {
         Section {
             NativeNote("iOS 27 replaced the status bar override file, so only the carrier "
                 + "entry can be changed here: its name, its service badge and its signal bars. "
-                + "The badge and the bars apply to the carrier name, so set one first. The other "
+                + "The badge and the bars apply to the carrier name, so set one first. An unset bar count writes zero; live signal cannot pass through a replaced cellular entry. The other "
                 + "options need iOS 26 or lower.")
         }
     }

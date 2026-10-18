@@ -89,6 +89,7 @@ enum Tunnel {
         var ifaceSubnetMask: String?
         var peerSubnetMask: String?
         var peerReachable: Bool?
+        var overridePeerReachable: Bool?
 
         var isEmpty: Bool { self == Reported() }
 
@@ -100,6 +101,7 @@ enum Tunnel {
             if let ifaceIP { parts.append("iface \(ifaceIP)\(ifaceSubnetMask.map { "/\($0)" } ?? "")") }
             if let peerIP { parts.append("peer \(peerIP)\(peerSubnetMask.map { "/\($0)" } ?? "")") }
             if let peerReachable { parts.append("peer reachable=\(peerReachable)") }
+            if let overridePeerReachable { parts.append("configured peer reachable=\(overridePeerReachable)") }
             return "tunnel as resolved by the connection manager: " + parts.joined(separator: ", ")
         }
     }

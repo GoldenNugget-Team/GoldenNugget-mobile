@@ -300,6 +300,7 @@ enum PasscodeThemeEngine {
             throw GoldenNuggetError("\(theme.name) has no key images in it.")
         }
         let stage = try stage(theme: theme, language: language, weight: weight)
+        defer { try? FileManager.default.removeItem(at: stage) }
 
         let suffixes = weight.suffixes
         let languages = languages(for: language)
@@ -307,6 +308,7 @@ enum PasscodeThemeEngine {
             + "\(suffixes.count) weight(s)")
 
         let roots = telephonyCacheRoots
+        var written = 0
         for (index, root) in roots.enumerated() {
             let label = (root as NSString).lastPathComponent
             do {
@@ -314,6 +316,7 @@ enum PasscodeThemeEngine {
                                            sourceDir: stage.path,
                                            targetDir: root)
                 log("  ✅ \(label)")
+                written += 1
             } catch {
                 // A directory that does not exist on this iOS version is expected,
                 // not a failure — so only a total wipe-out is an error.
@@ -322,7 +325,12 @@ enum PasscodeThemeEngine {
             progress(Double(index + 1) / Double(roots.count))
         }
 
-        try? FileManager.default.removeItem(at: stage)
+        guard written > 0 else {
+            throw GoldenNuggetError("No keypad cache was written. Unlock the device and check the AirLift connection.")
+        }
+        if written < roots.count {
+            log("Keypad theme written to \(written)/\(roots.count) cache locations.")
+        }
         log("Lock the device to see the keypad.")
     }
 

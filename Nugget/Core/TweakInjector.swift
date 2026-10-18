@@ -239,8 +239,8 @@ enum TweakInjector {
                         ? (Int(MODE_FILE_DEFAULT) | Int(S_IFREG))
                         : (Int(MODE_DIR_DEFAULT) | Int(S_IFDIR)),
                     size: isFile ? bytes.count : 0,
-                    userID: isFile ? profile.fileOwner : (isRoot ? profile.rootOwner : profile.dirOwner),
-                    groupID: isFile ? profile.fileGroup : (isRoot ? profile.rootGroup : profile.dirGroup),
+                    userID: isFile ? (payload.owner ?? profile.fileOwner) : (isRoot ? profile.rootOwner : profile.dirOwner),
+                    groupID: isFile ? (payload.owner ?? profile.fileGroup) : (isRoot ? profile.rootGroup : profile.dirGroup),
                     protectionClass: isFile
                         ? profile.fileProtectionClass
                         : (isRoot ? profile.rootProtectionClass : profile.dirProtectionClass),

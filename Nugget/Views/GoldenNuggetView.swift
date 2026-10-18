@@ -16,6 +16,7 @@ import Foundation
 /// the copy that goes stale is the one on the page they are reading.  The
 /// sections are reachable from the sidebar and from nowhere else.
 struct GoldenNuggetView: View {
+    @ObservedObject private var community = CommunityTemplateStore.shared
     @AppStorage(PairingRecord.Key.stored) var pairingFileRaw: String?
     // The tunnel addressing, persisted under the same keys `Tunnel` reads (see
     // `Tunnel.Key`), so the fields below and every probe are looking at one set
@@ -713,7 +714,7 @@ struct GoldenNuggetView: View {
     /// when there are wallpapers, when there are templates, or any combination.
     private var canApply: Bool {
         paired && !running && (tweakSelection.enabledCount > 0 || posterBoardSelection.isActive
-                               || templateSelection.usesDomains)
+                               || templateSelection.usesDomains || !community.templates.isEmpty)
     }
 
     /// The button is named for what it will actually carry.  "Apply Tweaks" was the
@@ -1041,7 +1042,8 @@ struct GoldenNuggetView: View {
                 statusBar: statusBarSelection,
                 skipSetupEnabled: SkipSetupSettings.shared.skipSetupEnabled,
                 deviceVersion: identity.version,
-                isIPhone: identity.isIPhone)
+                isIPhone: identity.isIPhone, deviceModel: identity.productType,
+                communityPayloads: try CommunityTemplateStore.shared.compile(version: identity.version))
             showApplyConfirm = true
         } catch {
             errorText = error.localizedDescription
@@ -1071,7 +1073,9 @@ struct GoldenNuggetView: View {
                                                                 statusBar: statusBar,
                                                                 templates: templates,
                                                                 deviceVersion: device.version,
-                                                                isIPhone: device.isIPhone)
+                                                                isIPhone: device.isIPhone, deviceModel: device.productType,
+                                                                communityPayloads: try CommunityTemplateStore.shared.compile(version: device.version),
+                                                                communityPresetEntry: CommunityTemplateStore.shared.presetEntry)
                 text = "Applied. Reboot the device."
                 tone = .success
                 succeeded = true
@@ -1209,8 +1213,10 @@ struct GoldenNuggetView: View {
                         setTunnelIfaceSubnetMask: { value in Tunnel.noteReported { $0.ifaceSubnetMask = value } },
                         getRemoteServerIp: { "" },
                         setRemoteReachable: { _ in },
-                        getOverrideTunnelPeerIp: { "" },
-                        setOverrideTunnelPeerReachable: { _ in },
+                        // Use the same peer as the pre-start probe, even when
+                        // LocalDevVPN's routes cannot be auto-discovered.
+                        getOverrideTunnelPeerIp: { Tunnel.peerIP },
+                        setOverrideTunnelPeerReachable: { value in Tunnel.noteReported { $0.overridePeerReachable = value } },
                         getConnectionMode: { .localVPN }
                     ))
                     // Diagnostic: show the record's real keys, so a wrong or
@@ -1237,14 +1243,19 @@ struct GoldenNuggetView: View {
                     // then back off, and stop at a hard deadline.
                     let readyStage = StageTimer("minimuxer readiness")
                     var isReady = false
+                    var readinessFailure = "Readiness check returned false"
                     let deadline = Date().addingTimeInterval(20)
                     var poll = 0
                     var delay: UInt64 = 200_000_000   // 0.2 s -> doubles -> 2 s cap
                     while Date() < deadline {
                         poll += 1
-                        if case .success(true) = await minimuxer.core.isReady() {
+                        let readiness = await minimuxer.core.isReady()
+                        if case .success(true) = readiness {
                             isReady = true
                             break
+                        }
+                        if case .failure(let error) = readiness {
+                            readinessFailure = minimuxer.core.describeError(error)
                         }
                         try await Task.sleep(nanoseconds: delay)
                         delay = min(delay * 2, 2_000_000_000)
@@ -1252,10 +1263,12 @@ struct GoldenNuggetView: View {
                     readyStage.done("ready=\(isReady) after \(poll) poll(s)")
                     GoldenNuggetEngine.shared.log("minimuxer started. ready=\(isReady)")
                     if !isReady {
+                        let reason = readinessFailure
                         let tail = RustLog.tail()
+                        GoldenNuggetEngine.shared.log("minimuxer readiness failed: \(reason)")
                         GoldenNuggetEngine.shared.log("minimuxer.log tail:\n\(tail)")
                         DispatchQueue.main.async {
-                            errorText = "minimuxer started but never became ready.\n\nLast minimuxer.log lines:\n\(tail)"
+                            errorText = "minimuxer started but never became ready.\n\n\(reason)\n\nLast minimuxer.log lines:\n\(tail)"
                         }
                     }
                 } catch {

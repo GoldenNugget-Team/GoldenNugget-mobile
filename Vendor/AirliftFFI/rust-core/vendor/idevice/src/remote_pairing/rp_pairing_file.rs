@@ -89,7 +89,7 @@ impl RpPairingFile {
     /// Parse from plist bytes (XML or binary).
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, IdeviceError> {
         let mut p: Dictionary = plist::from_bytes(bytes)?;
-        debug!("Read dictionary for rppairingfile: {p:#?}");
+        debug!("Reading RemotePairing record (secret fields omitted)");
 
         let public_key = match p
             .remove("public_key")
