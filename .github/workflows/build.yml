@@ -14,10 +14,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7.0.1
 
-      - name: Show toolchain
-        run: |
-          xcodebuild -version
-          swift --version
+      - name: Check toolchain
+        run: bash scripts/check-xcode-toolchain.sh
 
       - name: Install XcodeGen
         # Pinned to the version project.yml is written against (2.46 — see the

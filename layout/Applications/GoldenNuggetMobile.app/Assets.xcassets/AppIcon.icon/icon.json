@@ -1,8 +1,4 @@
 {
-  "features" : [
-    "refractivity",
-    "specular-location"
-  ],
   "fill" : {
     "automatic-gradient" : "display-p3:1.00000,0.85540,0.32426,1.00000"
   },
@@ -211,7 +207,6 @@
         "kind" : "layer-color",
         "opacity" : 0.52
       },
-      "specular" : "outside",
       "translucency" : {
         "enabled" : true,
         "value" : 0.15

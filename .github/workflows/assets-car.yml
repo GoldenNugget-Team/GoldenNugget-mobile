@@ -55,25 +55,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show toolchain
-        run: |
-          xcodebuild -version
-          xcrun --sdk iphoneos --show-sdk-version
-          xcrun --sdk iphoneos --find actool
-
-      - name: Select Xcode
-        # Pin to a named install so a runner image change cannot silently
-        # change the car format. Falls back to the default when the named one
-        # is absent (older images, self-hosted).
-        run: |
-          for candidate in /Applications/Xcode_16.4.app /Applications/Xcode_16.app; do
-            if [ -d "$candidate" ]; then
-              sudo xcode-select -s "$candidate"
-              echo "using $candidate"
-              break
-            fi
-          done
-          xcodebuild -version
+      - name: Check toolchain
+        # Use the runner's selected Xcode, and fail early if it cannot compile
+        # the Icon Composer document. Xcode 16 is not supported by this project.
+        run: bash scripts/check-xcode-toolchain.sh
 
       - name: Compile Assets.xcassets
         run: |
@@ -138,13 +123,6 @@ jobs:
         # actool accepts a catalog whose dark half it silently dropped, so
         # "the compile succeeded" is not evidence that a dark icon exists.
         # This gate is the only place that claim gets checked.
-        #
-        # Not fatal yet: the `.appiconset` route is known to compile light-only
-        # (actool drops `luminosity=dark` there), and the run that finds the
-        # Icon Composer path needs to stay red rather than block the artifact
-        # upload below. Flip this to `continue-on-error: false` once the dark
-        # half is actually reproducible.
-        continue-on-error: true
         run: |
           python3 scripts/check-car-appearances.py \
             "$RUNNER_TEMP/car-out/Assets.car" --require-dark --name AppIcon
