@@ -88,6 +88,8 @@ settings:
     SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
     TARGETED_DEVICE_FAMILY: "1,2"
+    # No App Intents or Shortcuts are declared; skip their metadata build task.
+    LM_SKIP_METADATA_EXTRACTION: YES
     GENERATE_INFOPLIST_FILE: NO
     INFOPLIST_FILE: layout/Applications/GoldenNuggetMobile.app/Info.plist
     PRODUCT_BUNDLE_IDENTIFIER: com.awesomenull.goldennugget
@@ -108,8 +110,8 @@ settings:
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_IDENTITY: Apple Development
     DEVELOPMENT_TEAM: L7HX85L6GU
-    CURRENT_PROJECT_VERSION: 3
-    MARKETING_VERSION: 9.6.0
+    CURRENT_PROJECT_VERSION: 4
+    MARKETING_VERSION: 9.7.0
     # The app icon is an Icon Composer document (`Assets.xcassets/AppIcon.icon`),
     # not loose PNGs: it layers one glass image over an `automatic-gradient`
     # fill, and actool expands that into the light/dark/tintable renditions the

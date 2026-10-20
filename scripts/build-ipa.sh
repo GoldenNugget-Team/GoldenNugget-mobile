@@ -21,6 +21,16 @@ for arg in "$@"; do
   esac
 done
 
+# A failed build must never leave yesterday's IPA at the advertised path.
+# Preserve the previous success under an explicitly historical name instead.
+mkdir -p build
+if [[ -f build/GoldenNuggetMobile.ipa ]]; then
+  mkdir -p build/previous
+  previous="build/previous/GoldenNuggetMobile-$(date +%Y%m%d-%H%M%S)-$$.ipa"
+  mv build/GoldenNuggetMobile.ipa "$previous"
+  echo "previous IPA preserved: $previous"
+fi
+
 DERIVED="$(pwd)/build/xderived"
 if (( CLEAN )); then
   echo "cleaning $DERIVED"
@@ -40,6 +50,8 @@ if [ ! -f "$BINARY" ]; then
   echo "error: expected app binary not found at $BINARY" >&2
   exit 1
 fi
+
+python3 scripts/check-car-appearances.py "$APP_PATH/Assets.car" --require-dark --name AppIcon
 
 # Post-build staleness check.  A .swift newer than the linked binary means the
 # app was NOT relinked — the exact shape of "build says OK, IPA has old code".

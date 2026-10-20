@@ -11,6 +11,8 @@ bundleID: com.awesomenull.goldennugget
 # numbers than the Info.plist the device reads.
 deploymentTarget: 26.0
 infoPath: layout/Applications/GoldenNuggetMobile.app/Info.plist
+# Both builders add UIDeviceFamily themselves: xtool's application defaults
+# are [1, 2], matching project.yml's TARGETED_DEVICE_FAMILY for Xcode.
 resources:
   # The icon is an Icon Composer bundle. Normally Apple's own actool compiles
   # it into this car (see scripts/compile-assets.sh and

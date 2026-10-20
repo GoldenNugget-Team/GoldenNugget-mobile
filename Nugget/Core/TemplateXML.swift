@@ -286,7 +286,7 @@ enum TemplateXML {
                           values: [String],
                           useCAID: Bool = false) throws -> Data {
         guard !keys.isEmpty else { return data }
-        var document = try parse(data)
+        let document = try parse(data)
         let idKey = useCAID ? "id" : "nuggetId"
 
         for element in document.root.descendants() {
@@ -326,7 +326,7 @@ enum TemplateXML {
     /// which is what makes "remove the layer" and "remove whatever points at the
     /// layer" one option.
     static func deleteValue(in data: Data, id: String, useCAID: Bool = false) throws -> Data {
-        var document = try parse(data)
+        let document = try parse(data)
         let idKey = useCAID ? "id" : "nuggetId"
         remove(matching: { $0.attribute(idKey) == id }, from: document.root)
         if useCAID {
@@ -554,7 +554,7 @@ enum TemplateXML {
                     return base
                 }
                 index += 2
-                return try pow(base, try parseUnary())
+                return pow(base, try parseUnary())
             }
 
             mutating func parseAtom() throws -> Double {

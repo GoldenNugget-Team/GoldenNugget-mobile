@@ -17,7 +17,11 @@ struct DaemonsView: View {
     /// The master switch, upstream's `daemons_tweak.enabled`. Kept out of the
     /// selection on purpose: it gates every group rather than being one, and
     /// turning it off is the same observable state as having no group on.
-    @State private var masterEnabled = true
+    @State private var masterEnabled = false
+    /// Matches desktop's install-level acknowledgement, outside autosave/presets.
+    /// No selection is changed until both warnings have been accepted.
+    @AppStorage("daemon_bootloop_warned") private var daemonWarningsAccepted = false
+    @State private var pendingEnable: DaemonEnableAction?
     /// The model line at the top of the page, from the shared monitor — see
     /// `TweaksView`'s note.  A computed read, so this page cannot hold a copy that
     /// disagrees with the one the Tweaks page filtered its rows by.
@@ -74,6 +78,13 @@ struct DaemonsView: View {
         // toggle, and a second button beside it is the duplicate-controls mess.
         .goldenSidebarButton()
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $pendingEnable) { action in
+            DaemonEnableWarningSheet {
+                daemonWarningsAccepted = true
+                performEnable(action)
+                pendingEnable = nil
+            }
+        }
         .task {
             // Upstream's master switch reads the stored `enabled` flag. There is
             // no separate flag here, so the page reports the state that actually
@@ -135,7 +146,11 @@ struct DaemonsView: View {
         Toggle("Enable Daemon Modifications", isOn: Binding(
             get: { masterEnabled },
             set: { on in
-                masterEnabled = on
+                if on {
+                    requestEnable(.master)
+                    return
+                }
+                masterEnabled = false
                 // The reference's master switch is a gate, not a group: flipping
                 // it off leaves the per-group choices alone and only stops the
                 // write.
@@ -145,9 +160,10 @@ struct DaemonsView: View {
 
     private var recommendedRow: some View {
         Button {
-            let turnOn = !isAllRecommendedOn
-            for group in DaemonGroups.recommended {
-                setGroup(group, on: turnOn)
+            if isAllRecommendedOn {
+                setAllRecommended(false)
+            } else {
+                requestEnable(.recommended)
             }
         } label: {
             Label("Recommended (analytics, tracking & logging)",
@@ -159,7 +175,7 @@ struct DaemonsView: View {
         Section("Other") {
             let spec = TweakCatalog.screenTimeSpec
             TweakRow(spec: spec, selection: $selection,
-                     isOn: { isOn(spec) }, setOn: { setOn($0, for: spec) })
+                     isOn: { isOn(spec) }, setOn: { requestSetOn($0, for: spec) })
             NativeNote("Writes a 0-byte file over "
                 + "\(DaemonGroups.screenTime.path). Upstream models this as "
                 + "a NullifyFileTweak: it removes a plist rather than "
@@ -176,7 +192,7 @@ struct DaemonsView: View {
     private func groupRow(_ group: DaemonGroup) -> some View {
         if let spec = spec(group) {
             TweakRow(spec: spec, selection: $selection,
-                     isOn: { isOn(spec) }, setOn: { setOn($0, for: spec) })
+                     isOn: { isOn(spec) }, setOn: { requestSetOn($0, for: spec) })
         } else {
             // A group with no spec would be a switch that does nothing. Say so
             // rather than rendering a row that cannot be tapped.
@@ -226,6 +242,34 @@ struct DaemonsView: View {
         DaemonGroups.recommended.allSatisfy(isOn)
     }
 
+    /// Gate every interactive enable path, including Recommended and Screen Time.
+    /// Turning something off never requires acknowledgement.
+    private func requestSetOn(_ on: Bool, for spec: TweakSpec) {
+        if on {
+            requestEnable(.tweak(spec.id))
+        } else {
+            setOn(false, for: spec)
+        }
+    }
+
+    private func requestEnable(_ action: DaemonEnableAction) {
+        if daemonWarningsAccepted {
+            performEnable(action)
+        } else {
+            pendingEnable = action
+        }
+    }
+
+    private func performEnable(_ action: DaemonEnableAction) {
+        masterEnabled = true
+        switch action {
+        case .master: break
+        case .recommended: setAllRecommended(true)
+        case .tweak(let id):
+            if let spec = TweakCatalog.byID[id] { setOn(true, for: spec) }
+        }
+    }
+
     /// One group on means "disable every launchd label in it", which is what
     /// upstream's `set_multiple_values(sorted(keys), value=True)` does.
     private func setGroup(_ group: DaemonGroup, on: Bool) {
@@ -254,5 +298,53 @@ struct DaemonsView: View {
 
     private func setAllRecommended(_ on: Bool) {
         for group in DaemonGroups.recommended { setGroup(group, on: on) }
+    }
+}
+
+/// The pending intent stays separate from the selection so Stop or a swipe to
+/// dismiss leaves both the toggles and the persisted acknowledgement unchanged.
+private enum DaemonEnableAction: Identifiable {
+    case master
+    case recommended
+    case tweak(String)
+
+    var id: String {
+        switch self {
+        case .master: "master"
+        case .recommended: "recommended"
+        case .tweak(let id): id
+        }
+    }
+}
+
+/// Desktop's two consecutive confirmations, presented in one native sheet to
+/// avoid presenting a second alert while the first is still being dismissed.
+private struct DaemonEnableWarningSheet: View {
+    let confirm: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var backupWarning = false
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.largeTitle)
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            Text("Before you continue")
+                .font(.headline)
+            Text(backupWarning
+                 ? "Make a full device backup before applying these changes."
+                 : "Stopping system services can leave your device stuck restarting or unable to start. Recovery may require restoring the device.")
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Continue Anyway") {
+                if backupWarning { confirm() } else { backupWarning = true }
+            }
+            .buttonStyle(.borderedProminent)
+            Button("Stop", role: .cancel) { dismiss() }
+        }
+        .padding(24)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }

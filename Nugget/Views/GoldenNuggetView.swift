@@ -970,7 +970,7 @@ struct GoldenNuggetView: View {
         autosaveTask = Task {
             try? await Task.sleep(for: GoldenNuggetAutosave.debounce)
             guard !Task.isCancelled else { return }
-            await Task.detached(priority: .utility) {
+            _ = await Task.detached(priority: .utility) {
                 GoldenNuggetAutosave.save(snapshot, identity: device)
             }.value
         }
@@ -1227,10 +1227,7 @@ struct GoldenNuggetView: View {
                     // perfectly valid `.rppairing` record an iOS 17+ device
                     // uses.  The authoritative verdict comes from `start()` on
                     // the next line, which names whatever keys are missing.
-                    // `await` is load-bearing, not decorative: this runs on a
-                    // `DispatchQueue.global` task while `View` is `@MainActor`,
-                    // so it is the hop that keeps the call legal.
-                    if let keys = await PairingRecord.topLevelKeys(pairingFileRaw) {
+                    if let keys = PairingRecord.topLevelKeys(pairingFileRaw) {
                         GoldenNuggetEngine.shared.log("pairing file top-level keys: \(keys.isEmpty ? "(empty)" : keys.sorted().joined(separator: ", "))")
                     } else {
                         GoldenNuggetEngine.shared.log("pairing file: NOT a parseable plist")

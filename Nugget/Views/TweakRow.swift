@@ -125,7 +125,7 @@ struct TweakNumberField: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .textFieldStyle(.roundedBorder)
-            .onChange(of: draft) { newValue in
+            .onChange(of: draft) { _, newValue in
                 if let value = spec.numberValue(from: newValue) {
                     selection.setValue(value, for: spec)
                 }

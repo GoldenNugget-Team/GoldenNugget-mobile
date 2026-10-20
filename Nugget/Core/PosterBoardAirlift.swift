@@ -16,8 +16,7 @@ import ZIPFoundation
 ///  * **Costs** — iOS 26.2+, an unlocked device, and a store reset cannot be
 ///    expressed: this path can add a descriptor, not remove one.
 ///
-/// The two modes are therefore not a preference to be optimised. `backup` stays
-/// the default, and this is the opt-in.
+/// AirLift is the default; protective backup also supports store resets.
 enum PosterBoardAirlift {
     /// The bundle whose container holds the store.
     static let bundleID = "com.apple.PosterBoard"
@@ -151,12 +150,17 @@ enum PosterBoardAirlift {
                     // randomized on the way in — the directory name and the plist
                     // values have to be rewritten together or PosterBoard indexes a
                     // wallpaper it cannot find.
-                    randomizeIdentifiers(in: descriptor.url, numericID: numericID)
 
+                    let currentExtension = descriptor.extensionID == PosterBoardPosterType.collections.extensionBundleID
+                        ? "com.apple.Posters.CollectionsPosterApp" : descriptor.extensionID
                     let parent = container + "Library/Application Support/"
                         + PosterBoard.storeDirectoryName + "/\(structureVersion)/Extensions/"
-                        + descriptor.extensionID + "/descriptors"
+                        + currentExtension + "/descriptors"
                     do {
+                        try randomizeIdentifiers(in: descriptor.url, numericID: numericID,
+                                                 extensionID: descriptor.extensionID)
+                        // Supported iOS versions read Collections from its current
+                        // provider. Do not count a legacy-only write as installed.
                         try await Airlift.injectFolder(
                             pairingPath: pairingPath,
                             folderPath: descriptor.url.path,
@@ -165,24 +169,8 @@ enum PosterBoardAirlift {
                         )
                         injected += 1
                         done += 1
-                        log("  ✅ \(position + 1)/\(descriptors.count) → \(descriptor.extensionID)")
+                        log("  ✅ \(position + 1)/\(descriptors.count) → \(currentExtension)")
                         progress(overall(done))
-
-                        // iOS 18+ moved the collections provider, so the reference
-                        // writes the same descriptor to both ids and treats the
-                        // second as best-effort (`try?`). Not a duplicate on the
-                        // device: the old id is no longer read, the new one is.
-                        if descriptor.extensionID == PosterBoardPosterType.collections.extensionBundleID {
-                            let modern = container + "Library/Application Support/"
-                                + PosterBoard.storeDirectoryName + "/\(structureVersion)"
-                                + "/Extensions/com.apple.Posters.CollectionsPosterApp/descriptors"
-                            try? await Airlift.injectFolder(
-                                pairingPath: pairingPath,
-                                folderPath: descriptor.url.path,
-                                targetParentDir: modern,
-                                destName: target
-                            )
-                        }
                     } catch {
                         // A stale cached container is the likeliest cause and the one
                         // worth fixing in place rather than making the user retry.
@@ -416,68 +404,39 @@ enum PosterBoardAirlift {
         return found
     }
 
-    /// Rewrite the identifier files so a copy of a pack can be indexed twice.
-    ///
-    /// The names are PosterBoard's, not ours: a provider descriptor carries its id
-    /// in a bare file, and the wallpaper's own plist points at the row it belongs
-    /// to. All three have to change together.
-    ///
-    /// Each is rewritten **only if the shape is there to rewrite**, which the
-    /// reference's version is not. It writes the number unconditionally, and that
-    /// is right for the shape almost every pack has — 53 of the 62 packs in
-    /// `downloaded_wallpapers` carry a bare numeric id and a userInfo that already
-    /// has `wallpaperRepresentingIdentifier` — and wrong for the rest:
-    ///
-    ///  * a provider's own id can be a *string*. `com.apple.MercuryPoster` ships
-    ///    `com.apple.posterkit.provider.descriptor.identifier` as `v6x.colorB`, a
-    ///    key into the provider's built-in catalogue of looks. Overwriting it with
-    ///    a number points the descriptor at a look that does not exist, and
-    ///    PosterBoard indexes nothing — a successful injection that installs a
-    ///    wallpaper nobody can select. It is left alone instead: the user asked
-    ///    for this wallpaper, and the same id in a second, freshly named folder is
-    ///    the same wallpaper installed twice, which is the point of the rename.
-    ///  * `wallpaperRepresentingIdentifier` is only set where the key already
-    ///    exists. Adding it to a userInfo that has never heard of it (one of the
-    ///    62, and every Mercury one) writes a field the provider does not read.
-    ///
-    /// The folder is renamed either way, so a second copy is a second directory.
-    private static func randomizeIdentifiers(in folder: URL, numericID: Int) {
+    /// Keep the same three identity fields in sync as the backup compiler.
+    /// Mercury's identifiers are provider lookup keys, so its entire descriptor
+    /// is preserved. Other providers need a sidecar even when the pack omitted it.
+    private static func randomizeIdentifiers(in folder: URL, numericID: Int,
+                                             extensionID: String) throws {
+        guard extensionID != "com.apple.MercuryPoster" else { return }
+        try Data(String(numericID).utf8).write(to: folder.appendingPathComponent(
+            "com.apple.posterkit.provider.descriptor.identifier"))
         guard let walker = FileManager.default.enumerator(
-            at: folder, includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else { return }
+            at: folder, includingPropertiesForKeys: [.isRegularFileKey]
+        ) else {
+            throw GoldenNuggetError("Could not read descriptor: \(folder.lastPathComponent)")
+        }
 
         while let url = walker.nextObject() as? URL {
-            switch url.lastPathComponent {
-            case "com.apple.posterkit.provider.descriptor.identifier":
-                // Only a bare number is ours to replace; see above for why a
-                // provider's string id has to survive.
-                if let existing = try? Data(contentsOf: url),
-                   let text = String(data: existing, encoding: .utf8),
-                   Int(text.trimmingCharacters(in: .whitespacesAndNewlines)) != nil {
-                    try? Data(String(numericID).utf8).write(to: url)
-                }
+            let name = url.lastPathComponent
+            if name == "__MACOSX" || name == ".DS_Store" || name.hasPrefix("._") {
+                walker.skipDescendants()
+                continue
+            }
+            switch name {
             case "com.apple.posterkit.provider.contents.userInfo":
-                rewritePlist(url) { plist in
-                    guard plist["wallpaperRepresentingIdentifier"] != nil else { return }
-                    plist["wallpaperRepresentingIdentifier"] = numericID
-                }
+                let updated = try PosterBoardPlist.set(contentsOf: url,
+                    key: "wallpaperRepresentingIdentifier", value: String(numericID),
+                    recursive: false)
+                try updated.write(to: url)
             default:
-                if url.lastPathComponent.hasSuffix("Wallpaper.plist") {
-                    rewritePlist(url) { $0["identifier"] = numericID }
+                if name.hasSuffix("Wallpaper.plist") {
+                    let updated = try PosterBoardPlist.set(contentsOf: url,
+                        key: "identifier", value: numericID, recursive: false)
+                    try PosterBoardPlist.alignedForFamily(updated).write(to: url)
                 }
             }
         }
-    }
-
-    private static func rewritePlist(_ url: URL, _ mutate: (inout [String: Any]) -> Void) {
-        guard let data = try? Data(contentsOf: url),
-              var plist = (try? PropertyListSerialization.propertyList(
-                  from: data, options: .mutableContainers, format: nil)) as? [String: Any]
-        else { return }
-        mutate(&plist)
-        guard let updated = try? PropertyListSerialization.data(
-            fromPropertyList: plist, format: .binary, options: 0) else { return }
-        try? updated.write(to: url)
     }
 }

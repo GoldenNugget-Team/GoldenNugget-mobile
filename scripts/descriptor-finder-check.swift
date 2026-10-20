@@ -12,18 +12,11 @@
 //   2  STORE    a snapshot's store directory is found wherever the pack put it —
 //               under `container/`, under `Container/`, or wrapped in a folder
 //               named after the pack. Three spellings, one walk.
-//   3  IDS      `randomizeIdentifiers` replaces a bare numeric id and leaves a
-//               provider's string id (`v6x.colorB`) alone, and does not add
-//               `wallpaperRepresentingIdentifier` to a userInfo that has none.
-//               The other way round installs a wallpaper PosterBoard cannot
-//               index, silently, after a "successful" injection.
+//   3  IDS      sidecar, string userInfo identity, nested wallpaper assets,
+//               Mercury preservation and malformed plist rejection.
+//   4  APPLY    current Collections provider delivery and failure propagation.
 //
-// Run:
-//   cat Nugget/Core/PosterBoardAirlift.swift \
-//       scripts/descriptor-finder-check.swift \
-//     | grep -v '^import ZIPFoundation$' > /tmp/finder/main.swift
-//   && swiftc -O /tmp/finder/main.swift -o /tmp/finder/check
-//   && /tmp/finder/check <pack.tendies> [more.tendies ...]
+// Run: python3 scripts/check-posterboard-airlift.py [pack.tendies ...]
 //
 // The real source is concatenated, not copied, so `private` members are in
 // scope and the code under test is the code that ships. The stubs below are the
@@ -38,6 +31,9 @@ import Foundation
 enum PosterBoard {
     static let storeDirectoryName = "PRBPosterExtensionDataStore"
     static let fallbackStructureVersion = 61
+    static func shouldConvertLegacy(pack: PosterBoardPack, deviceVersion: String,
+                                    log: (String) -> Void) -> Bool { false }
+    static func convertLegacyPack(_ name: String, at root: URL, log: (String) -> Void) {}
     static let workDirectory = URL(fileURLWithPath: "/tmp/finder/work")
 }
 
@@ -72,10 +68,22 @@ struct GoldenNuggetError: Error { let message: String; init(_ m: String) { messa
 
 enum Airlift {
     static func appContainer(pairingPath: String, bundleID: String) async throws -> String { "" }
-    static func extractZip(archivePath: String, destDir: String) async throws {}
+    static var targets: [String] = []
+    static var failInjection = false
+    static var resprings = 0
+    static func extractZip(archivePath: String, destDir: String) async throws {
+        for child in try FileManager.default.contentsOfDirectory(
+            at: URL(fileURLWithPath: archivePath), includingPropertiesForKeys: nil) {
+            try FileManager.default.copyItem(at: child, to: URL(fileURLWithPath: destDir)
+                .appendingPathComponent(child.lastPathComponent))
+        }
+    }
     static func injectFolder(pairingPath: String, folderPath: String,
-                             targetParentDir: String, destName: String) async throws {}
-    static func respring() async throws {}
+                             targetParentDir: String, destName: String) async throws {
+        targets.append(targetParentDir)
+        if failInjection { throw GoldenNuggetError("fixture injection failed") }
+    }
+    static func respring() async throws { resprings += 1 }
 }
 
 // `countDescriptors` reads a zip listing; the harness only ever calls the
@@ -102,8 +110,9 @@ extension PosterBoardAirlift {
             .map { (ext: $0.extensionID, url: $0.url) }
     }
 
-    static func __check_randomize(in folder: URL, numericID: Int) {
-        randomizeIdentifiers(in: folder, numericID: numericID)
+    static func __check_randomize(in folder: URL, numericID: Int,
+                                   extensionID: String) throws {
+        try randomizeIdentifiers(in: folder, numericID: numericID, extensionID: extensionID)
     }
 }
 
@@ -205,16 +214,13 @@ for argument in CommandLine.arguments.dropFirst() {
         }
     }
 
-    // 3  IDS. A numeric id is ours to replace; a provider's string id is not,
-    //     and a userInfo without the key must not gain one. Both id carriers are
-    //     checked — the video/photos shape has no bare id file and keeps its id
-    //     in `Wallpaper.plist` instead, and a pack with neither is a fact about
-    //     the pack, not a miss.
+    // Identity fields agree for Collections/Photos; Mercury retains its lookup keys.
     for descriptor in found {
         let bareBefore = identifierText(in: descriptor.url)
         let plistBefore = wallpaperIdentifier(in: descriptor.url)
         let keysBefore = userInfoKeys(in: descriptor.url)
-        PosterBoardAirlift.__check_randomize(in: descriptor.url, numericID: 47123)
+        try PosterBoardAirlift.__check_randomize(in: descriptor.url, numericID: 47123,
+                                                   extensionID: descriptor.ext)
         let bareAfter = identifierText(in: descriptor.url)
         let plistAfter = wallpaperIdentifier(in: descriptor.url)
         let keysAfter = userInfoKeys(in: descriptor.url)
@@ -232,8 +238,8 @@ for argument in CommandLine.arguments.dropFirst() {
                 fail("provider id \(bareBefore) was rewritten to \(bareAfter ?? "nil") — "
                      + "that points the descriptor at a look the provider does not have")
             }
-        } else if bareAfter != nil {
-            fail("a bare identifier file appeared: \(bareAfter ?? "nil")")
+        } else if descriptor.ext != "com.apple.MercuryPoster", bareAfter == "47123" {
+            pass("missing sidecar stamped")
         } else if let plistBefore {
             if "\(plistAfter ?? "nil")" == "47123" {
                 pass("Wallpaper.plist identifier \(plistBefore) -> \(plistAfter ?? "nil")")
@@ -246,8 +252,8 @@ for argument in CommandLine.arguments.dropFirst() {
         }
 
         if let keysBefore, !keysBefore.contains("wallpaperRepresentingIdentifier") {
-            if keysAfter?.contains("wallpaperRepresentingIdentifier") == false {
-                pass("no wallpaperRepresentingIdentifier added to \(keysBefore.joined(separator: ","))")
+            if keysAfter?.contains("wallpaperRepresentingIdentifier") == (descriptor.ext != "com.apple.MercuryPoster") {
+                pass("userInfo identity matches provider requirements")
             } else {
                 fail("added wallpaperRepresentingIdentifier to a userInfo that had "
                      + "\(keysBefore.joined(separator: ","))")
@@ -301,7 +307,8 @@ for spelling in ["container", "Container", "Some Pack Name/Container", "Some Pac
         $0.url.appendingPathComponent("com.apple.posterkit.provider.descriptor.identifier")
     }
     if let idFile {
-        PosterBoardAirlift.__check_randomize(in: found[0].url, numericID: 47123)
+        try PosterBoardAirlift.__check_randomize(in: found[0].url, numericID: 47123,
+                                                   extensionID: found[0].ext)
         let text = (try? Data(contentsOf: idFile)).flatMap {
             String(data: $0, encoding: .utf8)
         }
@@ -310,6 +317,79 @@ for spelling in ["container", "Container", "Some Pack Name/Container", "Some Pac
         }
     }
 }
+
+print("▸ AirLift descriptor identity and delivery")
+let identityRoot = URL(fileURLWithPath: NSTemporaryDirectory())
+    .appendingPathComponent("airlift-identity-\(UUID().uuidString)")
+defer { try? FileManager.default.removeItem(at: identityRoot) }
+let descriptor = identityRoot.appendingPathComponent("descriptors/Test")
+let contents = descriptor.appendingPathComponent("versions/0/contents")
+try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+let userInfo = contents.appendingPathComponent("com.apple.posterkit.provider.contents.userInfo")
+let wallpaper = contents.appendingPathComponent("ExampleWallpaper.plist")
+let hidden = contents.appendingPathComponent(".com.apple.posterkit.provider.contents.configurableOptions.plist")
+func writePlist(_ value: [String: Any], to url: URL) throws {
+    try PropertyListSerialization.data(fromPropertyList: value, format: .binary, options: 0)
+        .write(to: url)
+}
+func readPlist(_ url: URL) throws -> [String: Any] {
+    try PropertyListSerialization.propertyList(from: Data(contentsOf: url), options: [], format: nil)
+        as! [String: Any]
+}
+try writePlist(["suggestionMetadata": ["wallpaperRepresentingIdentifier": "keep"]], to: userInfo)
+try writePlist(["identifier": 1, "assets": ["lockAndHome": ["default": ["identifier": 2]]]], to: wallpaper)
+try Data("depth options".utf8).write(to: hidden)
+try PosterBoardAirlift.__check_randomize(in: descriptor, numericID: 47123,
+    extensionID: PosterBoardPosterType.collections.extensionBundleID)
+let info = try readPlist(userInfo)
+if identifierText(in: descriptor) == "47123",
+   info["wallpaperRepresentingIdentifier"] as? String == "47123",
+   (info["suggestionMetadata"] as? [String: Any])?["wallpaperRepresentingIdentifier"] as? String == "keep" {
+    pass("missing sidecar and top-level string identity agree; nested identity preserved")
+} else { fail("descriptor identity fields disagree") }
+let aligned = try readPlist(wallpaper)
+let assets = aligned["assets"] as? [String: Any]
+let lockAndHome = assets?["lockAndHome"] as? [String: Any]
+let fallback = lockAndHome?["default"] as? [String: Any]
+if aligned["identifier"] as? Int == 47123, fallback?["identifier"] as? Int == 47123,
+   aligned["family"] as? String == "Marble", aligned["name"] as? String == "Lavender",
+   try Data(contentsOf: hidden) == Data("depth options".utf8) {
+    pass("wallpaper assets aligned and hidden depth options preserved")
+} else { fail("wallpaper assets disagree with descriptor identity") }
+let mercuryBefore = try Data(contentsOf: userInfo)
+try PosterBoardAirlift.__check_randomize(in: descriptor, numericID: 99999,
+    extensionID: PosterBoardPosterType.mercury.extensionBundleID)
+if try Data(contentsOf: userInfo) == mercuryBefore, identifierText(in: descriptor) == "47123" {
+    pass("Mercury descriptor preserved byte for byte")
+} else { fail("Mercury descriptor was changed") }
+try Data("invalid plist".utf8).write(to: userInfo)
+do {
+    try PosterBoardAirlift.__check_randomize(in: descriptor, numericID: 47123,
+        extensionID: PosterBoardPosterType.collections.extensionBundleID)
+    fail("malformed identity plist silently accepted")
+} catch { pass("malformed identity plist rejected before injection") }
+try writePlist([:], to: userInfo)
+let fixtureSelection = PosterBoardSelection(tendies: [PosterBoardPack(
+    url: identityRoot, posterType: .collections)])
+PosterBoardAirlift.cachedContainer = "/fixture/PosterBoard"
+try await PosterBoardAirlift.apply(selection: fixtureSelection, structureVersion: 61,
+    deviceVersion: "26.5", pairingPath: "fixture", log: { _ in }, progress: { _ in })
+if Airlift.targets.count == 1,
+   Airlift.targets[0].hasSuffix("Extensions/com.apple.Posters.CollectionsPosterApp/descriptors"),
+   Airlift.resprings == 1 {
+    pass("Collections delivered to current provider before respring")
+} else { fail("Collections delivery used wrong provider") }
+Airlift.failInjection = true
+let previousResprings = Airlift.resprings
+do {
+    try await PosterBoardAirlift.apply(selection: fixtureSelection, structureVersion: 61,
+        deviceVersion: "26.5", pairingPath: "fixture", log: { _ in }, progress: { _ in })
+    fail("failed delivery reported success")
+} catch {
+    if Airlift.resprings == previousResprings { pass("failed delivery reports failure without respring") }
+    else { fail("resprung after failed delivery") }
+}
+UserDefaults.standard.removeObject(forKey: "PosterBoardAirliftContainer")
 
 print(failures == 0 ? "\nall checks passed" : "\n\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

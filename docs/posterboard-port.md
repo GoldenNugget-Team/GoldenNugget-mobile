@@ -136,8 +136,14 @@ record into a boolean.
   in the `-wal`, and copying the bare main file would lose it. SQLite's online-backup API
   does the fold (the reference's `src.backup(merged)`), and the `-shm` is deliberately
   **not** copied — a stale shared-memory file desyncs against the WAL and is a classic
-  "database disk image is malformed". A failed fold, or a database that does not validate
-  afterwards, falls back to the plain main file, exactly as the reference does.
+  "database disk image is malformed". Every fetch now goes through a writable scratch
+  copy and produces a validated `journal_mode=DELETE` snapshot, even without a WAL
+  companion: the main file can still carry WAL mode, and the old copy-only path could
+  fail at `sqlite_master` with "unable to open database file". Old cache sidecars are
+  removed before publishing the snapshot. Unlike the reference, a failed merge stops
+  the apply and preserves the previous cache instead of falling back to a main file
+  that may omit committed rows. `scripts/check-posterboard-backup.py` covers this
+  failure, WAL-only rows, and stitching a new wallpaper into the restore payload.
 - **The structure version is read out of the path** (`PRBPosterExtensionDataStore/<v>/`),
   falling back to 61 only when the path does not name the store directory — the reference's
   own fallback. The wrong version lands the injected database in a directory the device

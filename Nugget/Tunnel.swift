@@ -244,8 +244,8 @@ enum Tunnel {
         addr.sin_port = port.bigEndian
         guard inet_pton(AF_INET, ip, &addr.sin_addr) == 1 else { return false }
 
-        var flags = fcntl(fd, F_GETFL, 0)
-        fcntl(fd, F_SETFL, flags | O_NONBLOCK)
+        let flags = fcntl(fd, F_GETFL, 0)
+        guard flags >= 0, fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0 else { return false }
         let rc = withUnsafePointer(to: &addr) { ptr in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
                 connect(fd, sa, socklen_t(MemoryLayout<sockaddr_in>.size))

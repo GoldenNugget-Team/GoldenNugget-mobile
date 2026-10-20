@@ -110,6 +110,7 @@ xargs < /tmp/typecheck-sources.txt xcrun swiftc -typecheck \
   -swift-version 5 \
   -I "$PRODUCTS" \
   -I Vendor/IDevice.xcframework/ios-arm64/Headers \
+  -I Vendor/AirliftFFI.xcframework/ios-arm64/Headers \
   -I Vendor/EMProxy.xcframework/ios-arm64/Headers \
   -I Vendor/libimobiledevice.xcframework/ios-arm64/Headers \
   > /tmp/typecheck.log 2>&1 || true

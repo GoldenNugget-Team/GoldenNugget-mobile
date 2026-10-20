@@ -362,85 +362,89 @@ enum PosterBoardBackup {
 
     // MARK: - Consolidation
 
-    /// Fold the `-wal` companion into the main file, if there is one.
-    ///
-    /// The store runs in WAL mode, so recent wallpaper data can live in the WAL
-    /// rather than the main file — and copying the bare main file would lose it.
-    /// The `-shm` is deliberately **not** copied: a stale shared-memory file
-    /// desyncs against the WAL and is a classic "database disk image is
-    /// malformed".
-    ///
-    /// SQLite's own backup API does the fold, which is what the reference's
-    /// `src.backup(merged)` is; on any failure this falls back to the plain
-    /// file, exactly as the reference does.
+    /// Produce a standalone SQLite snapshot even when no WAL was uploaded.
+    /// A main file can still carry WAL journal mode without a companion. Opening
+    /// that copy read-only can require sidecar creation/recovery and fail before
+    /// sqlite_master is readable. Work on a writable private copy, then publish
+    /// a DELETE-mode snapshot with no dependency on sidecars from an earlier fetch.
     private static func consolidate(main: URL,
                                     wal: URL?,
                                     destination: URL,
                                     log: @escaping @Sendable (String) -> Void) throws -> URL {
         let fm = FileManager.default
-        try? fm.removeItem(at: destination)
-        guard let wal else {
-            do {
-                try fm.copyItem(at: main, to: destination)
-            } catch {
-                log("PosterBoard: copying the store onto the cache failed — "
-                    + "\(error.localizedDescription) (from \(main.lastPathComponent), "
-                    + "\(fileSize(main)) bytes, onto \(destination.path))")
-                throw error
-            }
-            return destination
-        }
-
         let work = fm.temporaryDirectory.appendingPathComponent("posterboard-\(UUID().uuidString)",
-                                                                conformingTo: .data)
+                                                                isDirectory: true)
         try fm.createDirectory(at: work, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: work) }
-        let scratch = work.appendingPathComponent("posterboard.sqlite3")
-        do {
-            try fm.copyItem(at: main, to: scratch)
-            try fm.copyItem(at: wal, to: URL(fileURLWithPath: scratch.path + "-wal"))
-        } catch {
-            log("PosterBoard: staging the store and its WAL failed — "
-                + "\(error.localizedDescription) (store \(fileSize(main)) bytes, "
-                + "WAL \(fileSize(wal)) bytes, in \(work.lastPathComponent))")
-            throw error
+        let scratch = work.appendingPathComponent("source.sqlite3")
+        let snapshot = work.appendingPathComponent("snapshot.sqlite3")
+        try fm.copyItem(at: main, to: scratch)
+        try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: scratch.path)
+        if let wal, fileSize(wal) > 0 {
+            let scratchWAL = URL(fileURLWithPath: scratch.path + "-wal")
+            try fm.copyItem(at: wal, to: scratchWAL)
+            try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: scratchWAL.path)
         }
-
-        let folded = fold(source: scratch, into: destination)
-        if !folded || !PosterBoardStore.validate(destination, strict: false) {
-            let reason = folded
-                ? (PosterBoardStore.diagnose(destination, strict: false) ?? "validation failed")
-                : "the backup API refused"
-            log("PosterBoard: WAL consolidation did not produce a healthy database "
-                + "(\(reason)) — using the plain file, which is what the reference falls "
-                + "back to as well")
-            try? fm.removeItem(at: destination)
-            try fm.copyItem(at: main, to: destination)
+        // Never copy -shm: SQLite must rebuild it against this exact WAL.
+        try fold(source: scratch, into: snapshot)
+        if let complaint = PosterBoardStore.diagnose(snapshot, strict: false) {
+            throw GoldenNuggetError("The downloaded PosterBoard store could not be prepared: "
+                + complaint)
         }
+        try fm.createDirectory(at: destination.deletingLastPathComponent(),
+                               withIntermediateDirectories: true)
+        // Validation of an older WAL-mode cache may have created these. Removing
+        // only its main file leaves stale journal state for the replacement.
+        for suffix in ["", "-wal", "-shm", "-journal"] {
+            let old = URL(fileURLWithPath: destination.path + suffix)
+            if fm.fileExists(atPath: old.path) { try fm.removeItem(at: old) }
+        }
+        try fm.moveItem(at: snapshot, to: destination)
+        log("PosterBoard: prepared standalone store snapshot ("
+            + "\(fileSize(destination)) bytes, journal_mode=DELETE)")
         return destination
     }
 
-    /// SQLite's online-backup API, the Swift spelling of the reference's
-    /// `src.backup(merged)`.
-    ///
-    /// Both handles are closed before this returns: the destination's connection
-    /// holds the `journal_mode` pragma, and a reader opened while it is still
-    /// live is not guaranteed to see the copy.
-    private static func fold(source sourcePath: URL, into destination: URL) -> Bool {
-        var source: OpaquePointer?
-        var merged: OpaquePointer?
+    /// Both the backup step and finish must succeed. A failed merge must not
+    /// silently fall back to a main file that omits committed wallpaper rows.
+    private static func fold(source sourcePath: URL, into destination: URL) throws {
+        var sourceHandle: OpaquePointer?
+        var mergedHandle: OpaquePointer?
         defer {
-            sqlite3_close(source)
-            sqlite3_close(merged)
+            sqlite3_close(sourceHandle)
+            sqlite3_close(mergedHandle)
         }
-        guard sqlite3_open_v2(sourcePath.path, &source, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
-              sqlite3_open(destination.path, &merged) == SQLITE_OK,
-              let source, let merged else { return false }
-        guard let backup = sqlite3_backup_init(merged, "main", source, "main") else { return false }
-        sqlite3_backup_step(backup, -1)
-        sqlite3_backup_finish(backup)
-        sqlite3_exec(merged, "PRAGMA journal_mode=DELETE", nil, nil, nil)
-        return true
+        func failure(_ stage: String, _ db: OpaquePointer?) -> GoldenNuggetError {
+            GoldenNuggetError("PosterBoard snapshot \(stage) failed: "
+                + String(cString: sqlite3_errmsg(db))
+                + " (SQLite \(sqlite3_extended_errcode(db))).")
+        }
+        guard sqlite3_open_v2(sourcePath.path, &sourceHandle, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK,
+              let source = sourceHandle else {
+            throw failure("opening downloaded store", sourceHandle)
+        }
+        guard sqlite3_open(destination.path, &mergedHandle) == SQLITE_OK,
+              let merged = mergedHandle else {
+            throw failure("creating snapshot", mergedHandle)
+        }
+        sqlite3_busy_timeout(source, 1000)
+        sqlite3_busy_timeout(merged, 1000)
+        guard let backup = sqlite3_backup_init(merged, "main", source, "main") else {
+            throw failure("starting backup", merged)
+        }
+        let step = sqlite3_backup_step(backup, -1)
+        let finish = sqlite3_backup_finish(backup)
+        guard step == SQLITE_DONE, finish == SQLITE_OK else {
+            throw failure("copying pages (step \(step), finish \(finish))", merged)
+        }
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(merged, "PRAGMA journal_mode=DELETE", -1, &statement, nil) == SQLITE_OK,
+              sqlite3_step(statement) == SQLITE_ROW,
+              let mode = sqlite3_column_text(statement, 0),
+              String(cString: mode).lowercased() == "delete" else {
+            throw failure("normalizing journal mode", merged)
+        }
     }
 
     private static func fileSize(_ url: URL) -> Int64 {

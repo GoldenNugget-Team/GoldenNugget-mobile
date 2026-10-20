@@ -273,11 +273,13 @@ struct TemplatesView: View {
                         }))
                     .labelsHidden()
                 }
-                NativeNote(value.identifier == nil
-                    ? "Deletes: \(value.files.joined(separator: ", "))."
-                    : "Removes the element \"\(value.identifier)\""
+                if let identifier = value.identifier {
+                    NativeNote("Removes the element \"\(identifier)\""
                         + (value.useCAID ? " (by its CoreAnimation id)" : "")
                         + " from: \(value.files.joined(separator: ", ")).")
+                } else {
+                    NativeNote("Deletes: \(value.files.joined(separator: ", ")).")
+                }
                 if value.inverted {
                     NativeNote("Inverted: the targets are deleted while this is **off**.")
                 }
@@ -495,7 +497,6 @@ struct TemplatesView: View {
 
     private var replaceContentTypes: [UTType] {
         guard let target = replaceTarget,
-              let template = selection.templates[safe: target.template],
               let option = current(target.template, target.option) as? ReplaceOption
         else { return [.data] }
         let extensions = option.allowedExtensions

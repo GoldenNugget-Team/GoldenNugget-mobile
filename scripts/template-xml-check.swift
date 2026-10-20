@@ -389,8 +389,6 @@ do {
     check(mineRefused && referenceRefused, "refuse/offset-unbound-variable",
           "mine refused=\(mineRefused), reference refused=\(referenceRefused) — both must refuse, "
           + "because the reference's zip() binds no `y` for a one-component value")
-} catch {
-    check(false, "refuse/offset-non-numeric", "unexpected throw: \\(error)")
 }
 
 do {
@@ -399,8 +397,6 @@ do {
                       useCAID: false, isDelete: false)
     check(mine(badXML) == nil, "refuse/malformed",
           "a mismatched closing tag was accepted")
-} catch {
-    check(false, "refuse/malformed", "unexpected throw: \\(error)")
 }
 
 // fnmatch, the `files` glob behind every option.
@@ -443,7 +439,8 @@ do {
     try Data().write(to: root.appendingPathComponent("descriptors/UUID/main.caml"))
     try Data().write(to: root.appendingPathComponent("top.caml"))
 
-    let globScript = work.appendingPathComponent("glob.py")
+    // Do not shadow Python's standard-library glob module with the script itself.
+    let globScript = work.appendingPathComponent("reference-glob.py")
     try Data("""
 import glob, json, os, sys
 root, pattern = json.load(sys.stdin)

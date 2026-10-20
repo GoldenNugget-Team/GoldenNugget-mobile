@@ -16,6 +16,6 @@ gradients, blends, glass flags, translucency, shadow and refractivity settings
 are preserved. The unsupported specular override falls back to the compiler's
 default; this is not a replacement with the historical light/dark PNG artwork.
 
-Both GitHub Actions workflows check for Xcode 26+, iOS SDK 26+, and Swift 6+
-before compiling. The Assets.car workflow requires the dark appearance check
-to pass before uploading its artifact.
+`scripts/build-ipa.sh` checks compiled icon appearances and moves a previous
+IPA into `build/previous/` before building. A failed build therefore cannot
+leave an old archive at `build/GoldenNuggetMobile.ipa`.

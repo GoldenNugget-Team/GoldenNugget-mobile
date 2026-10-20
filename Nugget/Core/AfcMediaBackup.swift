@@ -183,21 +183,23 @@ enum AfcMediaBackup {
             FileManager.default.createFile(atPath: partial.path, contents: nil)
             let handle = try FileHandle(forWritingTo: partial)
 
-            var written: Int64 = 0
+            let written: Int64
             do {
-                _ = try await gateway.afcStreamFile(path: entry.path, chunkSize: chunkSize) {
+                written = try await gateway.afcStreamFile(path: entry.path, chunkSize: chunkSize) {
                     chunk in
                     try handle.write(contentsOf: chunk)
-                    written += Int64(chunk.count)
                 }
                 try handle.synchronize()
                 try handle.close()
             } catch {
+                // The callback runs on the gateway's worker. Read the file's
+                // offset after it finishes instead of mutating a captured counter.
+                let partialWritten = (try? handle.offset()) ?? 0
                 try? handle.close()
                 try? FileManager.default.removeItem(at: partial)
                 // Fatal: the store is the only copy once originals are deleted.
                 throw GoldenNuggetError(
-                    "AFC media: \(entry.path) failed after \(written) byte(s) — "
+                    "AFC media: \(entry.path) failed after \(partialWritten) byte(s) — "
                     + "no original was removed.")
             }
 

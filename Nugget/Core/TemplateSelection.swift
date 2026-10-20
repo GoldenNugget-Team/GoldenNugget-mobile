@@ -134,7 +134,7 @@ enum TemplateImports {
         var out: [TemplateFile] = []
         for name in names {
             let url = directory.appendingPathComponent(name)
-            guard var template = try? TemplateFile(url: url, deviceVersion: deviceVersion) else {
+            guard let template = try? TemplateFile(url: url, deviceVersion: deviceVersion) else {
                 continue
             }
             for index in template.options.indices {
@@ -243,7 +243,7 @@ enum TemplateOptionStore {
         guard index >= 0, index < template.options.count else { return }
         let parts = value(at: index, in: template) ?? []
         switch template.options[index] {
-        case let value as ReplaceOption:
+        case is ReplaceOption:
             // The picked file is not in the store — only its name is, and the
             // file itself was never copied in.  So a replace option does not
             // survive a relaunch, and that is stated on the page: the user

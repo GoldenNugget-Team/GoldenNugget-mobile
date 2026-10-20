@@ -26,6 +26,23 @@ final class RegressionSuite {
         return gateway
     }
     func all() async {
+        await run("partial media stream reports bytes and keeps original") {
+            let gateway = try self.resetStore("partial-stream")
+            gateway.files = ["/DCIM/a.jpg": Data([1, 2, 3])]
+            gateway.afterStream = { throw GoldenNuggetError("Injected disconnect after write") }
+            do {
+                _ = try await AfcMediaBackup.pull(deletingOriginals: true)
+                self.check(false, "partial stream must throw")
+            } catch {
+                self.check(error.localizedDescription.contains("failed after 3 byte(s)"),
+                           "failure reports bytes already written")
+            }
+            self.check(gateway.removed.isEmpty && gateway.files["/DCIM/a.jpg"] == Data([1, 2, 3]),
+                       "failed stream retains original")
+            self.check(try AfcMediaBackup.read().entries.isEmpty, "failed stream is not journaled")
+            self.check(!FileManager.default.fileExists(atPath: AppPaths.mediaStore
+                .appendingPathComponent("DCIM/a.jpg.afcpartial").path), "partial copy is removed")
+        }
         await run("media journal survives disconnect") {
             let gateway = try self.resetStore("disconnect")
             gateway.files = ["/DCIM/a.jpg": Data([1]), "/DCIM/b.jpg": Data([2])]
