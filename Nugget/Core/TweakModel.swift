@@ -121,6 +121,7 @@ struct TweakSpec: Sendable {
     var requires: [String] = []
     var exclusiveWith: String? = nil
     var unavailableReason: String? = nil
+    var supportedModels: [String] = []
 
     /// Whether this tweak writes a whole dict rather than a single key.
     var writesWholeDict: Bool { multiValues != nil }
@@ -189,6 +190,9 @@ extension TweakSpec {
     /// the reference derives it (`src/gui/ios/tweaks.py:107`).
     func isCompatible(deviceVersion: String, isIPhone: Bool, deviceModel: String = "") -> Bool {
         if disabled || unavailableReason != nil { return false }
+        if !supportedModels.isEmpty && !supportedModels.contains(deviceModel) { return false }
+        // Opaque Siri archives have a stricter delivery gate than ordinary preferences.
+        if factory == "SiriAITweak" && deviceVersion != "27.0" { return false }
         if deviceVersion.isEmpty && deviceModel.isEmpty { return true }
         if !deviceVersion.isEmpty {
             guard let range = deviceVersion.range(of: "[0-9]+(\\.[0-9]+){0,3}", options: .regularExpression) else { return false }

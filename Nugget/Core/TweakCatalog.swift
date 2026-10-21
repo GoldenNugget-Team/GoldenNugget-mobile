@@ -28,6 +28,7 @@ enum TweakFileLocation: String, CaseIterable, Sendable {
     case ambient = "/var/Managed Preferences/mobile/com.apple.ambient.plist"
     case statusBarOverridesArchive = "/var/mobile/Library/SpringBoard/StatusBarOverrides.archive"
     case accessibility = "/var/Managed Preferences/mobile/com.apple.Accessibility.plist"
+    case siriAIOverrides = "/var/containers/Data/SystemGroup/com.apple.eligibilityd/Library/Caches/NeverRestore/eligibility_overrides.data"
     case globalPreferences = "/var/Managed Preferences/mobile/.GlobalPreferences.plist"
     case globalPreferencesHomeDomain = "/var/mobile/Library/Preferences/.GlobalPreferences.plist"
     case appStore = "/var/Managed Preferences/mobile/com.apple.AppStore.plist"
@@ -66,6 +67,72 @@ enum TweakKind: Sendable {
 enum TweakCatalog {
     static let all: [TweakSpec] = [
         TweakSpec(
+            id: "SiriAI",
+            section: .internalOptions,
+            title: "Siri AI (Ineligible Regions)",
+            location: .siriAIOverrides,
+            key: "SiriAI",
+            value: .bool(true),
+            kind: .toggle,
+            minValue: 0.0,
+            maxValue: 999.0,
+            step: 1.0,
+            minVersion: "27.0",
+            maxVersion: "27.0",
+            iphoneOnly: true,
+            ipadOnly: false,
+            disabled: false,
+            detail: "Experimental eligibility override by Project Linwood (mattisklein). Verified on iPhone 16 Pro, iOS 27.0 build 24A437 only.",
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false,
+            factory: "SiriAITweak",
+            offValue: nil,
+            integerBoolean: false,
+            requiresCameraControl: false,
+            requiresActionButton: false,
+            requiresHomeButton: false,
+            requiresAlwaysOn: false,
+            warning: "Requires an unencrypted protective backup and a reboot. Set Siri language to English (US), then complete consent in Settings. This replaces ALL existing eligibility overrides. Other builds are untested. Turning this switch off does not undo an applied override; use Reset Siri AI Overrides and apply.",
+            requires: [],
+            exclusiveWith: "ResetSiriAIOverrides",
+            unavailableReason: nil,
+            supportedModels: ["iPhone17,1"]
+        ),
+        TweakSpec(
+            id: "ResetSiriAIOverrides",
+            section: .internalOptions,
+            title: "Reset Siri AI Overrides",
+            location: .siriAIOverrides,
+            key: "ResetSiriAIOverrides",
+            value: .bool(true),
+            kind: .toggle,
+            minValue: 0.0,
+            maxValue: 999.0,
+            step: 1.0,
+            minVersion: "27.0",
+            maxVersion: "27.0",
+            iphoneOnly: true,
+            ipadOnly: false,
+            disabled: false,
+            detail: "Writes a valid empty eligibility override archive. This clears ALL eligibility overrides, including overrides installed by other tools.",
+            multiValues: nil,
+            reversibleBoolean: false,
+            requiresDynamicIsland: false,
+            factory: "SiriAITweak",
+            offValue: nil,
+            integerBoolean: false,
+            requiresCameraControl: false,
+            requiresActionButton: false,
+            requiresHomeButton: false,
+            requiresAlwaysOn: false,
+            warning: "This clears ALL eligibility overrides, not just Siri AI. It cannot recover a previous override map. Requires an unencrypted protective backup; apply and reboot.",
+            requires: [],
+            exclusiveWith: "SiriAI",
+            unavailableReason: nil,
+            supportedModels: ["iPhone17,1"]
+        ),
+        TweakSpec(
             id: "SBChamoisWindowingEnabled",
             section: .springboard,
             title: "iPad Window Mode",
@@ -95,7 +162,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBChamoisHideDockExternal",
@@ -127,7 +195,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBChamoisHideStripsExternal",
@@ -159,7 +228,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDisableCaptureButton",
@@ -191,7 +261,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDisableProximity",
@@ -223,7 +294,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBSuppressScreenSharingStatusBarOverridePreferenceKey",
@@ -255,7 +327,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCarPlayShowOptimalCellData",
@@ -287,7 +360,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDisableHomeButton",
@@ -319,7 +393,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBForceAllPhoneAppsToBeResizableOnPad",
@@ -351,7 +426,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBForceAllPhoneAppsToBeResizableOnResizableDisplays",
@@ -383,7 +459,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBScreenLongevityDimInterval",
@@ -415,7 +492,8 @@ enum TweakCatalog {
             warning: "The effect and safe values are unknown. Test this alone. Enter -1 and apply to remove this setting.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBPhoneInitiatedAppResizeWidth",
@@ -447,7 +525,8 @@ enum TweakCatalog {
             warning: "Working window sizes are unknown and apps may display incorrectly. Enter -1 and apply to remove this setting.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBPhoneInitiatedAppResizeHeight",
@@ -479,7 +558,8 @@ enum TweakCatalog {
             warning: "Working window sizes are unknown and apps may display incorrectly. Enter -1 and apply to remove this setting.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCaptureButtonAssociatedAppBundleIdentifier",
@@ -511,7 +591,8 @@ enum TweakCatalog {
             warning: "An unsupported app ID may stop this button working. Clear the field and apply to remove this setting.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisableControlSymbolAnimations",
@@ -543,7 +624,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NavigationBarBackButtonShowsContextMenu",
@@ -575,7 +657,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBAppIconForceTouchAnimationDurationMultiplier",
@@ -607,7 +690,8 @@ enum TweakCatalog {
             warning: "This older setting may be ignored on your system version. Test it alone. Enter -1 and apply to remove it.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBQuickActionAnimationDuration",
@@ -639,7 +723,8 @@ enum TweakCatalog {
             warning: "This older setting may be ignored on your system version. The example number is not a proven working value. Enter -1 and apply to remove it.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBAppIconForceTouchEnableUIPreviewInteractionAnimations",
@@ -671,7 +756,8 @@ enum TweakCatalog {
             warning: "This older setting may do nothing. It does not stop every animation. Turn off and apply to reverse the request.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisableIconGlassOutline",
@@ -703,7 +789,8 @@ enum TweakCatalog {
             warning: "This guessed setting may do nothing. It does not remove all Liquid Glass effects.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBBacklightLevel2",
@@ -735,7 +822,8 @@ enum TweakCatalog {
             warning: "The screen may become very dim, especially at 0. The system may ignore or replace this value. Enter -1 and apply to remove it.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBAppLibraryInDockEnabled",
@@ -767,7 +855,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBRecentsEnabled",
@@ -799,7 +888,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBAlwaysOnTapToInteract",
@@ -831,7 +921,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBAlwaysOnSwipeToUnlock",
@@ -863,7 +954,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBAndromedaDebugColors",
@@ -895,7 +987,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBUseAlwaysOnBrightnessCurve",
@@ -927,7 +1020,8 @@ enum TweakCatalog {
             warning: "The Always-On screen may look different or use more battery.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBEnforceOverallAPLLimit",
@@ -959,7 +1053,8 @@ enum TweakCatalog {
             warning: "This may change screen brightness or increase battery use. Test it alone and restore defaults afterward.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShouldAddDefaultWidgetsToHomeScreen",
@@ -991,7 +1086,8 @@ enum TweakCatalog {
             warning: "This affects setup or upgrades. Removing this setting cannot bring back a widget layout that has already changed.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShouldUpgradeEnableWidgetSuggestions",
@@ -1023,7 +1119,8 @@ enum TweakCatalog {
             warning: "This affects setup or upgrades. Removing this setting cannot bring back a widget layout that has already changed.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShouldResetDefaultTodayList",
@@ -1055,7 +1152,8 @@ enum TweakCatalog {
             warning: "This affects setup or upgrades. Removing this setting cannot bring back a widget layout that has already changed.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShouldResetStackForDefaultTodayList",
@@ -1087,7 +1185,8 @@ enum TweakCatalog {
             warning: "This affects setup or upgrades. Removing this setting cannot bring back a widget layout that has already changed.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCaptureButtonAllowLaunchIfUnobstructionOccursWhileButtonDown",
@@ -1119,7 +1218,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCaptureButtonAllowLaunchIfUnobstructionOccursPromptlyAfterButtonUp",
@@ -1151,7 +1251,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBEnableExtraBacklightLogging",
@@ -1183,7 +1284,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShouldLaunchWithMallocStackLogging",
@@ -1215,7 +1317,8 @@ enum TweakCatalog {
             warning: "Detailed memory logs can slow down the interface and use extra memory and storage. This is for troubleshooting, not making the device faster.",
             requires: [],
             exclusiveWith: "SBDisableAutomaticMallocStackLogging",
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDisableAutomaticMallocStackLogging",
@@ -1247,7 +1350,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: "SBShouldLaunchWithMallocStackLogging",
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDisableIdleSleep",
@@ -1279,7 +1383,8 @@ enum TweakCatalog {
             warning: "The device may stay awake longer, get warmer or use more battery. Test this alone.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBSystemGestureLogging",
@@ -1311,7 +1416,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "AMBumpToWakeEnabled",
@@ -1343,7 +1449,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBMenuBarDemoMode",
@@ -1375,7 +1482,8 @@ enum TweakCatalog {
             warning: "Demo commands can save or change app-window layouts. Set 0 and apply to hide the commands. This does not undo layouts changed through that menu.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBStatusBarishLogOptions",
@@ -1407,7 +1515,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: "Accepted values and reset behavior not established."
+            unavailableReason: "Accepted values and reset behavior not established.",
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBTrackpadSwitcherGesturesEnabled",
@@ -1439,7 +1548,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDisableHomeButtonDoublePress",
@@ -1471,7 +1581,8 @@ enum TweakCatalog {
             warning: "Double-pressing Home may stop opening the App Switcher. Turn off and apply to reverse this request.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "AMAmbientIgnoreBatteryCharging",
@@ -1503,7 +1614,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "AMAlwaysUpdateIconModelOnAmbientWidgetLayoutChange",
@@ -1535,7 +1647,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBHideNotifications",
@@ -1567,7 +1680,8 @@ enum TweakCatalog {
             warning: "Lock Screen notifications may disappear. Turn off and apply to reverse this request.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShowQuickNoteFingerGestureRecognizer",
@@ -1599,7 +1713,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCoverSheetForceWakeToMaps",
@@ -1631,7 +1746,8 @@ enum TweakCatalog {
             warning: "This may change what appears when the device wakes. The exact effect is unknown.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBFolderViewSuppressSetCurrentPage",
@@ -1663,7 +1779,8 @@ enum TweakCatalog {
             warning: "This may stop you switching pages inside Home Screen folders normally.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBHomeSidebarIsPinned",
@@ -1695,7 +1812,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBIgnoreCaptureApplicationLaunchMonitor",
@@ -1727,7 +1845,8 @@ enum TweakCatalog {
             warning: "Camera may stop opening correctly. The effect on your system version is unconfirmed.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShouldShowSplitPeekEducation",
@@ -1759,7 +1878,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShouldShowSlideOverPeekEducation",
@@ -1791,7 +1911,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBHomeShouldShowLibraryEducationView",
@@ -1823,7 +1944,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShouldShowWidgetIntroductionPage",
@@ -1855,7 +1977,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBExternalDisplayContentsScaleAndDontFileRadars",
@@ -1887,7 +2010,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: "iOS 27 preference binding and accepted range not established."
+            unavailableReason: "iOS 27 preference binding and accepted range not established.",
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDisableLiveIcons",
@@ -1919,7 +2043,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDisableIconFlyInAnimation",
@@ -1951,7 +2076,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDisableParallaxOnPageControl",
@@ -1983,7 +2109,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBHideReportWidgetStackRotationQuickAction",
@@ -2015,7 +2142,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBWidgetSnapshottingEnabled",
@@ -2047,7 +2175,8 @@ enum TweakCatalog {
             warning: "Widgets may appear blank, outdated or drawn incorrectly.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCoverSheetPrewarmCameraOnSwipe",
@@ -2079,7 +2208,8 @@ enum TweakCatalog {
             warning: nil,
             requires: ["SBCoverSheetUseDefaultsValuesForCameraPrewarm"],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCoverSheetPrelaunchCameraOnSwipe",
@@ -2111,7 +2241,8 @@ enum TweakCatalog {
             warning: nil,
             requires: ["SBCoverSheetUseDefaultsValuesForCameraPrewarm"],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCoverSheetPrewarmCameraOnButtonTouch",
@@ -2143,7 +2274,8 @@ enum TweakCatalog {
             warning: nil,
             requires: ["SBCoverSheetUseDefaultsValuesForCameraPrewarm"],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCoverSheetPrelaunchCameraOnButtonTouch",
@@ -2175,7 +2307,8 @@ enum TweakCatalog {
             warning: nil,
             requires: ["SBCoverSheetUseDefaultsValuesForCameraPrewarm"],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBSuppressNoSimAlert",
@@ -2207,7 +2340,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBIgnoreMinimumRequiredSDKVersionForWidgets",
@@ -2239,7 +2373,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBPIPInitiallyUsesMinimumPreferredContentSize",
@@ -2271,7 +2406,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDisableAsyncRenderingSurfaceRetention",
@@ -2303,7 +2439,8 @@ enum TweakCatalog {
             warning: "The screen may draw incorrectly or the interface may become unstable. No speed or memory improvement is confirmed.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBEnableDynamicJetsamLimits",
@@ -2335,7 +2472,8 @@ enum TweakCatalog {
             warning: "Changing the system interface's memory limits may cause crashes or repeated restarts. Keep a usable backup.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBKillableInAppSwitcher",
@@ -2367,7 +2505,8 @@ enum TweakCatalog {
             warning: "Closing the system interface may restart it. Repeated restarts or an unusable screen are possible; recovery may require restoring the device.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBChamoisHideStrips",
@@ -2399,7 +2538,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBChamoisHideDock",
@@ -2431,7 +2571,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBBackgroundNethermostWindows",
@@ -2463,7 +2604,8 @@ enum TweakCatalog {
             warning: "This may interrupt apps or change how iPad windows stay active. The exact effect is unknown.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBFlexibleWindowingManualStageCreationShouldRestorePreviousOpenWindows",
@@ -2495,7 +2637,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCoverSheetUseDefaultsValuesForCameraPrewarm",
@@ -2527,7 +2670,8 @@ enum TweakCatalog {
             warning: "Camera may open more slowly or respond differently to gestures. Test one camera setting at a time.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBMaxIconListCount",
@@ -2559,7 +2703,8 @@ enum TweakCatalog {
             warning: "Home Screen pages or icons may disappear. Set 0 to request the default found in the examined software.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCoverSheetCameraPrewarmThreshold",
@@ -2591,7 +2736,8 @@ enum TweakCatalog {
             warning: nil,
             requires: ["SBCoverSheetUseDefaultsValuesForCameraPrewarm"],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCoverSheetCameraPrelaunchThreshold",
@@ -2623,7 +2769,8 @@ enum TweakCatalog {
             warning: nil,
             requires: ["SBCoverSheetUseDefaultsValuesForCameraPrewarm"],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCoverSheetPlayerTimeout",
@@ -2655,7 +2802,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBSuppressAppShortcutTruncation",
@@ -2687,7 +2835,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShouldInsertDownloadFileStackIconToFloatingDock",
@@ -2719,7 +2868,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCoverSheetProportionalAdaptiveTime",
@@ -2751,7 +2901,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBNotificationCenterUseDuet",
@@ -2783,7 +2934,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBBatteryWidgetAlwaysAvailable",
@@ -2815,7 +2967,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBAlwaysAllowLongLookGesture",
@@ -2847,7 +3000,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBWantsManyForegroundWindows",
@@ -2879,7 +3033,8 @@ enum TweakCatalog {
             warning: "App behavior, memory use and the number of active windows may change. No higher window limit is guaranteed.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCameraShutterButtonShouldUsePocketDetection",
@@ -2911,7 +3066,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDismissControlCenterElsewhereOnPresentation",
@@ -2943,7 +3099,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCameraShutterButtonLongPressTimeout",
@@ -2975,7 +3132,8 @@ enum TweakCatalog {
             warning: "Camera Control may stop responding reliably. Record your current value before changing it.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCameraShutterButtonLongPressCancellationTimeout",
@@ -3007,7 +3165,8 @@ enum TweakCatalog {
             warning: "Camera Control may stop responding reliably. Record your current value before changing it.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBForceMedusaAdoption",
@@ -3039,7 +3198,8 @@ enum TweakCatalog {
             warning: "Apps may display incorrectly or have broken window controls. Test one app at a time.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBIgnoreSBUsesNetwork",
@@ -3071,7 +3231,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBWidgetLogging",
@@ -3103,7 +3264,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBHijackSpotlightButtonActionForPrototyping",
@@ -3135,7 +3297,8 @@ enum TweakCatalog {
             warning: "The Search button may stop working normally. Its replacement action is unknown.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBPIPVisualizeKeyboardFrame",
@@ -3167,7 +3330,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBPIPVisualizePositionRegions",
@@ -3199,7 +3363,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBPostModernRotationForciblyEnabled",
@@ -3231,7 +3396,8 @@ enum TweakCatalog {
             warning: "The screen may rotate incorrectly, apps may display badly or the interface may become unstable.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCoverSheetDisableDeviceMotionEffectPerformanceOptimizations",
@@ -3263,7 +3429,8 @@ enum TweakCatalog {
             warning: "Lock Screen movement may stutter or use more power. No speed improvement is confirmed.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBAlwaysShowSystemApertureOnClonedDisplays",
@@ -3295,7 +3462,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBEnableSystemApertureStateCollection",
@@ -3327,7 +3495,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShowRSSI",
@@ -3359,7 +3528,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShowThermalWarning",
@@ -3391,7 +3561,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShowStatusBarOverridesForRecording",
@@ -3423,7 +3594,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBAlwaysAllowDefaultAction",
@@ -3455,7 +3627,8 @@ enum TweakCatalog {
             warning: "Notification actions may behave differently. Do not assume this removes passcode or other security checks.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBSimulateCaptureButtonUsingActionButton",
@@ -3487,7 +3660,8 @@ enum TweakCatalog {
             warning: "This may replace the Action Button's current action. Camera Control features may still be unavailable.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDisablePreLaunchCaptureButtonSuppression",
@@ -3519,7 +3693,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCaptureButtonDisableWakeWhenDim",
@@ -3551,7 +3726,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCaptureButtonDisableStationaryDetection",
@@ -3583,7 +3759,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCaptureButtonDisableDirectLaunchAfterUnsuppress",
@@ -3615,7 +3792,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBCaptureButtonEnableCameraPose",
@@ -3647,7 +3825,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBBundleIdentifierToForceHomeAffordanceInset",
@@ -3679,7 +3858,8 @@ enum TweakCatalog {
             warning: "Use an installed app's ID. An unsupported ID may disrupt this part of the screen. Clear the field and apply to remove it.",
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBSwitcherBottomEdgeGestureSwipeCount",
@@ -3711,7 +3891,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBNotificationVisibleIdleTimer",
@@ -3743,7 +3924,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBMainDisplayDarkeningPercentage",
@@ -3775,7 +3957,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: "Accepted range and active consumer not verified."
+            unavailableReason: "Accepted range and active consumer not verified.",
+            supportedModels: []
         ),
         TweakSpec(
             id: "SolariumEnableHomeScreenExteriorEffects",
@@ -3807,7 +3990,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SolariumNoBlurReducedFrost",
@@ -3839,7 +4023,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "ReduceHighlightingEffectsEnabled",
@@ -3871,7 +4056,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "ForceSolariumFallback",
@@ -3903,7 +4089,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "IgnoreSolariumLinkedOnCheck",
@@ -3935,7 +4122,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "ForceSolariumIntelligence",
@@ -3967,7 +4155,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "ForceEnhancedSpeculars",
@@ -3999,7 +4188,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "UISolariumFallback",
@@ -4031,7 +4221,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "IgnoreSolariumHardwareCheck",
@@ -4063,7 +4254,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "IgnoreSolariumOptOut",
@@ -4095,7 +4287,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisallowGlassButtons",
@@ -4127,7 +4320,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisallowGlassLockScreen",
@@ -4159,7 +4353,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisableSpecularEverywhere",
@@ -4191,7 +4386,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NoLiquidClock",
@@ -4223,7 +4419,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NoLiquidDock",
@@ -4255,7 +4452,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisableSpecularMotion",
@@ -4287,7 +4485,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisableOuterRefraction",
@@ -4319,7 +4518,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisableSolariumHDR",
@@ -4351,7 +4551,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisableWidgetSpecular",
@@ -4383,7 +4584,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisableDockSpecular",
@@ -4415,7 +4617,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisableFolderSpecular",
@@ -4447,7 +4650,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "ExcludeClearGlassShadows",
@@ -4479,7 +4683,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "ExcludeDockShadow",
@@ -4511,7 +4716,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "ExcludeSearchShadow",
@@ -4543,7 +4749,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "UseFlatIconsEverywhere",
@@ -4575,7 +4782,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FlexiGlassMacOS",
@@ -4607,7 +4815,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FlexiGlassMacOSPointer",
@@ -4639,7 +4848,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "InvisibilitySuppressesGlass",
@@ -4671,7 +4881,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "EnableGlassEffectBridgeLayers",
@@ -4703,7 +4914,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "EnableGaussianGlassEffectBridgeLayers",
@@ -4735,7 +4947,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "UnifiedSystemBackgroundColorsEnabled",
@@ -4767,7 +4980,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "UnaryGlassContainerEnabled",
@@ -4799,7 +5013,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "EnableSolariumCompactChrome",
@@ -4831,7 +5046,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisableSolariumCompactChrome",
@@ -4863,7 +5079,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SolariumIncreasedDiffusion",
@@ -4895,7 +5112,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SolariumUseDisplayAngle",
@@ -4927,7 +5145,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SolariumTintMask",
@@ -4959,7 +5178,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SolariumBackgroundFilter",
@@ -4991,7 +5211,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SolariumHighlightWhite",
@@ -5023,7 +5244,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SolariumHierarchicalStyle",
@@ -5055,7 +5277,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "GlassHierarchicalStyle",
@@ -5087,7 +5310,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "GlassVisualDebug",
@@ -5119,7 +5343,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "GlassVisualWarnings",
@@ -5151,7 +5376,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "BlurFillExperiment",
@@ -5183,7 +5409,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "AdaptiveGlassHysteresisDarkRange",
@@ -5215,7 +5442,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "AdaptiveGlassHysteresisLightRange",
@@ -5247,7 +5475,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "CalistogaLargeRefraction",
@@ -5279,7 +5508,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "CalistogaRegularClearer",
@@ -5311,7 +5541,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "CalistogaBackdropMarginIncludesBlur",
@@ -5343,7 +5574,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "CalistogaAllowLumaTracking",
@@ -5375,7 +5607,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "CalistogaSidebarAccentOpacity",
@@ -5407,7 +5640,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "CalistogaPerceptualBackdropScale",
@@ -5439,7 +5673,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "CalistogaKeyboardGlass",
@@ -5471,7 +5706,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "CalistogaCameraGlass",
@@ -5503,7 +5739,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FloatingContentViewSpecularHighlightOpacity",
@@ -5535,7 +5772,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FloatingContentViewUnfocusedBorderOpacity",
@@ -5567,7 +5805,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FloatingContentViewUnfocusedBorderWidth",
@@ -5599,7 +5838,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FloatingContentViewEnableBackgroundFills",
@@ -5631,7 +5871,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FloatingContentViewDebugBackgroundFills",
@@ -5663,7 +5904,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FloatingContentViewPunchoutShadow",
@@ -5695,7 +5937,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FloatingContentViewModifyTransformMode",
@@ -5727,7 +5970,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FloatingContentViewOverrideRotationX",
@@ -5759,7 +6003,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FloatingContentViewOverrideRotationY",
@@ -5791,7 +6036,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FloatingContentViewOverrideTranslationX",
@@ -5823,7 +6069,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FloatingContentViewOverrideTranslationY",
@@ -5855,7 +6102,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FloatingContentViewModifyRotationStrength",
@@ -5887,7 +6135,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FloatingContentViewModifyTranslationStrength",
@@ -5919,7 +6168,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FocusSpecularHighlightMaxSize",
@@ -5951,7 +6201,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FocusSpecularHighlightScaleFactor",
@@ -5983,7 +6234,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FocusSpecularHighlightSensitivity",
@@ -6015,7 +6267,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FocusSpecularHighlightNormalizedPositionX",
@@ -6047,7 +6300,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "FocusSpecularHighlightNormalizedPositionY",
@@ -6079,7 +6333,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImageRenderingEnabled",
@@ -6111,7 +6366,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImageFiltersEnabled",
@@ -6143,7 +6399,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImage3DTransformsEnabled",
@@ -6175,7 +6432,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImage3DTransformedGlassLayer",
@@ -6207,7 +6465,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImageSpecularEnabled",
@@ -6239,7 +6498,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImageSpecularOpacity",
@@ -6271,7 +6531,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImageRadiosityEnabled",
@@ -6303,7 +6564,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImageForceAdjustMotionForSize",
@@ -6335,7 +6597,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImageForceDefaultScaleSizeIncrease",
@@ -6367,7 +6630,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImageInnerParallaxScale",
@@ -6399,7 +6663,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImageAsymmetricScale",
@@ -6431,7 +6696,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImageProgressiveScale",
@@ -6463,7 +6729,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImageAdditionalTranslation",
@@ -6495,7 +6762,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NewStackedImageFocusedAdditionalScaleAmount",
@@ -6527,7 +6795,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "StackedImageContainerDefaultMaxDepth",
@@ -6559,7 +6828,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "StackedImageContainerDefaultRotationX",
@@ -6591,7 +6861,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "StackedImageContainerDefaultRotationY",
@@ -6623,7 +6894,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "StackedImageContainerDefaultTranslationX",
@@ -6655,7 +6927,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "StackedImageContainerDefaultTranslationY",
@@ -6687,7 +6960,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "StackedImageContainerModifyMaxDepthStrength",
@@ -6719,7 +6993,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "StackedImageContainerModifyRotationStrength",
@@ -6751,7 +7026,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "StackedImageContainerModifyTranslationStrength",
@@ -6783,7 +7059,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "StackedImageContainerModifyInnerParallaxScaleStrength",
@@ -6815,7 +7092,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "StackedImageContainerModifyTransformMinWidth",
@@ -6847,7 +7125,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "StackedImageContainerModifyTransformMaxWidth",
@@ -6879,7 +7158,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "StackedImageContainerModifyTransformMinHeight",
@@ -6911,7 +7191,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "StackedImageContainerModifyTransformMaxHeight",
@@ -6943,7 +7224,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "LockScreenFootnote",
@@ -6975,7 +7257,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "WatchOSCompatibility",
@@ -7015,7 +7298,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "AirDropDisableTimeLimit",
@@ -7047,7 +7331,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDontLockAfterCrash",
@@ -7079,7 +7364,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDontDimOrLockOnAC",
@@ -7111,7 +7397,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBHideLowPowerAlerts",
@@ -7143,7 +7430,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBHideACPower",
@@ -7175,7 +7463,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBNeverBreadcrumb",
@@ -7207,7 +7496,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShowSupervisionTextOnLockScreen",
@@ -7239,7 +7529,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "AirplaySupport",
@@ -7271,7 +7562,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBMinimumLockscreenIdleTime",
@@ -7303,7 +7595,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBAlwaysShowSystemApertureInSnapshots",
@@ -7335,7 +7628,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "HideDICompletely",
@@ -7367,7 +7661,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBShowAuthenticationEngineeringUI",
@@ -7399,7 +7694,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "KeyboardShouldSplitInDefaultContext",
@@ -7431,7 +7727,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "KeyboardShouldSplitInSplitPreferringContext",
@@ -7463,7 +7760,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "UIKeyboardPersistentSplitProgress",
@@ -7495,7 +7793,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "UIKeyboardPersistentSplitLock",
@@ -7527,7 +7826,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "UseFloatingTabBar",
@@ -7559,7 +7859,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBDisableIconParallax",
@@ -7591,7 +7892,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBHideSearchAffordance",
@@ -7623,7 +7925,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBBuildNumber",
@@ -7655,7 +7958,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "RTL",
@@ -7687,7 +7991,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "LTR",
@@ -7719,7 +8024,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "SBIconVisibility",
@@ -7751,7 +8057,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "iMessageDiagnosticsEnabled",
@@ -7783,7 +8090,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "IDSDiagnosticsEnabled",
@@ -7815,7 +8123,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "VCDiagnosticsEnabled",
@@ -7847,7 +8156,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "AccessoryDeveloperEnabled",
@@ -7879,7 +8189,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisableSecondsHand",
@@ -7911,7 +8222,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "DisableSearchingWebsites",
@@ -7943,7 +8255,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "ShowButtonHints",
@@ -7975,7 +8288,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "AppStoreDebug",
@@ -8007,7 +8321,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "NotesDebugMode",
@@ -8039,7 +8354,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "BKDigitizerVisualizeTouches",
@@ -8071,7 +8387,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "BKHideAppleLogoOnLaunch",
@@ -8103,7 +8420,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "EnableWakeGestureHaptic",
@@ -8135,7 +8453,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "PlaySoundOnPaste",
@@ -8167,7 +8486,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
         TweakSpec(
             id: "AnnounceAllPastes",
@@ -8199,7 +8519,8 @@ enum TweakCatalog {
             warning: nil,
             requires: [],
             exclusiveWith: nil,
-            unavailableReason: nil
+            unavailableReason: nil,
+            supportedModels: []
         ),
     ]
 
@@ -8217,6 +8538,13 @@ enum TweakCatalog {
     }
 }
 
+
+extension TweakCatalog {
+    static let siriAIArchives: [String: Data] = [
+        "SiriAI": Data(base64Encoded: "YnBsaXN0MDDUAQIDBAUGBwpYJHZlcnNpb25ZJGFyY2hpdmVyVCR0b3BYJG9iamVjdHMSAAGGoF8QD05TS2V5ZWRBcmNoaXZlctEICVRyb290gAGvEBALDBEdHh8gJCUsLzQ6Ozw/VSRudWxs0g0ODxBbb3ZlcnJpZGVNYXBWJGNsYXNzgAKAD9MSEw4UGBxXTlMua2V5c1pOUy5vYmplY3RzoxUWF4ADgASABaMZGhuABoAJgAqADhB6EJsQYNIhDiIjVmFuc3dlcoAHgAgQBNImJygpWiRjbGFzc25hbWVYJGNsYXNzZXNfEBdFbGlnaWJpbGl0eU92ZXJyaWRlRGF0YaIqK18QF0VsaWdpYmlsaXR5T3ZlcnJpZGVEYXRhWE5TT2JqZWN00iEOIiOAB4AI0yEwDiIyI1djb250ZXh0gAeAC4AI0xITDjU3HKE2gAyhOIANgA5fECtPU19FTElHSUJJTElUWV9DT05URVhUX0xJTldPT0RfQVZBSUxBQklMSVRZEALSJic9PlxOU0RpY3Rpb25hcnmiPSvSJidAQV8QE0VsaWdpYmlsaXR5T3ZlcnJpZGWiQitfEBNFbGlnaWJpbGl0eU92ZXJyaWRlAAgAEQAaACQAKQAyADcASQBMAFEAUwBmAGwAcQB9AIQAhgCIAI8AlwCiAKYAqACqAKwAsACyALQAtgC4ALoAvAC+AMMAygDMAM4A0ADVAOAA6QEDAQYBIAEpAS4BMAEyATkBQQFDAUUBRwFOAVABUgFUAVYBWAGGAYgBjQGaAZ0BogG4AbsAAAAAAAACAQAAAAAAAABDAAAAAAAAAAAAAAAAAAAB0Q==")!,
+        "ResetSiriAIOverrides": Data(base64Encoded: "YnBsaXN0MDDUAQIDBAUGBwpYJHZlcnNpb25ZJGFyY2hpdmVyVCR0b3BYJG9iamVjdHMSAAGGoF8QD05TS2V5ZWRBcmNoaXZlctEICVRyb290gAGlCwwRFx1VJG51bGzSDQ4PEFtvdmVycmlkZU1hcFYkY2xhc3OAAoAE0xITDhQVFldOUy5rZXlzWk5TLm9iamVjdHOgoIAD0hgZGhtaJGNsYXNzbmFtZVgkY2xhc3Nlc1xOU0RpY3Rpb25hcnmiGhxYTlNPYmplY3TSGBkeH18QE0VsaWdpYmlsaXR5T3ZlcnJpZGWiIBxfEBNFbGlnaWJpbGl0eU92ZXJyaWRlCBEaJCkyN0lMUVNZX2Rwd3l7goqVlpeZnqmyv8LL0ObpAAAAAAAAAQEAAAAAAAAAIQAAAAAAAAAAAAAAAAAAAP8=")!,
+    ]
+}
 
 /// Device capabilities generated from desktop device_capabilities.py.
 enum TweakDeviceCapabilities {

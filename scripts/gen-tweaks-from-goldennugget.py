@@ -186,7 +186,7 @@ def emit(output: list[str], FileLocation, SPECS, Kind, Section) -> None:
         instance = spec.factory() if spec.factory is not None else None
         reversible = instance is not None and type(instance).__name__ == "ReversibleBooleanPlistTweak"
         factory = type(instance).__name__ if instance is not None else "BasicPlistTweak"
-        supported = {"ExperimentalBooleanPlistTweak", "ResettableNumericPreferenceTweak", "OptionalBundlePreferenceTweak"}
+        supported = {"ExperimentalBooleanPlistTweak", "ResettableNumericPreferenceTweak", "OptionalBundlePreferenceTweak", "SiriAITweak"}
         if instance is not None and not reversible and factory not in supported:
             if type(instance).__name__ != "AdvancedPlistTweak" or not isinstance(instance.value, dict):
                 die(f"unsupported factory for {spec.id.name}: {type(instance).__name__}")
@@ -206,7 +206,8 @@ def emit(output: list[str], FileLocation, SPECS, Kind, Section) -> None:
         w(f"            warning: {swift_string(spec.warning) if spec.warning else 'nil'},")
         w(f"            requires: [{', '.join(swift_string(x.name) for x in spec.requires)}],")
         w(f"            exclusiveWith: {swift_string(spec.exclusive_with.name) if spec.exclusive_with else 'nil'},")
-        w(f"            unavailableReason: {swift_string(spec.unavailable_reason) if spec.unavailable_reason else 'nil'}")
+        w(f"            unavailableReason: {swift_string(spec.unavailable_reason) if spec.unavailable_reason else 'nil'},")
+        w(f"            supportedModels: [{', '.join(swift_string(x) for x in spec.supported_models)}]")
         w(f"        ),")
     w("    ]")
     w("")
@@ -238,6 +239,14 @@ def main() -> int:
 
     lines: list[str] = []
     emit(lines, FileLocation, SPECS, Kind, Section)
+    # Preserve the opaque keyed archives byte-for-byte; validate against desktop hashes.
+    import base64
+    from src.tweaks.siri_ai import payload_file
+    lines += ["", "extension TweakCatalog {", "    static let siriAIArchives: [String: Data] = ["]
+    for name, action in [("SiriAI", "enable"), ("ResetSiriAIOverrides", "reset")]:
+        data = payload_file(action).contents
+        lines += [f'        "{name}": Data(base64Encoded: "{base64.b64encode(data).decode()}")!,']
+    lines += ["    ]", "}"]
     import runpy
     capabilities = runpy.run_path(str(Path(args.goldennugget) / "src/devicemanagement/device_capabilities.py"))
     lines += ["", "/// Device capabilities generated from desktop device_capabilities.py.", "enum TweakDeviceCapabilities {"]

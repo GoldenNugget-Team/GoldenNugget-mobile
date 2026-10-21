@@ -94,6 +94,10 @@ func compileCase(_ tweaks: [String: Any]) -> [String: [String: String]] {
                                        isIPhone: isIPhone, deviceModel: deviceModel)
     var out: [String: [String: String]] = [:]
     for payload in result.payloads {
+        if payload.domain == "SysContainerDomain-com.apple.eligibilityd" {
+            out[payload.label] = ["$archive": "str:" + payload.contents.base64EncodedString()]
+            continue
+        }
         let plist = (try? PropertyListSerialization.propertyList(from: payload.contents,
                                                                  options: [],
                                                                  format: nil)) as? [String: Any]

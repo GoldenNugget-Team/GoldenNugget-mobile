@@ -179,6 +179,7 @@ enum TweakCompiler {
         // injector writes `contents` verbatim, so an empty payload is it.
         var nullified: [TweakFileLocation] = []
         var skipped: [(label: String, reason: String)] = []
+        var archives: [TweakPayload] = []
 
         // Write explicit false values too: omitting the last switched-off group
         // would leave the previous disabled override on the device. Only catalog
@@ -207,6 +208,18 @@ enum TweakCompiler {
             guard spec.isCompatible(deviceVersion: deviceVersion, isIPhone: isIPhone, deviceModel: deviceModel) else {
                 if selection.isOn(spec) {
                     skipped.append((spec.id, "not compatible with this device / iOS version"))
+                }
+                continue
+            }
+
+            // Eligibility overrides are NSKeyedArchives, never preference dictionaries.
+            if spec.factory == "SiriAITweak" {
+                if selection.isOn(spec),
+                   !selection.enabled.contains(spec.exclusiveWith ?? ""),
+                   let data = TweakCatalog.siriAIArchives[spec.id],
+                   let dest = TweakDomainMap.split(path: spec.location.rawValue) {
+                    archives.append(TweakPayload(domain: dest.domain, relativePath: dest.relativePath,
+                                                 contents: data, owner: 0))
                 }
                 continue
             }
@@ -261,7 +274,7 @@ enum TweakCompiler {
             plists[spec.location] = dict
         }
 
-        var payloads: [TweakPayload] = []
+        var payloads: [TweakPayload] = archives
         var emitted: [TweakFileLocation] = []
 
         for location in order {

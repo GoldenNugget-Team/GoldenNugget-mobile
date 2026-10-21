@@ -60,6 +60,7 @@ if CommandLine.arguments.count > 3 && CommandLine.arguments[3] == "patch" {
     let database = try PosterBoardSnapshot.records(in: source).first { PosterBoardSnapshot.storeVersion(relativePath: $0.path) != nil }!
     _ = try TweakInjector.inject(into: target, payloads: [TweakPayload(domain: PosterBoard.domain, relativePath: database.path, contents: Data("new db".utf8))], preservedDirectories: snapshot.directories, preservedFileMetadata: snapshot.fileMetadata)
 }
+_ = try TweakInjector.inject(into: target, payloads: [TweakPayload(domain: "SysContainerDomain-com.apple.eligibilityd", relativePath: "Library/Caches/NeverRestore/eligibility_overrides.data", contents: Data("opaque archive".utf8))])
 print("Native PosterBoard merge and delta injection passed (\(snapshot.directories.count) original directories)")
 '''
 
@@ -109,6 +110,18 @@ def run_and_verify(binary, source, target, patch=False):
         assert info['Mode'] & 0o170000 == 0o100000
         assert conn.execute("SELECT count(*) FROM Files WHERE domain='HomeDomain'").fetchone()[0] == 1
         assert conn.execute("SELECT count(*) FROM Files WHERE domain='AppDomain-foreign'").fetchone()[0] == 0
+        eligibility = conn.execute("SELECT relativePath, flags, file FROM Files WHERE domain='SysContainerDomain-com.apple.eligibilityd'").fetchall()
+        assert len(eligibility) == 5
+        for path, flags, blob in eligibility:
+            info = plistlib.loads(blob)['$objects'][1]
+            assert info['UserID'] == 0 and info['GroupID'] == 0
+            assert info['ProtectionClass'] == (4 if flags == 1 else 0)
+            assert info['Mode'] == (0o100644 if flags == 1 else 0o40755)
+            assert 'Digest' not in info and 'ExtendedAttributes' not in info
+            if flags == 1:
+                ident = file_id(path, 'SysContainerDomain-com.apple.eligibilityd')
+                assert (target / ident[:2] / ident).read_bytes() == b'opaque archive'
+        print('PASS: eligibility archive bytes, root ownership, modes and protection classes match desktop')
     assert rows(source) == original, 'source snapshot mutated'
     assert rows(target.with_name(target.name + '-baseline')) == original, 'recovery baseline lost native records'
     print(f'PASS: {len(original)} native records and all file bytes survive delta injection')

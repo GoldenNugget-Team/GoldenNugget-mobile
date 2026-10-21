@@ -1,3 +1,6 @@
+Latest synchronization: [2026-10-22](desktop-sync-2026-10-22.md), desktop `5fd115a`.
+Previous update: [2026-10-21](desktop-sync-2026-10-21.md).
+
 # Desktop synchronization — 2026-10-18
 
 Reference: `GoldenNugget-Team/GoldenNugget`, main commit

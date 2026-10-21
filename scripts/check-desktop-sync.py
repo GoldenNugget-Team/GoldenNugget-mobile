@@ -56,16 +56,32 @@ extension URL {
         try encoded.write(to: root.appendingPathComponent("swift.code"), atomically: true, encoding: .utf8)
         let decoded = try PresetShareCode.decode(encoded)
         check((decoded["tweaks"] as? [String: [String: Any]])?["HideDICompletely"]?["enabled"] as? Bool == true, "GN1 Swift roundtrip")
+        let siri = TweakCatalog.byID["SiriAI"]!
+        let resetSiri = TweakCatalog.byID["ResetSiriAIOverrides"]!
+        var siriSelection = TweakSelection()
+        siriSelection.setOn(true, for: siri)
+        let siriFiles = TweakCompiler.compile(selection: siriSelection, deviceVersion: "27.0", isIPhone: true, deviceModel: "iPhone17,1").payloads.filter { $0.domain == "SysContainerDomain-com.apple.eligibilityd" }
+        check(siriFiles.count == 1 && siriFiles[0].owner == 0 && siriFiles[0].contents.count == 631, "Siri enable emits root-owned opaque archive")
+        siriSelection.setOn(false, for: siri)
+        check(!TweakCompiler.compile(selection: siriSelection, deviceVersion: "27.0", isIPhone: true, deviceModel: "iPhone17,1").payloads.contains { $0.domain == "SysContainerDomain-com.apple.eligibilityd" }, "Siri off only deselects operation")
+        siriSelection.setOn(true, for: resetSiri)
+        let siriReset = TweakCompiler.compile(selection: siriSelection, deviceVersion: "27.0", isIPhone: true, deviceModel: "iPhone17,1").payloads.first { $0.domain == "SysContainerDomain-com.apple.eligibilityd" }!
+        let resetArchive = try PropertyListSerialization.propertyList(from: siriReset.contents, format: nil) as! [String: Any]
+        check(siriReset.contents.count == 320 && resetArchive["$archiver"] as? String == "NSKeyedArchiver", "Siri reset is a valid keyed archive")
+        siriSelection.restore(enabled: true, value: nil, multiValues: nil, for: siri)
+        check(siriSelection.validationIssue() != nil, "conflicting Siri actions rejected")
         let previousUntested = UserDefaults.standard.object(forKey: UntestedTweaks.enabledKey)
         defer { UserDefaults.standard.set(previousUntested, forKey: UntestedTweaks.enabledKey) }
         UserDefaults.standard.set(false, forKey: UntestedTweaks.enabledKey)
         let versionProbe = TweakCatalog.all.first {
-            $0.minVersion == "27.0" && !$0.disabled && $0.unavailableReason == nil
+            $0.factory != "SiriAITweak" && $0.minVersion == "27.0" && !$0.disabled && $0.unavailableReason == nil
                 && $0.isCompatible(deviceVersion: "27.0", isIPhone: true, deviceModel: "iPhone17,1")
         }!
         check(!versionProbe.isCompatible(deviceVersion: "26.5", isIPhone: true, deviceModel: "iPhone17,1"), "version bounds apply by default")
         UserDefaults.standard.set(true, forKey: UntestedTweaks.enabledKey)
         check(versionProbe.isCompatible(deviceVersion: "26.5", isIPhone: true, deviceModel: "iPhone17,1"), "iOS 26 opt-in bypasses version bounds")
+        check(!siri.isCompatible(deviceVersion: "26.5", isIPhone: true, deviceModel: "iPhone17,1"), "Siri cannot bypass version restriction with opt-in")
+        check(!siri.isCompatible(deviceVersion: "27.0.1", isIPhone: true, deviceModel: "iPhone17,1") && !siri.isCompatible(deviceVersion: "27.0", isIPhone: true, deviceModel: "iPhone17,2"), "Siri requires exact OS and model")
         check(!versionProbe.isCompatible(deviceVersion: "25.0", isIPhone: true, deviceModel: "iPhone17,1"), "opt-in does not bypass other iOS versions")
         check(!TweakCatalog.byID["SBDisableCaptureButton"]!.isCompatible(deviceVersion: "26.5", isIPhone: true, deviceModel: "iPhone15,4"), "opt-in preserves hardware requirements")
         UserDefaults.standard.set(false, forKey: UntestedTweaks.enabledKey)

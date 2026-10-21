@@ -672,6 +672,10 @@ class GoldenNuggetEngine {
         // once, here, and both decisions below quote the same snapshot.
         let dev = DevSettings.effective
         let ios27 = major >= 27 && !dev.forcePartialRestore
+        let hasEligibility = payloads.contains { $0.domain == "SysContainerDomain-com.apple.eligibilityd" }
+        if hasEligibility && !ios27 {
+            throw GoldenNuggetError("Siri AI overrides require an unencrypted protective backup. Disable forced partial restore and retry.")
+        }
         // Reported before the fork, because this number *is* the fork: the
         // branch lines below say where the run went, this says why.
         log("device version for the manifest-format fork: \(version) (major \(major))")
@@ -695,6 +699,14 @@ class GoldenNuggetEngine {
         if ios27 {
             log("Manifest format: sqlite (iOS 27+ path), protective backup pulled")
             backupRoot = try await protectiveBackup(udid: udid)
+            if hasEligibility {
+                let manifestURL = backupRoot.appendingPathComponent(udid).appendingPathComponent("Manifest.plist")
+                let data = try Data(contentsOf: manifestURL)
+                let manifest = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+                guard manifest?["IsEncrypted"] as? Bool == false else {
+                    throw GoldenNuggetError("Siri AI overrides require a confirmed unencrypted protective backup. Disable local backup encryption in Finder/iTunes and retry.")
+                }
+            }
             prune = true
             // Media over AFC, after the backup and before the prune: the backup
             // filter rejects the media domains, so this is the only thing that

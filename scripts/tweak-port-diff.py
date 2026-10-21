@@ -111,6 +111,7 @@ def make_reference_compiler(SPECS, FileLocation, BasicPlistTweak, AdvancedPlistT
         if spec.requires_dynamic_island and not has_dynamic_island(model):
             return False
         if spec.unavailable_reason: return False
+        if spec.supported_models and model not in spec.supported_models: return False
         from src.devicemanagement import device_capabilities as caps
         for requirement, predicate in [('requires_camera_control', caps.has_camera_control), ('requires_action_button', caps.has_action_button), ('requires_home_button', caps.has_home_button), ('requires_always_on', caps.has_always_on_display)]:
             if getattr(spec, requirement) and not predicate(model):
@@ -132,6 +133,7 @@ def make_reference_compiler(SPECS, FileLocation, BasicPlistTweak, AdvancedPlistT
 
     def compile_case(tweaks: dict, device_version: str, is_iphone: bool, model: str) -> dict:
         other_tweaks: dict = {}
+        archives = {}
         for spec in SPECS:
             if spec.disabled:
                 continue
@@ -147,9 +149,17 @@ def make_reference_compiler(SPECS, FileLocation, BasicPlistTweak, AdvancedPlistT
             supplied = tweaks.get(name)
             if supplied is not None:
                 tweak.value = supplied
+            if type(tweak).__name__ == "SiriAITweak":
+                if spec.exclusive_with.name in tweaks: continue
+                files = []
+                tweak.apply_tweak(files, device_version, model)
+                import base64
+                for file in files:
+                    archives[f"{file.domain}/{file.restore_path}"] = {"$archive": base64.b64encode(file.contents).decode()}
+                continue
             other_tweaks = tweak.apply_tweak(other_tweaks)
 
-        out = {}
+        out = dict(archives)
         for location, plist in other_tweaks.items():
             domain, relative_path = split_path_into_domain(location.value)
             out[f"{domain}/{relative_path}"] = plist
@@ -249,7 +259,8 @@ def main() -> int:
     profiles = [("27.0", "iPhone17,1", True), ("26.5", "iPad16,2", False),
                 ("27.0", "iPad16,2", False), ("26.5", "iPhone14,7", True),
                 ("26.0", "iPhone17,1", True), ("26.3", "iPhone17,1", True),
-                ("26.4", "iPhone17,1", True)]
+                ("26.4", "iPhone17,1", True),
+                ("27.0.1", "iPhone17,1", True), ("27.0", "iPhone17,2", True)]
 
     failures = 0
     total = 0

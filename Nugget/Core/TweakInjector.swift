@@ -61,6 +61,7 @@ struct TweakRowProfile {
 
     /// Pick the profile for a domain.
     static func forDomain(_ domain: String) -> TweakRowProfile {
+        if domain == "SysContainerDomain-com.apple.eligibilityd" { return .eligibilityContainer }
         if domain == "AppDomain-com.apple.PosterBoard" { return .posterBoardContainer }
         if domain.hasPrefix("AppDomain") { return .appContainer }
         if domain.hasPrefix("SysSharedContainerDomain") || domain.hasPrefix("SysContainerDomain") {
@@ -77,6 +78,15 @@ struct TweakRowProfile {
 }
 
 extension TweakRowProfile {
+    /// Project Linwood's eligibilityd archive contract, mirrored from desktop.
+    static let eligibilityContainer = TweakRowProfile(
+        fileOwner: 0, fileGroup: 0, fileProtectionClass: 4,
+        fileExceptionPublisher: nil,
+        dirOwner: 0, dirGroup: 0, dirProtectionClass: 0,
+        rootOwner: 0, rootGroup: 0, rootProtectionClass: 0,
+        carriesDigest: false, verified: false,
+        note: "Project Linwood eligibilityd shape; mobile device verification pending")
+
     /// `AppDomain-*`: the class `BackupInjector.inject` already delivers, with
     /// production evidence (this app's own app-container restores).
     static let appContainer = TweakRowProfile(
