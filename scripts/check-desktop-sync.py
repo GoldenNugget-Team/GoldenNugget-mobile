@@ -74,6 +74,44 @@ extension URL {
         let disabled = try GoldenNuggetPreset.parse(JSONSerialization.data(withJSONObject: ["tweaks": ["Daemons": ["enabled": false, "value": [:]]]]))
         _ = GoldenNuggetPresetImport.apply(disabled, to: &selection, deviceVersion: "27.0", isIPhone: true, deviceModel: "iPhone17,1")
         check(!selection.isOn(daemon), "loading disabled daemon entry clears the previous selection")
+        func daemonPlist(_ state: TweakSelection) throws -> [String: Any]? {
+            let payloads = TweakCompiler.compile(selection: state, deviceVersion: "26.5", isIPhone: true).payloads
+            guard let file = payloads.first(where: { $0.relativePath.contains("disabled.plist") }) else { return nil }
+            return try PropertyListSerialization.propertyList(from: file.bytes(), options: [], format: nil) as? [String: Any]
+        }
+        var importedDaemons = TweakSelection()
+        try importedDaemonsFromDocument(daemonDecoded, into: &importedDaemons)
+        func importedDaemonsFromDocument(_ doc: [String: [String: Any]], into state: inout TweakSelection) throws {
+            let preset = try GoldenNuggetPreset.parse(JSONSerialization.data(withJSONObject: ["tweaks": doc]))
+            _ = GoldenNuggetPresetImport.apply(preset, to: &state, deviceVersion: "26.5", isIPhone: true)
+        }
+        let importedValues = try daemonPlist(importedDaemons)!
+        check(DaemonGroups.byName["OTA"]!.labels.allSatisfy { importedValues[$0] as? Bool == true },
+              "canonical daemon preset compiles true labels")
+        importedDaemons.daemonModificationsEnabled = false
+        importedDaemons.setOn(true, for: TweakCatalog.screenTimeSpec)
+        importedDaemons.daemonModificationsEnabled = false
+        check(try daemonPlist(importedDaemons) == nil, "master off excludes launchd payload")
+        let gated = TweakCompiler.compile(selection: importedDaemons, deviceVersion: "26.5", isIPhone: true)
+        check(!gated.payloads.contains(where: { $0.relativePath.contains("ScreenTimeAgent") }), "master off excludes Screen Time payload")
+        let gatedDocument = GoldenNuggetPresets.document(for: importedDaemons, deviceModel: "iPhone", iosVersion: "26.5",
+            description: "gated", tags: [], createdAt: nil)
+        var restoredGate = TweakSelection()
+        try importedDaemonsFromDocument(gatedDocument["tweaks"] as! [String: [String: Any]], into: &restoredGate)
+        check(!restoredGate.daemonModificationsEnabled && restoredGate.isOn(daemon), "master gate and group choices survive preset roundtrip")
+        importedDaemons.daemonModificationsEnabled = true
+        importedDaemons.setOn(false, for: daemon); importedDaemons.removeValue(for: daemon)
+        let resetValues = try daemonPlist(importedDaemons)!
+        check(DaemonGroups.byName["OTA"]!.labels.allSatisfy { resetValues[$0] as? Bool == false },
+              "last group off still writes explicit false labels")
+        let forbidden = "com.apple.not-in-catalog"
+        var hostile = TweakSelection()
+        try importedDaemonsFromDocument(["Daemon.OTA": ["enabled": true, "value": [forbidden: true]]], into: &hostile)
+        let hostileValues = try daemonPlist(hostile)
+        check(hostile.multiValues(for: daemon)?[forbidden] == nil && hostileValues?[forbidden] == nil,
+              "legacy preset cannot inject an unknown daemon")
+        hostile.restore(enabled: true, value: nil, multiValues: [forbidden: .bool(true)], for: daemon)
+        check((try daemonPlist(hostile))?[forbidden] == nil, "compiler rejects unknown labels even without the importer")
         rejects("GN1 expansion bomb rejected") { _ = try PresetShareCode.decode(String(contentsOf: root.appendingPathComponent("bomb.code"), encoding: .utf8)) }
         rejects("damaged GN1 rejected") { _ = try PresetShareCode.decode("GN1.not-valid") }
         let index = try CommunityCatalog.parse(bytes("index.json"))

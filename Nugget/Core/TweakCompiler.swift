@@ -180,10 +180,29 @@ enum TweakCompiler {
         var nullified: [TweakFileLocation] = []
         var skipped: [(label: String, reason: String)] = []
 
+        // Write explicit false values too: omitting the last switched-off group
+        // would leave the previous disabled override on the device. Only catalog
+        // labels can reach launchd, even if selection came from a legacy preset.
+        if selection.daemonModificationsEnabled {
+            var disabled: [String: Any] = Dictionary(uniqueKeysWithValues:
+                DaemonGroups.allowedKeys.map { ($0, false) })
+            for group in DaemonGroups.all {
+                guard let spec = TweakCatalog.byID["Daemon.\(group.name)"], selection.isOn(spec) else { continue }
+                let values = selection.multiOverrides[spec.id]
+                for label in group.labels where DaemonGroups.allowedKeys.contains(label) {
+                    disabled[label] = values?[label]?.coerced(to: spec).plistObject ?? true
+                }
+            }
+            order.append(.disabledDaemons)
+            plists[.disabledDaemons] = disabled
+        }
+
         // `allWithDaemons`, not `all`: the daemon group specs are not registry
         // rows, and compiling only the registry would drop the launchd
         // `disabled.plist` entirely.
         for spec in TweakCatalog.allWithDaemons where !spec.disabled {
+            if spec.location == .disabledDaemons { continue }
+            if spec.section == .daemons && !selection.daemonModificationsEnabled { continue }
             guard selection.isOn(spec) || spec.reversibleBoolean else { continue }
             guard spec.isCompatible(deviceVersion: deviceVersion, isIPhone: isIPhone, deviceModel: deviceModel) else {
                 if selection.isOn(spec) {

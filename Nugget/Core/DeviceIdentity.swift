@@ -2,7 +2,7 @@ import Foundation
 import Minimuxer
 import SwiftUI
 
-/// The two device facts the tweak registry's compatibility bounds need.
+/// Device facts for tweak compatibility and build-specific AirLift availability.
 ///
 /// GoldenNugget reads them off lockdown (`get_current_device_version` /
 /// `get_current_device_model`) and hands them to
@@ -15,6 +15,8 @@ struct DeviceIdentity: Equatable, Sendable {
     let version: String
     /// Lockdown `ProductType`, e.g. `iPad16,2`.
     let productType: String
+    /// Lockdown build distinguishes betas that share the same ProductVersion.
+    var buildVersion: String = ""
 
     /// The reference's device test (`src/gui/ios/tweaks.py:107`):
     /// `model.startswith("iPhone")`.
@@ -37,7 +39,8 @@ struct DeviceIdentity: Equatable, Sendable {
         guard let gateway = Minimuxer.shared().ideviceGateway else { return .unknown }
         let version = ((try? await gateway.getLockdownValue(key: "ProductVersion")) ?? nil) ?? ""
         let productType = ((try? await gateway.getLockdownValue(key: "ProductType")) ?? nil) ?? ""
-        return DeviceIdentity(version: version, productType: productType)
+        let build = ((try? await gateway.getLockdownValue(key: "BuildVersion")) ?? nil) ?? ""
+        return DeviceIdentity(version: version, productType: productType, buildVersion: build)
     }
 }
 
@@ -81,7 +84,7 @@ final class DeviceIdentityMonitor: ObservableObject {
     /// Thirty seconds, not the five the tunnel status uses, because an RSD read is
     /// not a property fetch: `syncGetLockdownValue` opens the tunnel, resolves the
     /// RSD port, connects a service stream, runs the `RSDCheckin` handshake, asks one
-    /// key and closes — and there are two keys per poll.  At thirty seconds that is
+    /// key and closes — and there are three keys per poll.  At thirty seconds that is
     /// traffic an idle tunnel was not making before, and it buys the thing that
     /// matters: a device that was swapped, rebooted or re-paired under a live tunnel
     /// renames itself within half a minute instead of at the next launch.

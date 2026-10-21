@@ -38,7 +38,8 @@ struct PosterBoardView: View {
     /// that applies.
     @Binding var selection: PosterBoardSelection
 
-    @State private var identity: DeviceIdentity = .unknown
+    @ObservedObject private var device = DeviceIdentityMonitor.shared
+    private var identity: DeviceIdentity { device.current }
     @State private var databaseSummary = "not checked yet"
     @State private var pickError: String?
     /// Only the database fetch runs from this page — the apply is the home page's.
@@ -58,7 +59,7 @@ struct PosterBoardView: View {
     /// AirLift needs iOS 26.2 and a pairing record, and a picker that can hold a mode
     /// the page will later refuse is a worse thing to show than one that cannot be
     /// set here.
-    @State private var applyMode: PosterBoardApplyMode = .airlift
+    @State private var applyMode: PosterBoardApplyMode = .backup
 
     /// The imported pack awaiting a Convert / Install-as-is answer, if any. See
     /// `LegacyConvertPromptModifier` for why the question is a value rather than
@@ -100,10 +101,15 @@ struct PosterBoardView: View {
             // The device line is read here and not in `body`, like every other page: it is
             // a lockdown call.  It used to be declared and never set, so the card said
             // "unknown device" for the whole life of this page.
-            identity = await DeviceIdentity.read()
+            await device.refresh()
             selection.loadFromDisk()
-            applyMode = PosterBoardApplyModeSettings.current
+            applyMode = PosterBoardApplyModeSettings.resolved(
+                deviceVersion: identity.version, buildVersion: identity.buildVersion)
             refreshDatabaseSummary()
+        }
+        .onChange(of: identity) { _, _ in
+            applyMode = PosterBoardApplyModeSettings.resolved(
+                deviceVersion: identity.version, buildVersion: identity.buildVersion)
         }
         .legacyConvertPrompt($legacyPrompt, answer: answerLegacyPrompt)
     }
@@ -155,12 +161,12 @@ struct PosterBoardView: View {
     private var applyModeSection: some View {
         Section {
             Picker("How to apply", selection: $applyMode) {
-                ForEach(PosterBoardApplyMode.allCases) { mode in
+                ForEach(PosterBoardApplyMode.allCases.filter { $0 != .airlift || !airliftHidden }) { mode in
                     Text(mode.title).tag(mode)
                 }
             }
             .onChange(of: applyMode) { _, mode in
-                PosterBoardApplyModeSettings.current = mode
+                if !airliftHidden { PosterBoardApplyModeSettings.current = mode }
             }
             NativeNote(applyMode.summary)
             if applyMode == .airlift, !airliftBlocker.isEmpty {
@@ -182,8 +188,12 @@ struct PosterBoardView: View {
     ///
     /// The same check `GoldenNuggetEngine` makes before it starts a run, stated
     /// here so the picker cannot be set to something the apply will refuse.
+    private var airliftHidden: Bool {
+        AirliftAvailability.isHidden(deviceVersion: identity.version, buildVersion: identity.buildVersion)
+    }
+
     private var airliftBlocker: String {
-        let reason = Airlift.unsupportedReason(deviceVersion: identity.version)
+        let reason = Airlift.unsupportedReason(deviceVersion: identity.version, buildVersion: identity.buildVersion)
         if !reason.isEmpty { return reason }
         if !FileManager.default.fileExists(atPath: AppPaths.pairingFile.path) {
             return "AirLift needs a pairing record and none is stored. Import one on the home page."

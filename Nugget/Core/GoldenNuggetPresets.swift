@@ -201,14 +201,13 @@ enum GoldenNuggetPresets {
         // Desktop has one Daemons enum entry, not the mobile UI's group IDs.
         // A GN1 code carrying Daemon.* would otherwise lose every daemon on desktop.
         var daemonValues: [String: Any] = Dictionary(uniqueKeysWithValues: DaemonGroups.allowedKeys.map { ($0, false) })
-        var daemonsEnabled = false
-        for spec in TweakCatalog.daemonSpecs where selection.isOn(spec) {
-            daemonsEnabled = true
-            for (key, value) in selection.multiValues(for: spec) ?? [:] where DaemonGroups.allowedKeys.contains(key) {
-                daemonValues[key] = value.plistObject
+        for group in DaemonGroups.all {
+            guard let spec = TweakCatalog.byID["Daemon.\(group.name)"], selection.isOn(spec) else { continue }
+            for key in group.labels where DaemonGroups.allowedKeys.contains(key) {
+                daemonValues[key] = selection.multiOverrides[spec.id]?[key]?.coerced(to: spec).plistObject ?? true
             }
         }
-        tweaks["Daemons"] = ["type": "AdvancedPlistTweak", "enabled": daemonsEnabled, "value": daemonValues]
+        tweaks["Daemons"] = ["type": "AdvancedPlistTweak", "enabled": selection.daemonModificationsEnabled, "value": daemonValues]
 
         let now = Int(Date().timeIntervalSince1970)
         let metadata: [String: Any] = [

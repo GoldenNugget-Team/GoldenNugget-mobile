@@ -20,7 +20,13 @@ enum TemplateArchive {
     /// Open a ZIP for reading.  Throws if it is not one.
     static func open(_ url: URL) throws -> Handle {
         do {
-            return Handle(archive: try Archive(url: url, accessMode: .read))
+            let archive = try Archive(url: url, accessMode: .read)
+            for entry in archive {
+                guard TemplatePath.isSafe(entry.path), entry.type != .symlink else {
+                    throw TemplateFile.fail("Unsafe template archive member: \(entry.path)")
+                }
+            }
+            return Handle(archive: archive)
         } catch {
             throw TemplateFile.TemplateError("\(url.lastPathComponent) is not a readable .batter archive: "
                 + error.localizedDescription)
@@ -60,16 +66,10 @@ enum TemplateArchive {
             try fm.createDirectory(at: destination, withIntermediateDirectories: true)
             for entry in archive {
                 let relative = entry.path
-                guard !relative.hasPrefix("/"),
-                      !relative.split(separator: "/").contains("..") else {
+                guard entry.type != .symlink,
+                      let target = TemplatePath.destination(relative, under: destination) else {
                     throw TemplateFile.TemplateError("the archive holds an entry that escapes the extraction "
                         + "directory (\(relative)).")
-                }
-                let target = destination.appendingPathComponent(relative)
-                guard target.standardizedFileURL.path
-                    .hasPrefix(destination.standardizedFileURL.path) else {
-                    throw TemplateFile.TemplateError("refusing to write \(relative) outside the extraction "
-                        + "directory.")
                 }
                 if entry.type == .directory {
                     try? fm.createDirectory(at: target, withIntermediateDirectories: true)
@@ -428,7 +428,9 @@ static func stagingDirectory() throws -> URL {
                 let pattern = (base as NSString).appendingPathComponent(resource)
                 for entryName in archive.names where TemplateGlob.fnmatch(pattern, entryName) {
                     guard let bytes = try? archive.data(at: entryName) else { continue }
-                    let target = destination.appendingPathComponent(entryName)
+                    guard let target = TemplatePath.destination(entryName, under: destination) else {
+                        throw TemplateError("Unsafe template resource path: \(entryName)")
+                    }
                     try? FileManager.default.createDirectory(at: target.deletingLastPathComponent(),
                                                             withIntermediateDirectories: true)
                     do {

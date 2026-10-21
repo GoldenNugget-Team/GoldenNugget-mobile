@@ -220,6 +220,12 @@ _pkg.QtGui.QColor = QColor
 sys.path.insert(0, %(root)r)
 os.chdir(%(root)r)
 
+# Import the real pure path_mapping module without running restore/__init__,
+# which initializes device transports and requires pymobiledevice3.
+_restore = types.ModuleType("src.restore")
+_restore.__path__ = [os.path.join(os.getcwd(), "src", "restore")]
+sys.modules["src.restore"] = _restore
+
 import json
 from src.tweaks.posterboard.template_file import TemplateFile
 
@@ -592,8 +598,6 @@ func report() -> Never {
     exit(1)
 }
 
-report()
-
 // MARK: - Fixture construction
 
 /// Every element's attributes, flattened, for comparing two XML serialisations.
@@ -646,7 +650,7 @@ func buildFixture(at archive: URL, in root: URL) throws {
          ],
          "default_value": 0],
     ]
-    var config: [String: Any] = [
+    let config: [String: Any] = [
         "title": "My Batter",
         "description": "A differential test template",
         "author": "harness",
@@ -718,3 +722,5 @@ func buildArchive(config: String, at archive: URL, in root: URL,
             + (detail.isEmpty ? "" : ": \(detail)"))
     }
 }
+
+report()

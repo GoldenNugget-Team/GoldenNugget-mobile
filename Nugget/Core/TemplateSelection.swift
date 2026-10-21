@@ -134,11 +134,11 @@ enum TemplateImports {
         var out: [TemplateFile] = []
         for name in names {
             let url = directory.appendingPathComponent(name)
-            guard let template = try? TemplateFile(url: url, deviceVersion: deviceVersion) else {
+            guard var template = try? TemplateFile(url: url, deviceVersion: deviceVersion) else {
                 continue
             }
             for index in template.options.indices {
-                TemplateOptionStore.restore(at: index, in: template)
+                TemplateOptionStore.restore(at: index, in: &template)
             }
             out.append(template)
         }
@@ -154,6 +154,35 @@ enum TemplateImports {
     static func removeAll() {
         try? FileManager.default.removeItem(at: directory)
         TemplateOptionStore.forgetAll()
+    }
+}
+
+/// Immutable file choices within one process. A second picker must not delete
+/// another option's input, or a snapshot already being compiled by Apply.
+enum TemplateChoices {
+    private static let sessionID = UUID().uuidString
+
+    static func store(_ source: URL, in root: URL) throws -> URL {
+        let scoped = source.startAccessingSecurityScopedResource()
+        defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+        let fm = FileManager.default
+        let session = root.appendingPathComponent(sessionID, isDirectory: true)
+        let choice = session.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let destination = choice.appendingPathComponent(source.lastPathComponent)
+        do {
+            try fm.createDirectory(at: choice, withIntermediateDirectories: true)
+            try fm.copyItem(at: source, to: destination)
+        } catch {
+            try? fm.removeItem(at: choice)
+            throw error
+        }
+        // Replace choices are deliberately not restored after launch. Reclaim
+        // older sessions only after the newly picked file has been copied.
+        for old in (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+            where old.lastPathComponent != sessionID {
+            try? fm.removeItem(at: old)
+        }
+        return destination
     }
 }
 
@@ -226,7 +255,8 @@ enum TemplateOptionStore {
                 return value.text.split(separator: " ").map(String.init)
             }
         case let value as PickerOption:
-            return [value.selection.sorted().map(String.init).joined(separator: ",")]
+            // An explicit empty multi-selection must differ from an unsaved option.
+            return [value.selection.isEmpty ? "-" : value.selection.sorted().map(String.init).joined(separator: ",")]
         default:
             return []
         }
@@ -239,7 +269,7 @@ enum TemplateOptionStore {
     /// the option at its own default rather than failing.  A template that
     /// cannot be loaded at all is refused in `TemplateFile.init`; this is a
     /// narrower window and it should not throw.
-    static func restore(at index: Int, in template: TemplateFile) {
+    static func restore(at index: Int, in template: inout TemplateFile) {
         guard index >= 0, index < template.options.count else { return }
         let parts = value(at: index, in: template) ?? []
         switch template.options[index] {
@@ -251,6 +281,7 @@ enum TemplateOptionStore {
             break
         case var value as RemoveOption:
             if let first = parts.first { value.value = first == "1" }
+            template.options[index] = value
         case var value as SetOption:
             switch value.setter {
             case .toggle:
@@ -267,12 +298,14 @@ enum TemplateOptionStore {
                     value.text = parts.joined(separator: " ")
                 }
             }
+            template.options[index] = value
         case var value as PickerOption:
             if let first = parts.first {
                 let indices = first.split(separator: ",").compactMap { Int($0) }
                     .filter { $0 >= 0 && $0 < value.choices.count }
-                if !indices.isEmpty { value.selection = Set(indices) }
+                if value.allowMultipleSelection || !indices.isEmpty { value.selection = Set(indices) }
             }
+            template.options[index] = value
         default:
             break
         }
@@ -332,7 +365,7 @@ enum TemplateDelivery {
 
         let domain = template.effectiveDomain
         var payloads: [TweakPayload] = []
-        try collect(from: extracted, base: extracted, domain: domain,
+        try collect(from: extracted, base: extracted, domain: domain, adding: false,
                     payloads: &payloads, log: log)
         if payloads.isEmpty {
             log("    ⚠️ \(template.title): nothing to deliver — its extracted tree has no "
@@ -346,6 +379,7 @@ enum TemplateDelivery {
     private static func collect(from directory: URL,
                                 base: URL,
                                 domain: String,
+                                adding: Bool,
                                 payloads: inout [TweakPayload],
                                 log: @Sendable (String) -> Void) throws {
         let fm = FileManager.default
@@ -362,19 +396,20 @@ enum TemplateDelivery {
             var isDirectory: ObjCBool = false
             guard fm.fileExists(atPath: childPath.path, isDirectory: &isDirectory) else { continue }
 
-            if child.lowercased() == "container" {
+            if !adding && child.lowercased() == "container" && isDirectory.boolValue {
                 // The reference starts the container walk at the archive root,
                 // so the payload paths are relative to it.
-                try collect(from: childPath, base: childPath, domain: domain,
+                try collect(from: childPath, base: childPath, domain: domain, adding: true,
                             payloads: &payloads, log: log)
                 continue
             }
             if isDirectory.boolValue {
-                try collect(from: childPath, base: base, domain: domain,
+                try collect(from: childPath, base: base, domain: domain, adding: adding,
                             payloads: &payloads, log: log)
                 continue
             }
-            let relative = childPath.path.replacingOccurrences(of: base.path + "/", with: "")
+            guard adding, TemplatePath.contains(childPath, under: base) else { continue }
+            let relative = String(childPath.path.dropFirst(base.path.count + 1))
             payloads.append(TweakPayload(domain: domain, relativePath: relative,
                                          source: childPath))
             log("    → \(domain)/\(relative)")

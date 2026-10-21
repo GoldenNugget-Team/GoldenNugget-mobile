@@ -14,10 +14,6 @@ import SwiftUI
 struct DaemonsView: View {
     @Binding var selection: TweakSelection
 
-    /// The master switch, upstream's `daemons_tweak.enabled`. Kept out of the
-    /// selection on purpose: it gates every group rather than being one, and
-    /// turning it off is the same observable state as having no group on.
-    @State private var masterEnabled = false
     /// Matches desktop's install-level acknowledgement, outside autosave/presets.
     /// No selection is changed until both warnings have been accepted.
     @AppStorage("daemon_bootloop_warned") private var daemonWarningsAccepted = false
@@ -86,10 +82,6 @@ struct DaemonsView: View {
             }
         }
         .task {
-            // Upstream's master switch reads the stored `enabled` flag. There is
-            // no separate flag here, so the page reports the state that actually
-            // reaches the device: master is on exactly when a group is on.
-            masterEnabled = DaemonGroups.all.contains { isOn($0) }
             // Fresh rather than cached: the model line at the top of this page is
             // what the user came to read, and a page opened after a device swap
             // should not need a restart to say so.
@@ -144,23 +136,19 @@ struct DaemonsView: View {
 
     private var masterRow: some View {
         Toggle("Enable Daemon Modifications", isOn: Binding(
-            get: { masterEnabled },
+            get: { selection.daemonModificationsEnabled },
             set: { on in
                 if on {
                     requestEnable(.master)
                     return
                 }
-                masterEnabled = false
-                // The reference's master switch is a gate, not a group: flipping
-                // it off leaves the per-group choices alone and only stops the
-                // write.
-                if !on { setAllRecommended(false) }
+                selection.daemonModificationsEnabled = false
             }))
     }
 
     private var recommendedRow: some View {
         Button {
-            if isAllRecommendedOn {
+            if selection.daemonModificationsEnabled && isAllRecommendedOn {
                 setAllRecommended(false)
             } else {
                 requestEnable(.recommended)
@@ -261,7 +249,7 @@ struct DaemonsView: View {
     }
 
     private func performEnable(_ action: DaemonEnableAction) {
-        masterEnabled = true
+        selection.daemonModificationsEnabled = true
         switch action {
         case .master: break
         case .recommended: setAllRecommended(true)

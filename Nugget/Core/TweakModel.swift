@@ -210,6 +210,8 @@ extension TweakSpec {
 /// `enabled = False`, and editing a value turns it on — the reference's
 /// `Tweak.set_value(..., toggle_enabled: True)`.
 struct TweakSelection: Equatable {
+    /// A real apply gate, independent of the retained per-group choices.
+    var daemonModificationsEnabled = false
     private(set) var enabled: Set<String> = []
     private(set) var values: [String: TweakValue] = [:]
     /// Imported overrides for the specs whose reference definition writes a
@@ -230,6 +232,7 @@ struct TweakSelection: Equatable {
     }
 
     mutating func setOn(_ on: Bool, for spec: TweakSpec) {
+        if on && spec.section == .daemons { daemonModificationsEnabled = true }
         if on { enabled.insert(spec.id) } else { enabled.remove(spec.id) }
     }
 
@@ -245,6 +248,7 @@ struct TweakSelection: Equatable {
     }
 
     mutating func removeAll() {
+        daemonModificationsEnabled = false
         enabled.removeAll()
         values.removeAll()
         multiOverrides.removeAll()
@@ -257,6 +261,7 @@ struct TweakSelection: Equatable {
                           value: TweakValue?,
                           multiValues: [String: TweakValue]?,
                           for spec: TweakSpec) {
+        if enabled && spec.section == .daemons { daemonModificationsEnabled = true }
         if enabled { self.enabled.insert(spec.id) } else { self.enabled.remove(spec.id) }
         if let value { values[spec.id] = value } else { values.removeValue(forKey: spec.id) }
         if let multiValues { multiOverrides[spec.id] = multiValues }

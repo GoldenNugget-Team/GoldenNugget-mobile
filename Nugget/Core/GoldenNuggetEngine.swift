@@ -346,9 +346,15 @@ class GoldenNuggetEngine {
         // different ways, and neither can stand in for the other. The mode's
         // constraints are checked *here*, before `prepareRun`, so a selection the
         // chosen mode cannot honour fails without paying for a tunnel first.
-        let posterBoardMode = PosterBoardApplyModeSettings.current
-        if posterBoard.isActive && posterBoardMode == .airlift {
-            try checkAirliftCanApply(posterBoard: posterBoard, deviceVersion: deviceVersion)
+        let modeIdentity = await DeviceIdentity.read()
+        let posterBoardMode = PosterBoardApplyModeSettings.resolved(
+            deviceVersion: modeIdentity.version.isEmpty ? deviceVersion : modeIdentity.version,
+            buildVersion: modeIdentity.buildVersion)
+        let hasPosterBoardTemplates = templates.templates.contains { $0.isPosterBoard && !$0.requiresSparserestore }
+        if (posterBoard.isActive || hasPosterBoardTemplates) && posterBoardMode == .airlift {
+            try checkAirliftCanApply(posterBoard: posterBoard,
+                templates: templates.templates.filter { $0.isPosterBoard && !$0.requiresSparserestore },
+                deviceVersion: deviceVersion, buildVersion: modeIdentity.buildVersion)
         }
 
         // Templates, if the page has any.  Two routes, and which one a template
@@ -359,11 +365,8 @@ class GoldenNuggetEngine {
         var posterBoardTemplates: [TemplateFile] = []
         if templates.isActive {
             log("Templates: \(templates.describe)")
-            // The chosen files of `replace` options are cleared at the start of
-            // every apply: they are staged for **this** run, and a stale one from
-            // a previous apply would be delivered again with no way for the user
-            // to tell which run it belonged to.
-            try? FileManager.default.removeItem(at: AppPaths.templateChoices)
+            // ReplaceOption URLs belong to the current selection. Keep their
+            // staging files available for this apply and any subsequent retry.
             for entry in templates.undeliverable {
                 log("  ⚠️ \(entry.template.title) was not delivered: \(entry.reason)")
             }
@@ -414,9 +417,10 @@ class GoldenNuggetEngine {
         // container *is* the apply.
         var posterBoardPayloads: [TweakPayload] = []
         var posterBoardInjectedOverAirlift = false
-        if posterBoard.isActive && posterBoardMode == .airlift {
+        if (posterBoard.isActive || !posterBoardTemplates.isEmpty) && posterBoardMode == .airlift {
             log("PosterBoard: \(posterBoard.describe) — over AirLift, no backup")
-            try await applyPosterBoardOverAirlift(selection: posterBoard, deviceVersion: version)
+            try await applyPosterBoardOverAirlift(selection: posterBoard,
+                                                 templates: posterBoardTemplates, deviceVersion: version)
             posterBoardInjectedOverAirlift = true
         } else if posterBoard.isActive || !posterBoardTemplates.isEmpty {
             // A PosterBoard template is a wallpaper source even when no pack and
@@ -431,27 +435,20 @@ class GoldenNuggetEngine {
             }
             var structureVersion = PosterBoard.fallbackStructureVersion
             var database: URL?
-            let needsWallpapers = posterBoard.fullReset || !posterBoard.resetModes.isEmpty
-                || posterBoard.tendies.count > 0 || posterBoard.video != nil
-            if needsWallpapers {
-                if posterBoard.fullReset || !posterBoard.resetModes.isEmpty {
-                    // A reset needs no database, so it needs no fetch and no exchange.
-                    log("PosterBoard: reset only — no database is needed, and none is fetched.")
-                } else {
-                    let fetched = try await PosterBoardBackup.fetch(
-                        backupRoot: AppPaths.posterBoardFetchRoot, udid: udid,
-                        // The same fork `deliver` is about to take, from the same number.
-                        ios27: major >= 27 && !DevSettings.effective.forcePartialRestore,
-                        onProgress: { overall in
-                            self.logProgress("posterboard backup progress", overall)
-                        },
-                        log: { AppLog.write($0) })
-                    database = fetched.database
-                    structureVersion = fetched.structureVersion
-                }
+            if posterBoard.fullReset || !posterBoard.resetModes.isEmpty {
+                // Resets synthesize their own store state; additions, including
+                // template-only descriptors, must start with the device's database.
+                log("PosterBoard: reset only — no database is needed, and none is fetched.")
             } else {
-                log("PosterBoard: templates only — no wallpaper was picked, so no database is "
-                    + "needed and none is fetched.")
+                let fetched = try await PosterBoardBackup.fetch(
+                    backupRoot: AppPaths.posterBoardFetchRoot, udid: udid,
+                    ios27: major >= 27 && !DevSettings.effective.forcePartialRestore,
+                    onProgress: { overall in
+                        self.logProgress("posterboard backup progress", overall)
+                    },
+                    log: { AppLog.write($0) })
+                database = fetched.database
+                structureVersion = fetched.structureVersion
             }
             posterBoardPayloads = try await PosterBoard.compile(
                 selection: posterBoard,
@@ -526,7 +523,12 @@ class GoldenNuggetEngine {
     /// A reset is a store operation and the video stage's frames are computed for
     /// the restore, so neither can travel a container write. Saying so up front is
     /// the alternative to accepting the selection and quietly dropping half of it.
-    private func checkAirliftCanApply(posterBoard: PosterBoardSelection, deviceVersion: String) throws {
+    private func checkAirliftCanApply(posterBoard: PosterBoardSelection,
+                                     templates: [TemplateFile] = [], deviceVersion: String, buildVersion: String = "") throws {
+        if templates.contains(where: \.isContainer) {
+            throw GoldenNuggetError("AirLift only installs template descriptors. A selected template "
+                + "also carries container files; switch to \"Protective backup\" to apply all of them.")
+        }
         if posterBoard.fullReset || !posterBoard.resetModes.isEmpty {
             throw GoldenNuggetError("AirLift cannot reset the PosterBoard store — it only adds "
                 + "wallpapers. Switch the apply mode to \"Protective backup\" for a reset.")
@@ -535,7 +537,7 @@ class GoldenNuggetEngine {
             throw GoldenNuggetError("AirLift cannot apply a PosterBoard video: its frames are "
                 + "staged for a restore. Switch the apply mode to \"Protective backup\".")
         }
-        let reason = Airlift.unsupportedReason(deviceVersion: deviceVersion)
+        let reason = Airlift.unsupportedReason(deviceVersion: deviceVersion, buildVersion: buildVersion)
         guard reason.isEmpty else { throw GoldenNuggetError(reason) }
         guard FileManager.default.fileExists(atPath: AppPaths.pairingFile.path) else {
             throw GoldenNuggetError("AirLift needs a pairing record and none is stored. Import one "
@@ -545,9 +547,11 @@ class GoldenNuggetEngine {
 
     /// Run the AirLift PosterBoard injection, reporting through the run log.
     private func applyPosterBoardOverAirlift(selection: PosterBoardSelection,
+                                             templates: [TemplateFile] = [],
                                              deviceVersion: String) async throws {
         try await PosterBoardAirlift.apply(
             selection: selection,
+            templates: templates,
             structureVersion: PosterBoard.fallbackStructureVersion,
             deviceVersion: deviceVersion,
             pairingPath: AppPaths.pairingFile.path,
@@ -617,7 +621,10 @@ class GoldenNuggetEngine {
         let stage = StageTimer("RUN posterboard airlift apply")
         defer { stage.done() }
 
-        try checkAirliftCanApply(posterBoard: selection, deviceVersion: deviceVersion)
+        let identity = await DeviceIdentity.read()
+        try checkAirliftCanApply(posterBoard: selection,
+            deviceVersion: identity.version.isEmpty ? deviceVersion : identity.version,
+            buildVersion: identity.buildVersion)
         log("PosterBoard: \(selection.describe) — over AirLift, no backup")
         try await applyPosterBoardOverAirlift(selection: selection, deviceVersion: deviceVersion)
         log("PosterBoard: injected over AirLift and resprung. No backup was taken, and no "

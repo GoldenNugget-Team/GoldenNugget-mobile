@@ -387,6 +387,7 @@ extension View {
 /// selection target is a `NavigationStack` *path* in the other column, not the
 /// split view's own: a link would push onto this list and replace it.
 private struct AppDestinationList: View {
+    @ObservedObject private var device = DeviceIdentityMonitor.shared
     let current: AppDestination
     let select: (AppDestination) -> Void
 
@@ -397,7 +398,11 @@ private struct AppDestinationList: View {
             // keeps the "every destination needs a title and an icon" obligation
             // on the enum while letting one of them stay reachable only from the
             // page that owns it.
-            ForEach(AppDestination.allCases.filter(\.showsInSidebar)) { destination in
+            ForEach(AppDestination.allCases.filter { destination in
+                destination.showsInSidebar && (!(destination == .wallet || destination == .passcode)
+                    || !AirliftAvailability.isHidden(deviceVersion: device.current.version,
+                                                    buildVersion: device.current.buildVersion))
+            }) { destination in
                 Button { select(destination) } label: {
                     Label(destination.title, systemImage: destination.systemImage)
                         .fontWeight(destination == current ? .semibold : .regular)

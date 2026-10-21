@@ -70,7 +70,8 @@ enum Airlift {
     /// Within the supported range the attempt can still fail, and it fails
     /// loudly: the write reports why, and an injection that wrote nothing is an
     /// error rather than a quiet no-op.
-    static func isSupported(deviceVersion: String) -> Bool {
+    static func isSupported(deviceVersion: String, buildVersion: String = "") -> Bool {
+        guard !AirliftAvailability.isHidden(deviceVersion: deviceVersion, buildVersion: buildVersion) else { return false }
         // `nil` from the comparison is an unorderable version string, which is
         // the same "unknown" case the empty one is refused as.
         guard let cmp = TweakVersion.compare(deviceVersion, referenceFloor) else { return false }
@@ -78,8 +79,13 @@ enum Airlift {
     }
 
     /// The reason to refuse, for the UI.
-    static func unsupportedReason(deviceVersion: String) -> String {
-        isSupported(deviceVersion: deviceVersion) ? ""
+    static func unsupportedReason(deviceVersion: String, buildVersion: String = "") -> String {
+        if deviceVersion.isEmpty { return "Connect the device to check AirLift support." }
+        if AirliftAvailability.isHidden(deviceVersion: deviceVersion, buildVersion: buildVersion) {
+            return "AirLift is unavailable on iOS 27.2 Beta 3 and newer. "
+                + "For iOS 27.2, a verified Beta 1 or Beta 2 build is required."
+        }
+        return isSupported(deviceVersion: deviceVersion, buildVersion: buildVersion) ? ""
             : "AirLift needs iOS \(minimumVersion) or newer — this device reports "
             + (deviceVersion.isEmpty ? "no version" : "iOS \(deviceVersion)") + "."
     }
@@ -92,12 +98,12 @@ enum Airlift {
     /// that is up to thirty seconds stale. Falls back to the polled value when
     /// lockdown does not answer, so a slow-but-alive tunnel still gets through.
     private static func requireSupported() async throws {
-        var version = await DeviceIdentity.read().version
-        if version.isEmpty {
-            version = await MainActor.run { DeviceIdentityMonitor.shared.current.version }
+        var identity = await DeviceIdentity.read()
+        if identity.version.isEmpty {
+            identity = await MainActor.run { DeviceIdentityMonitor.shared.current }
         }
-        guard isSupported(deviceVersion: version) else {
-            throw GoldenNuggetError(unsupportedReason(deviceVersion: version))
+        guard isSupported(deviceVersion: identity.version, buildVersion: identity.buildVersion) else {
+            throw GoldenNuggetError(unsupportedReason(deviceVersion: identity.version, buildVersion: identity.buildVersion))
         }
     }
 

@@ -640,6 +640,31 @@ enum TemplateXML {
 ///     does not ship a no-op rather than an error;
 ///   * directories come back too.  `remove` relies on it (`os.path.isdir` →
 ///     `rmtree`), and so does `set` on a directory-shaped pattern.
+/// Paths supplied by a template must stay inside its own staging tree, including
+/// when an existing ancestor is a symbolic link. Option paths historically allow
+/// a leading slash; archive members and rename destinations do not.
+enum TemplatePath {
+    static func isSafe(_ path: String, allowLeadingSlash: Bool = false) -> Bool {
+        !path.isEmpty && !path.contains("\0") && !path.contains("\\")
+            && (allowLeadingSlash || !path.hasPrefix("/"))
+            && !path.split(separator: "/").contains("..")
+    }
+
+    static func contains(_ candidate: URL, under root: URL) -> Bool {
+        let base = root.resolvingSymlinksInPath().standardizedFileURL.path
+        let path = candidate.resolvingSymlinksInPath().standardizedFileURL.path
+        return path == base || path.hasPrefix(base + "/")
+    }
+
+    static func destination(_ path: String, under root: URL,
+                            allowLeadingSlash: Bool = false) -> URL? {
+        guard isSafe(path, allowLeadingSlash: allowLeadingSlash) else { return nil }
+        let relative = path.drop(while: { $0 == "/" })
+        let target = root.appendingPathComponent(String(relative))
+        return contains(target, under: root) ? target : nil
+    }
+}
+
 enum TemplateGlob {
     /// The paths under `root` that `pattern` names, in a stable order.
     ///
@@ -648,6 +673,7 @@ enum TemplateGlob {
     /// makes the same choice everywhere else (see `PosterBoard`'s divergence
     /// note).
     static func match(_ pattern: String, under root: URL) -> [URL] {
+        guard TemplatePath.isSafe(pattern, allowLeadingSlash: true) else { return [] }
         let fm = FileManager.default
         // `FileManager` hands back `/private/tmp/...` for a `/tmp` root (that is
         // the symlink macOS puts there), so every path this returns is prefixed
@@ -671,9 +697,9 @@ enum TemplateGlob {
 
         if !rest.contains(where: { $0.contains("*") || $0.contains("?") || $0.contains("[") }) {
             let candidate = root.appendingPathComponent(rest.joined(separator: "/"))
-            return fm.fileExists(atPath: candidate.path) ? [candidate] : []
+            return TemplatePath.contains(candidate, under: root) && fm.fileExists(atPath: candidate.path) ? [candidate] : []
         }
-        return expand(rest, at: root, fm: fm)
+        return expand(rest, at: root, fm: fm).filter { TemplatePath.contains($0, under: root) }
     }
 
     private static func expand(_ components: [String], at directory: URL,
@@ -729,6 +755,7 @@ enum TemplateGlob {
         ((try? fm.contentsOfDirectory(at: directory,
                                        includingPropertiesForKeys: nil,
                                        options: [.skipsHiddenFiles])) ?? [])
+            .filter { (try? $0.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == false }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
@@ -797,7 +824,8 @@ enum TemplateGlob {
             if pattern[index] == "]" && !first { break }
             first = false
             if index + 2 < pattern.count, pattern[index + 1] == "-", pattern[index + 2] != "]" {
-                if pattern[index]...pattern[index + 2] ~= character { matched = true }
+                if pattern[index] <= pattern[index + 2],
+                   pattern[index]...pattern[index + 2] ~= character { matched = true }
                 index += 3
             } else {
                 if pattern[index] == character { matched = true }

@@ -136,7 +136,7 @@ struct WalletView: View {
     }
 
     private var blocker: String {
-        let reason = Airlift.unsupportedReason(deviceVersion: identity.version)
+        let reason = Airlift.unsupportedReason(deviceVersion: identity.version, buildVersion: identity.buildVersion)
         if !reason.isEmpty { return reason }
         if !FileManager.default.fileExists(atPath: AppPaths.pairingFile.path) {
             return "AirLift needs a pairing record and none is stored. Import one on the home page."

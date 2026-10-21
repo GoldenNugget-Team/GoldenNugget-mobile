@@ -44,10 +44,11 @@ enum PosterBoardAirlift {
     /// Inject the selected packs, and respring so they show up.
     ///
     /// - Parameters:
-    ///   - selection: the same selection the backup mode takes. Only the packs are
+    ///   - selection: the same selection the backup mode takes. Packs are
     ///     honoured here; the video stage is a backup-mode concern and is rejected
     ///     by the caller, because its frames are computed and staged locally and
     ///     this path does not carry them.
+    ///   - templates: configured before descriptor discovery, alongside the packs.
     ///   - structureVersion: the store directory version. 61 for everything this
     ///     supports, matching `PosterBoard.fallbackStructureVersion`.
     ///   - deviceVersion: the device's iOS version, for the legacy-conversion gate
@@ -55,6 +56,7 @@ enum PosterBoardAirlift {
     ///     see the note at the conversion itself.
     static func apply(
         selection: PosterBoardSelection,
+        templates: [TemplateFile] = [],
         structureVersion: Int,
         deviceVersion: String,
         pairingPath: String,
@@ -62,7 +64,29 @@ enum PosterBoardAirlift {
         progress: @escaping (Double) -> Void
     ) async throws {
         let packs = selection.tendies
-        guard !packs.isEmpty else { throw GoldenNuggetError("No PosterBoard packs to inject.") }
+        struct Source {
+            let name: String
+            let url: URL
+            let defaultExtension: String
+            let extract: (URL) async throws -> Void
+        }
+        var sources = packs.map { pack in
+            Source(name: pack.name, url: pack.url,
+                   defaultExtension: pack.posterType.extensionBundleID) { stage in
+                try await Airlift.extractZip(archivePath: pack.url.path, destDir: stage.path)
+                if PosterBoard.shouldConvertLegacy(pack: pack, deviceVersion: deviceVersion, log: log) {
+                    PosterBoard.convertLegacyPack(pack.name, at: stage, log: log)
+                }
+            }
+        }
+        sources += templates.map { template in
+            Source(name: template.title, url: template.url,
+                   defaultExtension: PosterBoardPosterType.collections.extensionBundleID) { stage in
+                try template.extract(to: stage)
+                PosterBoard.convertLegacyPack(template.title, at: stage, log: log)
+            }
+        }
+        guard !sources.isEmpty else { throw GoldenNuggetError("No PosterBoard packs or templates to inject.") }
 
         var container = cachedContainer
         if container.isEmpty {
@@ -88,7 +112,7 @@ enum PosterBoardAirlift {
         // each stage is deleted as soon as that pack is done — by the time the
         // last descriptor is injected, the earlier counts are gone. Reading the
         // zip directory is cheap and needs no unpack.
-        let planned = packs.reduce(0) { $0 + countDescriptors(inArchiveAt: $1.url) }
+        let planned = sources.reduce(0) { $0 + countDescriptors(inArchiveAt: $1.url) }
         var done = 0
         let overall = { (completed: Int) -> Double in
             guard planned > 0 else { return 0 }
@@ -96,8 +120,8 @@ enum PosterBoardAirlift {
         }
         progress(overall(done))
 
-        for (index, pack) in packs.enumerated() {
-            log("[\(index + 1)/\(packs.count)] \(pack.name)")
+        for (index, source) in sources.enumerated() {
+            log("[\(index + 1)/\(sources.count)] \(source.name)")
             // The `do` block is what scopes the `defer`. A `defer` written directly
             // in the loop body belongs to the *function*, so every stage would stay
             // on disk until the whole run finished — and a pack that `continue`s
@@ -109,36 +133,16 @@ enum PosterBoardAirlift {
                 try? FileManager.default.createDirectory(at: stage, withIntermediateDirectories: true)
                 defer { try? FileManager.default.removeItem(at: stage) }
 
-                do {
-                    try await Airlift.extractZip(archivePath: pack.url.path, destDir: stage.path)
-                } catch {
-                    log("  ⚠️ could not unpack: \(error.localizedDescription)")
-                    continue
-                }
-
-                // The legacy conversion, on this path too, and for the same reason
-                // the backup path runs it: both paths hand PosterBoard the *same*
-                // descriptor tree, so a pack converted in one and not the other
-                // installs differently depending only on which button was pressed.
-                // A pre-27 package injected unconverted is not a cosmetic
-                // difference — iOS 27 reads the converted (Clownfish) shape, so the
-                // wallpaper lands without the depth effect it was sold with.
-                //
-                // It has to sit here, before `findDescriptors`: `convertTree` stamps
-                // the family into the bundle's own descriptor and
-                // `renameDescriptorsToSkeleton` renames the bundles to the stock
-                // layout, and both change what the walk below sees.
-                if PosterBoard.shouldConvertLegacy(pack: pack, deviceVersion: deviceVersion,
-                                                  log: log) {
-                    PosterBoard.convertLegacyPack(pack.name, at: stage, log: log)
-                }
+                // Configure templates before descriptor discovery, just as the
+                // backup compiler does. Configuration errors must surface.
+                try await source.extract(stage)
 
                 let descriptors = findDescriptors(in: stage,
-                                                defaultExtension: pack.posterType.extensionBundleID,
+                                                defaultExtension: source.defaultExtension,
                                                 log: log)
                 guard !descriptors.isEmpty else {
-                    log("  ⚠️ no descriptor folders found in this pack")
-                    continue
+                    throw GoldenNuggetError("No wallpaper descriptors were found in \(source.name). "
+                        + "Use Protective backup for templates that deliver container files.")
                 }
                 log("  \(descriptors.count) descriptor(s)")
 

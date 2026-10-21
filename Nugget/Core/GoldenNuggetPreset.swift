@@ -223,12 +223,10 @@ enum GoldenNuggetPresetImport {
     /// upstream enforces before a preset or the apply pass ever sees them.
     private static func applyDaemons(_ entry: GoldenNuggetPreset.Entry,
                                      to selection: inout TweakSelection) {
-        guard let values = entry.multiValues ?? entry.value.map({ [$0.display: $0] }) else {
-            return
-        }
+        let values = entry.multiValues ?? [:]
         for group in DaemonGroups.all {
             guard let spec = TweakCatalog.byID["Daemon.\(group.name)"] else { continue }
-            if !entry.enabled {
+            if !entry.enabled && values.isEmpty {
                 selection.restore(enabled: false, value: nil, multiValues: nil, for: spec)
                 continue
             }
@@ -240,11 +238,14 @@ enum GoldenNuggetPresetImport {
             // left off rather than forced off, so a partial preset does not
             // clear a choice the user made by hand.
             if wanted.count == group.labels.count {
-                selection.restore(enabled: true, value: nil, multiValues: nil, for: spec)
+                selection.restore(enabled: true, value: nil,
+                                  multiValues: Dictionary(uniqueKeysWithValues:
+                                    group.labels.map { ($0, TweakValue.bool(true)) }), for: spec)
             } else if group.labels.allSatisfy({ values[$0] != nil }) {
                 selection.restore(enabled: false, value: nil, multiValues: nil, for: spec)
             }
         }
+        selection.daemonModificationsEnabled = entry.enabled
     }
 
     @discardableResult
@@ -280,7 +281,11 @@ enum GoldenNuggetPresetImport {
             }
 
             let value = entry.value.map { $0.coerced(to: spec) }
-            let multi = spec.writesWholeDict ? entry.multiValues : nil
+            var multi = spec.writesWholeDict ? entry.multiValues : nil
+            if spec.id.hasPrefix("Daemon."),
+               let group = DaemonGroups.byName[String(spec.id.dropFirst("Daemon.".count))], let imported = multi {
+                multi = imported.filter { group.labels.contains($0.key) && DaemonGroups.allowedKeys.contains($0.key) }
+            }
             selection.restore(enabled: entry.enabled, value: value,
                               multiValues: multi, for: spec)
             report.applied.append(entry.id)

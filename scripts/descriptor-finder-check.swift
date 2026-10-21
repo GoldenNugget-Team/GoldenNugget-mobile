@@ -66,6 +66,20 @@ struct PosterBoardSelection {
 
 struct GoldenNuggetError: Error { let message: String; init(_ m: String) { message = m } }
 
+/// Models configuration before injection; the template safety harness separately
+/// compiles the real TemplateFile and its option engine against ZIPFoundation.
+struct TemplateFile {
+    let url: URL
+    let title: String
+    static var extractions = 0
+    func extract(to destination: URL) throws {
+        for child in try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil) {
+            try FileManager.default.copyItem(at: child, to: destination.appendingPathComponent(child.lastPathComponent))
+        }
+        Self.extractions += 1
+    }
+}
+
 enum Airlift {
     static func appContainer(pairingPath: String, bundleID: String) async throws -> String { "" }
     static var targets: [String] = []
@@ -390,6 +404,34 @@ do {
     else { fail("resprung after failed delivery") }
 }
 UserDefaults.standard.removeObject(forKey: "PosterBoardAirliftContainer")
+
+Airlift.failInjection = false
+Airlift.targets = []
+let templateSource = TemplateFile(url: identityRoot, title: "Configured wallpaper")
+try await PosterBoardAirlift.apply(selection: PosterBoardSelection(), templates: [templateSource],
+    structureVersion: 61, deviceVersion: "26.5", pairingPath: "fixture", log: { _ in }, progress: { _ in })
+if TemplateFile.extractions == 1 && Airlift.targets.count == 1 {
+    pass("template-only AirLift configures and injects its descriptor")
+} else { fail("template-only AirLift skipped configuration or injection") }
+Airlift.targets = []
+try await PosterBoardAirlift.apply(selection: fixtureSelection, templates: [templateSource],
+    structureVersion: 61, deviceVersion: "26.5", pairingPath: "fixture", log: { _ in }, progress: { _ in })
+if TemplateFile.extractions == 2 && Airlift.targets.count == 2 {
+    pass("mixed AirLift delivers the pack and the configured template")
+} else { fail("mixed AirLift dropped a wallpaper source") }
+
+let emptySource = identityRoot.appendingPathComponent("empty-template")
+try FileManager.default.createDirectory(at: emptySource, withIntermediateDirectories: true)
+let beforeEmptyRespring = Airlift.resprings
+do {
+    try await PosterBoardAirlift.apply(selection: fixtureSelection,
+        templates: [TemplateFile(url: emptySource, title: "No descriptors")],
+        structureVersion: 61, deviceVersion: "26.5", pairingPath: "fixture", log: { _ in }, progress: { _ in })
+    fail("mixed AirLift silently accepted an undelivered template")
+} catch {
+    if Airlift.resprings == beforeEmptyRespring { pass("undeliverable source fails without reporting success or respringing") }
+    else { fail("resprung after rejecting an undeliverable template") }
+}
 
 print(failures == 0 ? "\nall checks passed" : "\n\(failures) check(s) failed")
 exit(failures == 0 ? 0 : 1)

@@ -72,6 +72,15 @@ enum PosterBoardApplyModeSettings {
     /// The stored value is the only thing that can move this off AirLift, and a
     /// device that has never touched the picker has nothing stored — so the
     /// default is what such a device gets.
+    /// Resolve saved AirLift selections against the actual target without erasing
+    /// the user's preference for another, supported device.
+    static func resolved(deviceVersion: String, buildVersion: String) -> PosterBoardApplyMode {
+        if AirliftAvailability.isHidden(deviceVersion: deviceVersion, buildVersion: buildVersion) {
+            return .backup
+        }
+        return current
+    }
+
     static var current: PosterBoardApplyMode {
         get {
             guard let raw = UserDefaults.standard.string(forKey: key) else { return .airlift }

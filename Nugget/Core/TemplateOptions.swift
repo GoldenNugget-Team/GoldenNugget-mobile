@@ -65,6 +65,9 @@ struct TemplateOptionFields {
                 throw TemplateFile.fail("The \(kind.rawValue) option \"\(label)\" in \(jsonPath) "
                     + "has no \"files\" list.")
             }
+            guard files.allSatisfy({ TemplatePath.isSafe($0, allowLeadingSlash: true) }) else {
+                throw TemplateFile.fail("An option in \(jsonPath) has an unsafe file path.")
+            }
             self.files = files
         }
         self.associatedPreview = data["associated_preview"] as? String
@@ -138,7 +141,7 @@ struct ReplaceOption: TemplateOption {
         return inside.split(separator: " ").compactMap { token -> String? in
             let text = String(token)
             guard text.hasPrefix("*."), text.count > 2 else { return nil }
-            return String(text.dropFirst(1)).lowercased()
+            return String(text.dropFirst(2)).lowercased()
         }
     }
 
@@ -675,8 +678,12 @@ struct PickerOption: TemplateOption {
                 throw TemplateFile.fail("Choice \(index) of the picker \"\(optionLabel)\" in "
                     + "\(jsonPath) has no \"label\".")
             }
+            let files = (choice["files"] as? [String]) ?? []
+            guard files.allSatisfy({ TemplatePath.isSafe($0, allowLeadingSlash: true) }) else {
+                throw TemplateFile.fail("The picker in \(jsonPath) has an unsafe file path.")
+            }
             return Choice(label: choiceLabel,
-                          files: (choice["files"] as? [String]) ?? [],
+                          files: files,
                           associatedPreview: choice["associated_preview"] as? String)
         }
         self.choices = parsedChoices
@@ -686,6 +693,9 @@ struct PickerOption: TemplateOption {
             guard let names = data["names"] as? [String] else {
                 throw TemplateFile.fail("The picker option \"\(label)\" in \(jsonPath) sets "
                     + "\"rename\" but has no \"names\" list to rename to.")
+            }
+            guard names.allSatisfy({ TemplatePath.isSafe($0) }) else {
+                throw TemplateFile.fail("The picker in \(jsonPath) has an unsafe rename destination.")
             }
             self.names = names
         } else {
@@ -746,7 +756,10 @@ struct PickerOption: TemplateOption {
         }
         for (index, pattern) in chosenFiles.enumerated() {
             for target in TemplateGlob.match(pattern, under: containerPath) {
-                let destination = containerPath.appendingPathComponent(names[index])
+                guard let destination = TemplatePath.destination(names[index], under: containerPath) else {
+                    throw TemplateFile.fail("Unsafe picker rename destination: \(names[index])")
+                }
+                if target.standardizedFileURL == destination.standardizedFileURL { continue }
                 try? fm.removeItem(at: destination)
                 do {
                     try fm.moveItem(at: target, to: destination)

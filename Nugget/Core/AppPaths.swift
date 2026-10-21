@@ -75,8 +75,8 @@ enum AppPaths {
     /// Its own directory because the files are transient by nature: a template's
     /// chosen image belongs to one template and one apply, and keeping the ones
     /// a user tried and abandoned would leave hundreds of megabytes behind with
-    /// nothing pointing at them.  It is emptied at the start of every apply,
-    /// which is also why a chosen file does not survive a relaunch.
+    /// nothing pointing at them. TemplateChoices reclaims older sessions when
+    /// a new file is picked, keeping current-session inputs intact for Apply.
     static let templateChoices = URL.documents
         .appendingPathComponent("TemplateChoices", conformingTo: .data)
 

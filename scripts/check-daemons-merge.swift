@@ -51,12 +51,12 @@ let expected = DaemonGroups.byName["thermalmonitord"]!.labels
              + DaemonGroups.byName["AppleAds"]!.labels
              + DaemonGroups.byName["VPN"]!.labels
 check("все 4 группы попали в один plist (слияние, не перезапись)",
-      Set(expected) == Set(disabled.keys),
+      Set(expected) == Set(disabled.filter { $0.value == "1" || $0.value == "true" }.keys),
       "ожидалось \(expected.count), в файле \(disabled.count); нет: \(Set(expected).subtracting(Set(disabled.keys)))")
-check("все значения true", disabled.values.allSatisfy { $0 == "1" || $0 == "true" },
+check("выбранные значения true", expected.allSatisfy { disabled[$0] == "1" || disabled[$0] == "true" },
       "\(disabled.filter { $0.value != "1" && $0.value != "true" })")
 check("метки вне INTERFACE_KEYS не появились",
-      Set(disabled.keys).subtracting(expected).isEmpty)
+      Set(disabled.keys) == DaemonGroups.allowedKeys)
 // The ScreenTime nullify is a 0-byte payload, so it needs the row on.
 var withNullify = selection
 withNullify.setOn(true, for: TweakCatalog.screenTimeSpec)
@@ -77,7 +77,7 @@ for p in only.payloads where p.label.contains("disabled") {
     let plist = (try? PropertyListSerialization.propertyList(from: p.contents, options: [], format: nil)) as? [String: Any] ?? [:]
     onlyKeys = plist.count
 }
-check("одна группа = только её метки", onlyKeys == DaemonGroups.byName["OTA"]!.labels.count,
+check("выключенные группы имеют явные false", onlyKeys == DaemonGroups.allowedKeys.count,
       "получено \(onlyKeys)")
 
 print(failures == 0 ? "\n  все проверки прошли" : "\n  \(failures) проверок упало")

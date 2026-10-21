@@ -528,7 +528,7 @@ struct TemplatesView: View {
             // Copied into the app's container, for the same reason a `.tendies`
             // pack is: the picker's URL is security-scoped and its access ends
             // with the callback, while the file is not read until Apply.
-            let stored = try PosterBoard.store(url, in: AppPaths.templateChoices)
+            let stored = try TemplateChoices.store(url, in: AppPaths.templateChoices)
             mutate(target.template, target.option, as: ReplaceOption.self) { opt in
                 opt.value = stored
             }
