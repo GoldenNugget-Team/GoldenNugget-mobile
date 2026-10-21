@@ -83,13 +83,14 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI {
         }
     }
 
-    /// The progress a restore has to reach before it counts as finished.
-    ///
-    /// A calibration, not a law: the device reports 0→100 over the job it plans,
-    /// so anything short of 100 means the device decided it was done early.  If
-    /// a genuine run is ever seen completing below 100, this is the one place to
-    /// change — and the thrown message already prints the value it observed.
+    /// Fallback for a response without an explicit device verdict. Progress
+    /// callbacks are advisory: a successful iOS 27 restore can end at 99%.
     static let restoreCompletionPercent: Double = 100
+
+    static func restoreDidComplete(errorCode: Int?, lastPercent: Double) -> Bool {
+        if let errorCode { return errorCode == 0 }
+        return lastPercent >= restoreCompletionPercent
+    }
 
     /// Last progress value the device reported during a restore.
     ///
@@ -3293,28 +3294,28 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI {
                     reason: "Restore did not complete: the device answered with error code \(code)"
                         + (verdict.errorDescription.map { " — \($0)" } ?? ""))
             }
-            // No error code is NOT the same as "finished".  A restore the device
-            // abandoned part-way answers without one, which is why the second,
-            // independent signal has to be checked: the device's own progress
-            // never reached the end.  Reporting success on the strength of "the
-            // FFI did not throw" is what produced a 55 % restore labelled
-            // "succeeded".
+            // An explicit zero is the device's success response. Some successful
+            // restores finish with their last advisory progress callback at 99%.
+            // If the device gives no verdict, still require complete progress
+            // rather than treating a clean protocol exchange alone as success.
             let reached = progressProbe.lastPercent
             let served = ctx.servedFileCount()
-            if reached < IdeviceGateway.restoreCompletionPercent {
+            if !Self.restoreDidComplete(errorCode: verdict.errorCode, lastPercent: reached) {
                 let shown = reached < 0 ? "never reported" : "\(Int(reached))%"
                 let expected = Int(IdeviceGateway.restoreCompletionPercent)
                 let verdictText = verdict.errorCode.map { "ErrorCode \($0)" } ?? "none"
                 throw IdeviceGatewayError(
                     .serviceError,
                     reason: "Restore stopped short: the device ended the exchange at \(shown) "
-                        + "(a completed restore reports \(expected)%), "
+                        + "(without a device verdict, completion requires \(expected)%), "
                         + "after taking \(served) file(s) from the host. "
                         + "device verdict: \(verdictText). "
                         + "Nothing threw, so this is not a transport failure — the device decided it was "
                         + "done. Check what the manifest offered against what the host actually has: "
                         + "the 'commit:' and 'delegate errors:' lines above are the host-side half.")
             }
+            delegateLog?("Restore confirmed complete: device verdict \(verdict.errorCode.map(String.init) ?? "absent"), last progress \(Int(reached))%, \(served) files served")
+            onProgress?(100)
             verboseLog("[IdeviceGateway] syncRestoreBackup() mobilebackup2_restore completed")
         }
     }

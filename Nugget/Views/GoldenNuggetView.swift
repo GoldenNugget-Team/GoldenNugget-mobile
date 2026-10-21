@@ -713,7 +713,7 @@ struct GoldenNuggetView: View {
     /// Either source of work is enough: a run is worth starting when there are tweaks,
     /// when there are wallpapers, when there are templates, or any combination.
     private var canApply: Bool {
-        paired && !running && (tweakSelection.enabledCount > 0 || tweakSelection.daemonModificationsEnabled || posterBoardSelection.isActive
+        paired && !running && (tweakSelection.hasPendingWrites || tweakSelection.daemonModificationsEnabled || posterBoardSelection.isActive
                                || templateSelection.usesDomains || !community.templates.isEmpty)
     }
 
@@ -728,7 +728,7 @@ struct GoldenNuggetView: View {
     /// full backup and change nothing.
     private var applyTitle: String {
         let names = [
-            tweakSelection.enabledCount > 0 || tweakSelection.daemonModificationsEnabled ? "Tweaks" : nil,
+            tweakSelection.hasPendingWrites || tweakSelection.daemonModificationsEnabled ? "Tweaks" : nil,
             posterBoardSelection.isActive ? "Wallpapers" : nil,
             templateSelection.usesDomains ? "Templates" : nil,
         ].compactMap { $0 }

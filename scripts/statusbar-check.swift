@@ -358,8 +358,16 @@ do {
     archiveOverrides.serviceBadge = .init(set: true, value: 0, text: " 5 ")
     archiveOverrides.signalBars = .init(set: true, value: 9, text: "")
     archiveOverrides.timeText = .init(set: true, value: 0, text: "IGNORED")
+    archiveOverrides.dataNetworkType = .init(set: true, value: 10, text: "")
     let archive = try StatusBarArchive.build(archiveOverrides)
 
+    check(try StatusBarArchive.carrierOverrides(of: archive).primary.networkType == 10, "fixed 5G badge survives archive")
+    var carrierOnly = StatusBarOverrides()
+    carrierOnly.carrierName = .init(set: true, value: 0, text: "Test")
+    let neutral = try StatusBarArchive.carrierOverrides(of: StatusBarArchive.build(carrierOnly))
+    check(neutral.primary.bars == nil && neutral.primary.networkType == 0, "unset bars omitted and network neutral")
+    carrierOnly.signalBars = .init(set: true, value: 0, text: "")
+    check(try StatusBarArchive.carrierOverrides(of: StatusBarArchive.build(carrierOnly)).primary.bars == 0, "explicit zero bars preserved")
     check(archive.count > 0, "archive is non-empty (\(archive.count) B)")
     check(!StatusBarArchive.isReset(archive), "not the reset record")
 

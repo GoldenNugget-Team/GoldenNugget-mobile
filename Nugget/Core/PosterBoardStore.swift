@@ -160,6 +160,9 @@ enum PosterBoardStore {
             throw GoldenNuggetError("Could not create the empty PosterBoard database schema: "
                 + String(cString: sqlite3_errmsg(db)))
         }
+        guard validate(url) else {
+            throw GoldenNuggetError("The empty PosterBoard database failed validation. Reset was stopped before writing to the device.")
+        }
     }
 
     // MARK: - Stitching
@@ -236,12 +239,13 @@ enum PosterBoardStore {
             "SELECT MAX(roleSortKey) FROM posterRoleMembership WHERE roleId = ?",
             [.text("PRPosterRoleLockScreen")]) ?? sequence
 
-        // Drop the current selection marker: whatever is added below becomes the
-        // selected wallpaper.
-        try run(db,
-            "DELETE FROM posterAttributes WHERE roleId = ? AND attributeIdentifier = ? "
-            + "AND attributePayload = ?",
-            [.text("PRPosterRoleLockScreen"), .text("SELECTED"), .integer(1)])
+        // Exactly one selected wallpaper is valid. Preserve the current one
+        // when no new item asks to become selected (including container-only runs).
+        let selectedUUID = items.last(where: { $0.setSelected })?.uuid
+        if selectedUUID != nil {
+            try run(db, "DELETE FROM posterAttributes WHERE roleId = ? AND attributeIdentifier = ?",
+                    [.text("PRPosterRoleLockScreen"), .text("SELECTED")])
+        }
 
         for item in items {
             let payload = usageMetadataJSON()
@@ -269,7 +273,7 @@ enum PosterBoardStore {
                      .text("PRPosterRoleAttributeTypeUsageMetadata"), .text(payload)])
             }
 
-            if item.setSelected {
+            if item.uuid == selectedUUID {
                 try run(db,
                     "DELETE FROM posterAttributes WHERE posterUUID = ? AND roleId = ? "
                     + "AND attributeIdentifier = ?",

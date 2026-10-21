@@ -280,6 +280,7 @@ class GoldenNuggetEngine {
         let runStage = StageTimer("RUN apply")
         defer { runStage.done() }
 
+        if let issue = selection.validationIssue() { throw GoldenNuggetError(issue) }
         let compiled = TweakCompiler.compile(selection: selection,
                                              deviceVersion: deviceVersion,
                                              isIPhone: isIPhone, deviceModel: deviceModel)
@@ -416,6 +417,7 @@ class GoldenNuggetEngine {
         // which case there is no database and no payload: the injection into the
         // container *is* the apply.
         var posterBoardPayloads: [TweakPayload] = []
+        var posterBoardSnapshotDirectory: URL?
         var posterBoardInjectedOverAirlift = false
         if (posterBoard.isActive || !posterBoardTemplates.isEmpty) && posterBoardMode == .airlift {
             log("PosterBoard: \(posterBoard.describe) — over AirLift, no backup")
@@ -435,6 +437,7 @@ class GoldenNuggetEngine {
             }
             var structureVersion = PosterBoard.fallbackStructureVersion
             var database: URL?
+            var preservedPosterBoardFiles: [TweakPayload] = []
             if posterBoard.fullReset || !posterBoard.resetModes.isEmpty {
                 // Resets synthesize their own store state; additions, including
                 // template-only descriptors, must start with the device's database.
@@ -443,11 +446,15 @@ class GoldenNuggetEngine {
                 let fetched = try await PosterBoardBackup.fetch(
                     backupRoot: AppPaths.posterBoardFetchRoot, udid: udid,
                     ios27: major >= 27 && !DevSettings.effective.forcePartialRestore,
+                    preserveExisting: true,
                     onProgress: { overall in
                         self.logProgress("posterboard backup progress", overall)
                     },
                     log: { AppLog.write($0) })
+                posterBoardSnapshotDirectory = fetched.snapshotDirectory
                 database = fetched.database
+                preservedPosterBoardFiles = fetched.preservedPayloads
+                log("PosterBoard: preserving \(preservedPosterBoardFiles.count) existing container file(s)")
                 structureVersion = fetched.structureVersion
             }
             posterBoardPayloads = try await PosterBoard.compile(
@@ -455,6 +462,8 @@ class GoldenNuggetEngine {
                 templates: posterBoardTemplates,
                 structureVersion: structureVersion,
                 database: database,
+                preservedPayloads: preservedPosterBoardFiles,
+                includeSnapshotFiles: posterBoardSnapshotDirectory == nil,
                 deviceVersion: version,
                 workingDirectory: PosterBoard.workDirectory,
                 log: { AppLog.write($0) })
@@ -482,7 +491,8 @@ class GoldenNuggetEngine {
             return
         }
 
-        try await deliver(payloads: payloads, udid: udid, version: version, label: "apply") {
+        try await deliver(payloads: payloads, udid: udid, version: version, label: "apply",
+                          posterBoardSnapshot: posterBoardSnapshotDirectory) {
             log("Apply succeeded: the device confirmed it finished.")
             log("Reboot the device so the injected preferences take effect.")
             if posterBoardInjectedOverAirlift {
@@ -646,6 +656,7 @@ class GoldenNuggetEngine {
         udid: String,
         version: String,
         label: String,
+        posterBoardSnapshot: URL? = nil,
         onSuccess: () -> Void
     ) async throws {
         // The two versions take opposite paths, and the split is the
@@ -713,6 +724,7 @@ class GoldenNuggetEngine {
             backupRoot: backupRoot,
             udid: udid,
             tweakPayloads: payloads,
+            posterBoardSnapshot: posterBoardSnapshot,
             prune: prune,
             ios27: ios27
         )

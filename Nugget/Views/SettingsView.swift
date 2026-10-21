@@ -15,6 +15,7 @@ import Minimuxer
 struct SettingsView: View {
     // Reactive mirrors of `DevSettings.Key`, so a toggle redraws the page. The
     // engine reads the same strings through `DevSettings.effective`.
+    @AppStorage(UntestedTweaks.enabledKey) private var untestedTweaks = false
     @AppStorage(DevSettings.Key.enabled) private var devModeOn = false
     @AppStorage(DevSettings.Key.forcePartialRestore) private var forcePartialRestore = false
     @AppStorage(DevSettings.Key.verboseLog) private var verboseLog = true
@@ -217,6 +218,12 @@ struct SettingsView: View {
     /// not a switch for working around a bug, it is part of what a run writes.
     private var applySection: some View {
         Section("Apply") {
+            Toggle("Enable incompatible tweaks", isOn: $untestedTweaks)
+                .onChange(of: untestedTweaks) { _, _ in
+                    UserDefaults.standard.set(true, forKey: UntestedTweaks.choiceKey)
+                }
+            Text("On iOS 26, show tweaks outside their tested iOS version range. Hardware requirements still apply.")
+                .font(.footnote).foregroundStyle(.secondary)
             switchRow("Skip Setup",
                       note: skipSetupNote,
                       isOn: Binding(

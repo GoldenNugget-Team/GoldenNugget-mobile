@@ -25,6 +25,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import ast
+import re
 import os
 import sys
 import types
@@ -183,7 +185,9 @@ def emit(output: list[str], FileLocation, SPECS, Kind, Section) -> None:
         w(f"            detail: {swift_string(spec.description) if spec.description else 'nil'},")
         instance = spec.factory() if spec.factory is not None else None
         reversible = instance is not None and type(instance).__name__ == "ReversibleBooleanPlistTweak"
-        if instance is not None and not reversible:
+        factory = type(instance).__name__ if instance is not None else "BasicPlistTweak"
+        supported = {"ExperimentalBooleanPlistTweak", "ResettableNumericPreferenceTweak", "OptionalBundlePreferenceTweak"}
+        if instance is not None and not reversible and factory not in supported:
             if type(instance).__name__ != "AdvancedPlistTweak" or not isinstance(instance.value, dict):
                 die(f"unsupported factory for {spec.id.name}: {type(instance).__name__}")
             w("            multiValues: [")
@@ -193,7 +197,16 @@ def emit(output: list[str], FileLocation, SPECS, Kind, Section) -> None:
         else:
             w("            multiValues: nil,")
         w(f"            reversibleBoolean: {'true' if reversible else 'false'},")
-        w(f"            requiresDynamicIsland: {'true' if spec.requires_dynamic_island else 'false'}")
+        w(f"            requiresDynamicIsland: {'true' if spec.requires_dynamic_island else 'false'},")
+        w(f"            factory: {swift_string(factory)},")
+        w(f"            offValue: {swift_value(instance.off_value) if factory == 'ExperimentalBooleanPlistTweak' else 'nil'},")
+        w(f"            integerBoolean: {'true' if getattr(instance, 'integer_value', False) else 'false'},")
+        for field, attr in [('requiresCameraControl', 'requires_camera_control'), ('requiresActionButton', 'requires_action_button'), ('requiresHomeButton', 'requires_home_button'), ('requiresAlwaysOn', 'requires_always_on')]:
+            w(f"            {field}: {'true' if getattr(spec, attr) else 'false'},")
+        w(f"            warning: {swift_string(spec.warning) if spec.warning else 'nil'},")
+        w(f"            requires: [{', '.join(swift_string(x.name) for x in spec.requires)}],")
+        w(f"            exclusiveWith: {swift_string(spec.exclusive_with.name) if spec.exclusive_with else 'nil'},")
+        w(f"            unavailableReason: {swift_string(spec.unavailable_reason) if spec.unavailable_reason else 'nil'}")
         w(f"        ),")
     w("    ]")
     w("")
@@ -227,11 +240,15 @@ def main() -> int:
     emit(lines, FileLocation, SPECS, Kind, Section)
     import runpy
     capabilities = runpy.run_path(str(Path(args.goldennugget) / "src/devicemanagement/device_capabilities.py"))
-    lines += ["", "/// Known Dynamic Island models, generated from desktop device_capabilities.py.",
-              "enum TweakDeviceCapabilities {", "    static func hasDynamicIsland(_ model: String) -> Bool {",
-              "        let models: Set<String> = ["]
-    lines += [f"            {swift_string(model)}," for model in sorted(capabilities["_DYNAMIC_ISLAND_MODELS"])]
-    lines += ["        ]", "        return models.contains(model.trimmingCharacters(in: .whitespacesAndNewlines))", "    }", "}", ""]
+    lines += ["", "/// Device capabilities generated from desktop device_capabilities.py.", "enum TweakDeviceCapabilities {"]
+    for method, predicate in [('hasDynamicIsland', 'has_dynamic_island'), ('hasCameraControl', 'has_camera_control'), ('hasActionButton', 'has_action_button'), ('hasHomeButton', 'has_home_button'), ('hasAlwaysOn', 'has_always_on_display')]:
+        # Enumerating known product identifiers through the actual predicates also
+        # covers the desktop sets defined locally inside functions.
+        models = {node.value for node in ast.walk(ast.parse((Path(args.goldennugget) / "src/devicemanagement/device_capabilities.py").read_text())) if isinstance(node, ast.Constant) and isinstance(node.value, str) and re.fullmatch(r"(?:iPhone|iPad)\d+,\d+", node.value)}
+        lines += [f"    static func {method}(_ model: String) -> Bool {{", "        let models: Set<String> = ["]
+        lines += [f"            {swift_string(model)}," for model in sorted(models) if capabilities[predicate](model)]
+        lines += ["        ]", "        return models.contains(model.trimmingCharacters(in: .whitespacesAndNewlines))", "    }"]
+    lines += ["}", ""]
     generated = "\n".join(lines)
 
     if args.check:

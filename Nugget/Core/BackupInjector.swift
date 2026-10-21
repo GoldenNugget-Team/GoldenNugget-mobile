@@ -153,6 +153,7 @@ enum BackupInjector {
         backupRoot: URL,
         udid: String,
         tweakPayloads: [TweakPayload],
+        posterBoardSnapshot: URL? = nil,
         prune: Bool = true,
         ios27: Bool = true
     ) async throws {
@@ -223,9 +224,19 @@ enum BackupInjector {
             AppLog.write("Partial Restore: synthesising the backup, nothing to prune.")
         }
 
+        let preservedDirectories: Set<String>
+        let preservedFileMetadata: [String: Data]
+        if let posterBoardSnapshot {
+            let snapshot = try PosterBoardSnapshot.merge(from: posterBoardSnapshot, into: deviceDir)
+            preservedDirectories = snapshot.directories
+            preservedFileMetadata = snapshot.fileMetadata
+            AppLog.write("PosterBoard: native manifest restored, \(preservedDirectories.count) directory records preserved")
+        } else { preservedDirectories = []; preservedFileMetadata = [:] }
+
         let tweakStage = StageTimer("inject tweaks")
         AppLog.write("Injecting \(tweakPayloads.count) tweak file(s)…")
-        let report = try TweakInjector.inject(into: deviceDir, payloads: tweakPayloads)
+        let report = try TweakInjector.inject(into: deviceDir, payloads: tweakPayloads, preservedDirectories: preservedDirectories,
+                                              preservedFileMetadata: preservedFileMetadata)
         tweakStage.done(report.summary)
         AppLog.write("Tweaks injected: \(report.summary)")
         for domain in report.unverifiedDomains {

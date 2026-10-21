@@ -19,6 +19,9 @@ import UniformTypeIdentifiers
 /// description) ride inside the same card instead of moving to a tooltip, so the
 /// page still shows everything it showed before.
 struct TweaksView: View {
+    @AppStorage(UntestedTweaks.enabledKey) private var untestedTweaks = false
+    @AppStorage(UntestedTweaks.choiceKey) private var untestedChoiceDone = false
+    @State private var showUntestedChoice = false
     @Binding var selection: TweakSelection
 
     /// The version and model this page filters the registry by, from the shared
@@ -97,6 +100,15 @@ struct TweaksView: View {
             // The reference loads AutoSave at startup (`_load_last_preset`) and
             // rewrites it right after, so a stale entry cannot survive a launch.
             restoreAutosave()
+            offerUntestedTweaks()
+        }
+        .onChange(of: identity.version) { _, _ in offerUntestedTweaks() }
+        .onChange(of: untestedTweaks) { _, _ in formEpoch += 1 }
+        .alert("This is not all tweaks", isPresented: $showUntestedChoice) {
+            Button("Enable incompatible tweaks") { untestedTweaks = true; untestedChoiceDone = true }
+            Button("No", role: .cancel) { untestedChoiceDone = true }
+        } message: {
+            Text("You can get more tweaks, but they are untested with your iOS version. You can change your mind in Settings.")
         }
         .fileImporter(isPresented: $showImporter,
                       allowedContentTypes: [.json]) { result in
@@ -104,6 +116,12 @@ struct TweaksView: View {
             case .success(let url): importAutosave(from: url)
             case .failure(let error): importError = error.localizedDescription
             }
+        }
+    }
+
+    private func offerUntestedTweaks() {
+        if UntestedTweaks.isIOS26(identity.version) && !untestedTweaks && !untestedChoiceDone {
+            showUntestedChoice = true
         }
     }
 

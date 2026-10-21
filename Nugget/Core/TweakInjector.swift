@@ -61,6 +61,7 @@ struct TweakRowProfile {
 
     /// Pick the profile for a domain.
     static func forDomain(_ domain: String) -> TweakRowProfile {
+        if domain == "AppDomain-com.apple.PosterBoard" { return .posterBoardContainer }
         if domain.hasPrefix("AppDomain") { return .appContainer }
         if domain.hasPrefix("SysSharedContainerDomain") || domain.hasPrefix("SysContainerDomain") {
             return .systemContainer
@@ -86,6 +87,15 @@ extension TweakRowProfile {
         carriesDigest: false,
         verified: true,
         note: "AppDomain-* rows, as delivered by BackupInjector.inject")
+
+    /// The live PosterBoard snapshot uses class 4 for Library, the store and
+    /// preference files. Generic app-container class 3 is not its row contract.
+    static let posterBoardContainer = TweakRowProfile(
+        fileOwner: 501, fileGroup: 501, fileProtectionClass: 4,
+        fileExceptionPublisher: "com.apple.containermanagerd_system",
+        dirOwner: 501, dirGroup: 501, dirProtectionClass: 4,
+        rootOwner: 501, rootGroup: 501, rootProtectionClass: 0,
+        carriesDigest: false, verified: true, note: "PosterBoard native snapshot row classes")
 
     /// `SysSharedContainerDomain-*`: the class `BackupInjector.injectSystemPlist`
     /// already delivers (the Lock Screen footnote), with production evidence.
@@ -191,7 +201,9 @@ enum TweakInjector {
     }
 
     /// Inject every payload.  Rows are upserted, so re-running is idempotent.
-    static func inject(into deviceDir: URL, payloads: [TweakPayload]) throws -> Report {
+    static func inject(into deviceDir: URL, payloads: [TweakPayload],
+                       preservedDirectories: Set<String> = [],
+                       preservedFileMetadata: [String: Data] = [:]) throws -> Report {
         let store = ManifestStore(deviceDir: deviceDir)
         let fm = FileManager.default
         let now = Int(Date().timeIntervalSince1970)
@@ -219,6 +231,7 @@ enum TweakInjector {
             rows.append((payload.relativePath, 1))
 
             for row in rows {
+                if row.flags == 2 && preservedDirectories.contains(payload.domain + "/" + row.path) { continue }
                 let isFile = row.flags == 1
                 let isRoot = row.path.isEmpty
                 let rowID = ManifestStore.fileID(domain: payload.domain, relativePath: row.path)
@@ -230,6 +243,13 @@ enum TweakInjector {
                     fileRows += 1
                 } else {
                     dirRows += 1
+                }
+
+                if isFile, let native = preservedFileMetadata[payload.domain + "/" + row.path] {
+                    let blob = try patchMBFileContents(native, contents: bytes)
+                    try store.upsert(fileID: rowID, domain: payload.domain,
+                                     relativePath: row.path, flags: row.flags, blob: blob)
+                    continue
                 }
 
                 nextInode += 1

@@ -298,6 +298,8 @@ extension PosterBoard {
         templates: [TemplateFile] = [],
         structureVersion: Int,
         database: URL?,
+        preservedPayloads: [TweakPayload] = [],
+        includeSnapshotFiles: Bool = true,
         deviceVersion: String,
         workingDirectory: URL,
         log: @escaping @Sendable (String) -> Void
@@ -343,6 +345,7 @@ extension PosterBoard {
             return []
         }
 
+        payloads = includeSnapshotFiles ? preservedPayloads : []
         let fm = FileManager.default
         try? fm.removeItem(at: workingDirectory)
         try fm.createDirectory(at: workingDirectory, withIntermediateDirectories: true)
@@ -388,6 +391,24 @@ extension PosterBoard {
         var builder = PosterBoardBuilder(structureVersion: version, log: log)
         try builder.walk(currentPath: workingDirectory, restorePath: "", isAdding: false)
         payloads.append(contentsOf: builder.payloads)
+        // Configurations register an installed Lock Screen; descriptors populate
+        // Add Wallpaper / Collections. Publish both, using the current gallery
+        // provider mapping shared with the desktop/AirLift descriptor path.
+        for payload in builder.payloads {
+            guard payload.relativePath.contains("/configurations/"),
+                  !payload.relativePath.hasSuffix("/com.apple.posterkit.role.identifier") else { continue }
+            var galleryPath = payload.relativePath.replacingOccurrences(of: "/configurations/", with: "/descriptors/")
+            if (compareVersion(deviceVersion, "26.4") ?? -1) >= 0 {
+                galleryPath = galleryPath.replacingOccurrences(of: "/Extensions/" + collectionsExtension + "/",
+                    with: "/Extensions/com.apple.Posters.CollectionsPosterApp/")
+            }
+            if let source = payload.source {
+                payloads.append(TweakPayload(domain: domain, relativePath: galleryPath, source: source))
+            } else {
+                payloads.append(TweakPayload(domain: domain, relativePath: galleryPath, contents: payload.contents))
+            }
+        }
+
 
         // 6. The database.  A wallpaper that is not in it does not exist.
         //
@@ -423,12 +444,23 @@ extension PosterBoard {
             }
         }
 
-        // 7. Force refresh: upstream's `auto_refresh_posterboard`, on by default.
+        // Refresh flags must be merged into the live preferences. Replacing
+        // that plist with a short default loses provider/migration state and can
+        // make PosterBoard discard existing collections after restore.
         if selection.autoRefresh {
-            payloads.append(TweakPayload(domain: domain,
-                                         relativePath: preferencesPath,
-                                         contents: try refreshPreferences(deviceVersion: deviceVersion)))
+            let path = TweakPayload.manifestPath(preferencesPath)
+            if let existing = preservedPayloads.last(where: { $0.relativePath == path }) {
+                payloads.append(TweakPayload(domain: domain, relativePath: preferencesPath,
+                    contents: try refreshPreferences(deviceVersion: deviceVersion, existing: existing.bytes())))
+            } else {
+                log("PosterBoard: no live preferences snapshot; leaving device preferences unchanged.")
+            }
         }
+        // New files replace snapshot files with the same manifest path.
+        var seen: Set<String> = []
+        payloads = payloads.reversed().filter {
+            seen.insert($0.domain + "/" + $0.relativePath).inserted
+        }.reversed()
 
         log("PosterBoard: \(payloads.count) file(s) — \(builder.configs.count) wallpaper(s) "
             + "staged into the store database (\(builder.payloads.count) from disk)")
@@ -486,7 +518,7 @@ extension PosterBoard {
     ///
     /// Binary, matching `plistlib.dumps(plist, fmt=FMT_BINARY)` — unlike the
     /// per-wallpaper plists, which the reference writes as XML.
-    static func refreshPreferences(deviceVersion: String) throws -> Data {
+    static func refreshPreferences(deviceVersion: String, existing: Data? = nil) throws -> Data {
         // Upstream compares with `packaging.version.Version`, which *raises* on
         // an empty or malformed string — so refusing here is the same verdict,
         // not a stricter one.  Guessing "not 26.4" would silently write a
@@ -496,11 +528,18 @@ extension PosterBoard {
                 + "reset preferences to write (26.4 added two migration lists), and "
                 + "\"\(deviceVersion)\" is not a version. Read the device identity and try again.")
         }
-        var plist: [String: Any] = [
-            "PBF_LOCALE_DID_CHANGE": false,
-            "PBF_RESET_FILE_PROTECTIONS": true,
-        ]
-        if atLeast264 >= 0 {
+        var plist: [String: Any] = [:]
+        if let existing {
+            guard let decoded = try PropertyListSerialization.propertyList(from: existing, format: nil) as? [String: Any] else {
+                throw GoldenNuggetError("The live PosterBoard preferences are not a dictionary; apply stopped to preserve them.")
+            }
+            plist = decoded
+        }
+        plist["PBF_LOCALE_DID_CHANGE"] = false
+        plist["PBF_RESET_FILE_PROTECTIONS"] = true
+        // These defaults belong only to an explicit reset. Ordinary additions
+        // retain the device's actual provider and migration lists.
+        if existing == nil, atLeast264 >= 0 {
             plist["PersistedPosterContainerBundleIdentifiers"] = [
                 "com.apple.Posters.CollectionsPosterApp",
             ]
@@ -709,6 +748,17 @@ private struct PosterBoardBuilder {
                 let destination = joined(restorePath, folderName)
                 var childIsDirectory: ObjCBool = false
                 guard fm.fileExists(atPath: childPath.path, isDirectory: &childIsDirectory) else { continue }
+
+                // Gallery descriptors are not configurations yet. Native iOS 27
+                // configurations carry this role sidecar in addition to the SQL
+                // membership; third-party packs such as DVD Screensaver omit it.
+                let roleFile = "com.apple.posterkit.role.identifier"
+                if randomizeUUID, childIsDirectory.boolValue,
+                   !fm.fileExists(atPath: childPath.appendingPathComponent(roleFile).path) {
+                    payloads.append(TweakPayload(domain: PosterBoard.domain,
+                        relativePath: joined(destination, roleFile),
+                        contents: Data("PRPosterRoleLockScreen".utf8)))
+                }
 
                 // Third-party .tendies usually ship **without** the
                 // `provider.descriptor.identifier` sidecar. PosterKit then invents

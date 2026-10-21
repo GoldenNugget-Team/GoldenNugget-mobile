@@ -18,6 +18,7 @@ struct TweakRow: View {
     @Binding private var selection: TweakSelection
     private let readOn: () -> Bool
     private let writeOn: (Bool) -> Void
+    @State private var showWarning = false
 
     init(spec: TweakSpec, selection: Binding<TweakSelection>) {
         self.init(spec: spec, selection: selection, readOn: nil, writeOn: nil)
@@ -60,20 +61,29 @@ struct TweakRow: View {
                         .textFieldStyle(.roundedBorder)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
-                    TweakRowCaption(id: spec.id, detail: spec.detail)
+                    TweakRowCaption(id: spec.id, detail: [spec.detail, spec.warning].compactMap { $0 }.joined(separator: "\n"))
                 }
             case .number:
                 VStack(alignment: .leading, spacing: 6) {
                     Text(spec.title)
                     TweakNumberField(spec: spec, selection: $selection)
-                    TweakRowCaption(id: spec.id, detail: spec.numberHint)
+                    TweakRowCaption(id: spec.id, detail: [spec.numberHint, spec.warning].compactMap { $0 }.joined(separator: "\n"))
                 }
             }
+        }
+        .alert(spec.title, isPresented: $showWarning) {
+            Button("Cancel", role: .cancel) {}
+            Button("Enable experiment", role: .destructive) { writeOn(true) }
+        } message: {
+            Text(spec.warning ?? "")
         }
     }
 
     private var toggleBinding: Binding<Bool> {
-        Binding(get: readOn, set: writeOn)
+        Binding(get: readOn, set: { on in
+            if on && spec.warning != nil { showWarning = true }
+            else { writeOn(on) }
+        })
     }
 
     private var textBinding: Binding<String> {

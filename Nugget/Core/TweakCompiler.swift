@@ -203,7 +203,7 @@ enum TweakCompiler {
         for spec in TweakCatalog.allWithDaemons where !spec.disabled {
             if spec.location == .disabledDaemons { continue }
             if spec.section == .daemons && !selection.daemonModificationsEnabled { continue }
-            guard selection.isOn(spec) || spec.reversibleBoolean else { continue }
+            guard selection.isOn(spec) || spec.reversibleBoolean || (spec.offValue != nil && selection.values[spec.id] != nil) else { continue }
             guard spec.isCompatible(deviceVersion: deviceVersion, isIPhone: isIPhone, deviceModel: deviceModel) else {
                 if selection.isOn(spec) {
                     skipped.append((spec.id, "not compatible with this device / iOS version"))
@@ -247,8 +247,17 @@ enum TweakCompiler {
             }
             if plists[spec.location] == nil { order.append(spec.location) }
             var dict = plists[spec.location] ?? [:]
-            dict[spec.key] = spec.reversibleBoolean
-                ? selection.isOn(spec) : selection.value(for: spec).plistObject
+            if let offValue = spec.offValue {
+                dict[spec.key] = (selection.isOn(spec) ? spec.value : offValue).plistObject
+            } else if spec.reversibleBoolean {
+                dict[spec.key] = spec.integerBoolean ? (selection.isOn(spec) ? 1 : 0) as Any : selection.isOn(spec) as Any
+            } else if spec.factory == "ResettableNumericPreferenceTweak" && selection.value(for: spec).display == "-1.0" {
+                dict.removeValue(forKey: spec.key)
+            } else if spec.factory == "OptionalBundlePreferenceTweak" && selection.value(for: spec).display.isEmpty {
+                dict.removeValue(forKey: spec.key)
+            } else {
+                dict[spec.key] = selection.value(for: spec).plistObject
+            }
             plists[spec.location] = dict
         }
 

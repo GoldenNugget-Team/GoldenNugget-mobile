@@ -110,6 +110,18 @@ struct TweakSpec: Sendable {
     var reversibleBoolean: Bool = false
     var requiresDynamicIsland: Bool = false
 
+    var factory: String = "BasicPlistTweak"
+    var offValue: TweakValue? = nil
+    var integerBoolean: Bool = false
+    var requiresCameraControl: Bool = false
+    var requiresActionButton: Bool = false
+    var requiresHomeButton: Bool = false
+    var requiresAlwaysOn: Bool = false
+    var warning: String? = nil
+    var requires: [String] = []
+    var exclusiveWith: String? = nil
+    var unavailableReason: String? = nil
+
     /// Whether this tweak writes a whole dict rather than a single key.
     var writesWholeDict: Bool { multiValues != nil }
 }
@@ -151,6 +163,18 @@ enum TweakVersion {
     }
 }
 
+/// Desktop's opt-in bypasses version bounds only on iOS 26; hardware gates stay active.
+enum UntestedTweaks {
+    static let enabledKey = "enable_incompatible_tweaks"
+    static let choiceKey = "incompatible_tweaks_choice_done"
+    static func isIOS26(_ version: String) -> Bool {
+        guard let range = version.range(of: "[0-9]+(\\.[0-9]+){0,3}", options: .regularExpression) else { return false }
+        let version = String(version[range])
+        return (TweakVersion.compare(version, "26") ?? -1) >= 0
+            && TweakVersion.compare(version, "27") == -1
+    }
+}
+
 extension TweakSpec {
     /// The verdict of the reference's `is_tweak_compatible`
     /// (`src/gui/ios/compat.py:11`), plus the registry's own `disabled` flag.
@@ -164,19 +188,24 @@ extension TweakSpec {
     /// lockdown; `isIPhone` is `ProductType.hasPrefix("iPhone")`, which is how
     /// the reference derives it (`src/gui/ios/tweaks.py:107`).
     func isCompatible(deviceVersion: String, isIPhone: Bool, deviceModel: String = "") -> Bool {
-        if disabled { return false }
+        if disabled || unavailableReason != nil { return false }
         if deviceVersion.isEmpty && deviceModel.isEmpty { return true }
         if !deviceVersion.isEmpty {
             guard let range = deviceVersion.range(of: "[0-9]+(\\.[0-9]+){0,3}", options: .regularExpression) else { return false }
             let deviceVersion = String(deviceVersion[range])
-            if let minVersion,
+            let allowUntested = UntestedTweaks.isIOS26(deviceVersion) && UserDefaults.standard.bool(forKey: UntestedTweaks.enabledKey)
+            if !allowUntested, let minVersion,
                let cmp = TweakVersion.compare(deviceVersion, minVersion), cmp < 0 { return false }
-            if let maxVersion,
+            if !allowUntested, let maxVersion,
                let cmp = TweakVersion.compare(deviceVersion, maxVersion), cmp > 0 { return false }
         }
         if ipadOnly && isIPhone { return false }
         if iphoneOnly && !isIPhone { return false }
         if requiresDynamicIsland && !TweakDeviceCapabilities.hasDynamicIsland(deviceModel) { return false }
+        if requiresCameraControl && !TweakDeviceCapabilities.hasCameraControl(deviceModel) { return false }
+        if requiresActionButton && !TweakDeviceCapabilities.hasActionButton(deviceModel) { return false }
+        if requiresHomeButton && !TweakDeviceCapabilities.hasHomeButton(deviceModel) { return false }
+        if requiresAlwaysOn && !TweakDeviceCapabilities.hasAlwaysOn(deviceModel) { return false }
         return true
     }
 
@@ -234,6 +263,10 @@ struct TweakSelection: Equatable {
     mutating func setOn(_ on: Bool, for spec: TweakSpec) {
         if on && spec.section == .daemons { daemonModificationsEnabled = true }
         if on { enabled.insert(spec.id) } else { enabled.remove(spec.id) }
+        if spec.offValue != nil { values[spec.id] = on ? spec.value : spec.offValue }
+        if on {
+            if let id = spec.exclusiveWith, let other = TweakCatalog.byID[id], isOn(other) { setOn(false, for: other) }
+        }
     }
 
     /// Set a value and switch the tweak on, like `Tweak.set_value`.
@@ -268,5 +301,30 @@ struct TweakSelection: Equatable {
         else { multiOverrides.removeValue(forKey: spec.id) }
     }
 
+    /// Validate dependencies before staging files, including presets that bypass editors.
+    func validationIssue() -> String? {
+        for spec in TweakCatalog.all where isOn(spec) {
+            if let reason = spec.unavailableReason { return "\(spec.title): \(reason)" }
+            if let peer = spec.exclusiveWith, enabled.contains(peer) {
+                return "\(spec.title) cannot be combined with \(TweakCatalog.byID[peer]?.title ?? peer)."
+            }
+            if spec.kind != .number || value(for: spec) != spec.value {
+                for id in spec.requires where !enabled.contains(id) {
+                    return "Enable \(TweakCatalog.byID[id]?.title ?? id) before applying \(spec.title)."
+                }
+            }
+            if spec.factory == "OptionalBundlePreferenceTweak" {
+                let text = value(for: spec).display
+                if text.count > 255 || text.range(of: "^(?:[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+)?$", options: .regularExpression) == nil {
+                    return "Enter a valid app bundle identifier for \(spec.title), or clear the field."
+                }
+            }
+        }
+        return nil
+    }
+
     var enabledCount: Int { enabled.count }
+    var hasPendingWrites: Bool {
+        !enabled.isEmpty || TweakCatalog.all.contains { $0.offValue != nil && values[$0.id] != nil }
+    }
 }

@@ -181,8 +181,7 @@ enum GoldenNuggetPresets {
                 // `type(tweak).__name__`.  A spec that writes a whole dict is
                 // the reference's `AdvancedPlistTweak`, everything else is a
                 // `BasicPlistTweak` (`tweak_classes.py:59`, `:115`).
-                "type": spec.writesWholeDict ? "AdvancedPlistTweak"
-                    : (spec.reversibleBoolean ? "ReversibleBooleanPlistTweak" : "BasicPlistTweak"),
+                "type": spec.factory,
                 "enabled": selection.isOn(spec),
             ]
             if spec.writesWholeDict {
@@ -194,7 +193,7 @@ enum GoldenNuggetPresets {
                 }
                 entry["value"] = dict
             } else {
-                entry["value"] = selection.value(for: spec).plistObject
+                entry["value"] = spec.offValue != nil && selection.values[spec.id] == nil ? NSNull() : selection.value(for: spec).plistObject
             }
             tweaks[spec.id] = entry
         }

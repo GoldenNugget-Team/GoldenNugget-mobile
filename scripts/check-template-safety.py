@@ -88,6 +88,8 @@ extension URL { static var documents: URL { URL(fileURLWithPath: ProcessInfo.pro
         end = support.index("enum PosterBoardVideo {", start)
         support = support[:start] + support[end:]
         support = support.replace('"/tmp/pbcheck/documents"', 'ProcessInfo.processInfo.environment["GN_TEST_ROOT"]!')
+        support = support.replace('func extract(to destination: URL) throws {}',
+            'func extract(to destination: URL) throws { if let path = ProcessInfo.processInfo.environment["GN_REAL_PB_PACK"] { try FileManager.default.copyItem(at: URL(fileURLWithPath: path), to: destination) } }')
         backup = folder / "BackupCheck.swift"
         backup.write_text("import Foundation\nimport UniformTypeIdentifiers\nimport SQLite3\n" + support
                           + (ROOT / "scripts/posterboard-template-check.swift").read_text())

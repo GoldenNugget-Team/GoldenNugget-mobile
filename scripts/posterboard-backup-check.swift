@@ -81,6 +81,27 @@ let staged = try PosterBoardStore.stitch(database: standalone, items: [PosterBoa
 check(count(staged) == 2 && count(standalone) == 1,
       "Protective compilation adds a wallpaper to the staged database and preserves the fetched cache")
 check(try deleteMode(staged), "staged restore payload needs no WAL to carry inserted rows")
+func selectedCount(_ url: URL) -> Int {
+    var db: OpaquePointer?
+    defer { sqlite3_close(db) }
+    guard sqlite3_open_v2(url.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else { return -1 }
+    var stmt: OpaquePointer?
+    defer { sqlite3_finalize(stmt) }
+    guard sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM posterAttributes WHERE attributeIdentifier = 'SELECTED'", -1, &stmt, nil) == SQLITE_OK,
+          sqlite3_step(stmt) == SQLITE_ROW else { return -1 }
+    return Int(sqlite3_column_int(stmt, 0))
+}
+let multiple = try PosterBoardStore.stitch(database: staged, items: [
+    PosterBoardConfigItem(uuid: "second", extensionID: "provider", setSelected: true),
+    PosterBoardConfigItem(uuid: "third", extensionID: "provider", setSelected: true),
+], workingDirectory: root.appendingPathComponent("multiple"))
+check(count(multiple) == 4 && selectedCount(multiple) == 1, "multiple additions leave exactly one selected wallpaper")
+let unchanged = try PosterBoardStore.stitch(database: multiple, items: [], workingDirectory: root.appendingPathComponent("unchanged"))
+check(selectedCount(unchanged) == 1, "container-only apply preserves current wallpaper selection")
+let unselected = try PosterBoardStore.stitch(database: multiple,
+    items: [PosterBoardConfigItem(uuid: "unselected", extensionID: "provider", setSelected: false)],
+    workingDirectory: root.appendingPathComponent("unselected"))
+check(selectedCount(unselected) == 1 && count(unselected) == 5, "unselected addition preserves existing selection")
 // This second committed row exists only in WAL, not in the main file.
 try execute(db, "INSERT INTO poster (UUID, providerId) VALUES ('wal-only', 'provider');")
 let walDestination = root.appendingPathComponent("wal-cache.sqlite3")

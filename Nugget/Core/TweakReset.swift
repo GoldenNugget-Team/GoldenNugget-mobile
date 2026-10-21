@@ -56,7 +56,7 @@ enum ResetPage: String, CaseIterable, Identifiable, Sendable {
             return [.globalPreferences, .globalPreferencesHomeDomain, .appStore,
                     .backboardd, .coreMotion, .pasteboard, .notes, .accessibility]
         case .daemons:
-            return [.disabledDaemons]
+            return [.disabledDaemons, .ota]
         }
     }
 }
@@ -251,8 +251,8 @@ enum TweakReset {
             }
         }
         // Every nulled file after the loop, in reference page order.
-        for page in ordered where page != .statusBar && page != .daemons {
-            for location in page.locations { addNulled(location) }
+        for page in ordered where page != .statusBar {
+            for location in page.locations where location != .disabledDaemons { addNulled(location) }
         }
 
         return Plan(targets: targets, payloads: payloads, skipped: skipped,

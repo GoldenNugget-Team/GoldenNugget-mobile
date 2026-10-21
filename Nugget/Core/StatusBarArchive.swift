@@ -35,7 +35,7 @@ import Foundation
 ///
 /// ## Scope, and why it is narrow
 ///
-/// Only the carrier **name**, its **service badge** and its **signal-bar count**
+/// Only the carrier **name**, its **service badge** and its **signal-bar count** and fixed network type
 /// survive. That is the entire surface the upstream reverse-engineering work
 /// exposes as supported; everything else in the cellular entry is written with
 /// fixed values that were verified to deserialize and render. Exposing more
@@ -65,15 +65,17 @@ final class StatusBarArchiveCellularEntry: NSObject, NSCoding {
     var string: String?
     var crossfadeString: String?
     var badgeString: String?
-    var displayValue: Int
+    var displayValue: Int?
+    var networkType: Int
 
-    init(string: String?, badge: String?, displayValue: Int) {
+    init(string: String?, badge: String?, displayValue: Int?, networkType: Int = 0) {
         self.string = string
         // The reference points both at one shared string object
         // (`entry["crossfadeString"] = text`, the same `add()` result).
         self.crossfadeString = string
         self.badgeString = badge
         self.displayValue = displayValue
+        self.networkType = networkType
     }
 
     /// `decodeObject(forKey:)` **raises** when the key is absent rather than
@@ -83,7 +85,7 @@ final class StatusBarArchiveCellularEntry: NSObject, NSCoding {
     /// `containsValue(forKey:)` first, which is the only safe way to ask "absent"
     /// rather than "nil".
     convenience init(coder: NSCoder) {
-        self.init(string: nil, badge: nil, displayValue: 0)
+        self.init(string: nil, badge: nil, displayValue: nil)
         if coder.containsValue(forKey: "string") {
             string = coder.decodeObject(forKey: "string") as? String
         }
@@ -93,6 +95,7 @@ final class StatusBarArchiveCellularEntry: NSObject, NSCoding {
         if coder.containsValue(forKey: "badgeString") {
             badgeString = coder.decodeObject(forKey: "badgeString") as? String
         }
+        networkType = coder.decodeInteger(forKey: "type")
         if coder.containsValue(forKey: "displayValue") {
             displayValue = coder.decodeInteger(forKey: "displayValue")
         }
@@ -103,7 +106,7 @@ final class StatusBarArchiveCellularEntry: NSObject, NSCoding {
     /// A key encoded twice makes `NSKeyedArchiver` warn and keep the *first*
     /// value, so the defaults loop has to skip these rather than write them again.
     private static let ownKeys: Set<String> = [
-        "string", "crossfadeString", "badgeString", "displayValue",
+        "string", "crossfadeString", "badgeString", "displayValue", "type",
     ]
 
     func encode(with coder: NSCoder) {
@@ -118,7 +121,8 @@ final class StatusBarArchiveCellularEntry: NSObject, NSCoding {
         if let string { coder.encode(string, forKey: "string") }
         if let string { coder.encode(string, forKey: "crossfadeString") }
         if let badgeString { coder.encode(badgeString, forKey: "badgeString") }
-        coder.encode(displayValue, forKey: "displayValue")
+        if let displayValue { coder.encode(displayValue, forKey: "displayValue") }
+        coder.encode(networkType, forKey: "type")
     }
 }
 
@@ -220,13 +224,12 @@ enum StatusBarArchive {
     ///
     /// `status` 5 is "connected" and `enabled` true is what makes the entry
     /// render at all; `displayValue` is the bar count (the user's value wins) and
-    /// `type` and unset bars stay zero: SpringBoard replaces the whole entry,
+    /// `type` defaults to zero; unset bars are omitted: SpringBoard replaces the whole entry,
     /// so a carrier-name edit must not fabricate 5G or a full signal.
     static let entryDefaults: [String: EntryValue] = [
         "badgeString": .null,
         "callForwardingEnabled": .value(false),
         "displayRawValue": .value(0),
-        "displayValue": .value(0),
         "enabled": .value(true),
         "isBootstrapCellular": .value(false),
         "lowDataModeActive": .value(false),
@@ -257,7 +260,8 @@ enum StatusBarArchive {
                 string: primary,
                 badge: truncateBadge(overrides.serviceBadge.text),
                 displayValue: clampBars(overrides.signalBars.set
-                                        ? overrides.signalBars.value : nil))
+                                        ? overrides.signalBars.value : nil),
+                networkType: overrides.dataNetworkType.set ? max(0, min(30, overrides.dataNetworkType.value)) : 0)
         }
         var secondaryEntry: StatusBarArchiveCellularEntry?
         if let secondary {
@@ -265,7 +269,8 @@ enum StatusBarArchive {
                 string: secondary,
                 badge: truncateBadge(overrides.secondaryServiceBadge.text),
                 displayValue: clampBars(overrides.secondarySignalBars.set
-                                        ? overrides.secondarySignalBars.value : nil))
+                                        ? overrides.secondarySignalBars.value : nil),
+                networkType: overrides.secondaryDataNetworkType.set ? max(0, min(30, overrides.secondaryDataNetworkType.value)) : 0)
         }
 
         let record = StatusBarArchiveRecord(
@@ -302,8 +307,8 @@ enum StatusBarArchive {
     }
 
     /// Clamp a bar count into the drawable range, or the verified default.
-    private static func clampBars(_ value: Int?) -> Int {
-        guard let value else { return 0 }
+    private static func clampBars(_ value: Int?) -> Int? {
+        guard let value else { return nil }
         return max(0, min(maxBars, value))
     }
 
@@ -445,15 +450,15 @@ enum StatusBarArchive {
     /// `(name, badge, bars)` per carrier. Every value is read back out of the
     /// encoded plist.
     static func carrierOverrides(of payload: Data) throws
-        -> (primary: (name: String?, badge: String?, bars: Int?),
-            secondary: (name: String?, badge: String?, bars: Int?)) {
+        -> (primary: (name: String?, badge: String?, bars: Int?, networkType: Int?),
+            secondary: (name: String?, badge: String?, bars: Int?, networkType: Int?)) {
         let data = try decode(payload)
         func read(_ entry: StatusBarArchiveCellularEntry?)
-            -> (name: String?, badge: String?, bars: Int?) {
-            guard let entry else { return (nil, nil, nil) }
+            -> (name: String?, badge: String?, bars: Int?, networkType: Int?) {
+            guard let entry else { return (nil, nil, nil, nil) }
             // The archiver's `$null` decodes back to a nil object, so a badge
             // that was never set reads as nil rather than as the string "$null".
-            return (entry.string, entry.badgeString, entry.displayValue)
+            return (entry.string, entry.badgeString, entry.displayValue, entry.networkType)
         }
         return (read(data.cellularEntry), read(data.secondaryCellularEntry))
     }
@@ -479,8 +484,6 @@ enum StatusBarArchive {
         if overrides.batteryCapacity.set { dropped.append("battery capacity") }
         if overrides.wifiBars.set { dropped.append("wifi bars") }
         if overrides.rawSignalShown { dropped.append("raw signal") }
-        if overrides.dataNetworkType.set { dropped.append("data network type") }
-        if overrides.secondaryDataNetworkType.set { dropped.append("secondary data network type") }
         if overrides.cellularServiceShown.set { dropped.append("cellular service") }
         if overrides.secondaryCellularConfigured.set { dropped.append("secondary cellular") }
         if !overrides.itemShown.isEmpty { dropped.append("item toggles") }

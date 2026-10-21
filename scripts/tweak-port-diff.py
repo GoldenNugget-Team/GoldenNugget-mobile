@@ -110,6 +110,11 @@ def make_reference_compiler(SPECS, FileLocation, BasicPlistTweak, AdvancedPlistT
         from src.devicemanagement.device_capabilities import has_dynamic_island
         if spec.requires_dynamic_island and not has_dynamic_island(model):
             return False
+        if spec.unavailable_reason: return False
+        from src.devicemanagement import device_capabilities as caps
+        for requirement, predicate in [('requires_camera_control', caps.has_camera_control), ('requires_action_button', caps.has_action_button), ('requires_home_button', caps.has_home_button), ('requires_always_on', caps.has_always_on_display)]:
+            if getattr(spec, requirement) and not predicate(model):
+                return False
         # The reference's own gate, `src/gui/ios/compat.py:is_tweak_compatible`.
         if device_version and spec.min_version:
             from packaging.version import Version

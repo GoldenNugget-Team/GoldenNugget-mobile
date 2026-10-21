@@ -296,6 +296,8 @@ do {
     check(uuid != "Original" && uuid.count == 36, "descriptor renamed to a UUID (\(uuid))")
     check(configs.first?.extensionID == "com.apple.WallpaperKit.CollectionsPoster",
           "routed to the Collections provider")
+    check(text("\(configurations)/\(uuid)/com.apple.posterkit.role.identifier", in: payloads) == "PRPosterRoleLockScreen",
+          "gallery descriptor becomes a Lock Screen configuration with a role sidecar")
 
     // 1 STAMP
     let stamped = payloads.with("\(configurations)/\(uuid)/\(sidecar)")
@@ -375,6 +377,15 @@ do {
     check(payloads.with(suffix).count == 1, "exactly one sidecar payload (got \(payloads.with(suffix).count))")
     check(text(suffix, in: payloads) != "100", "the shipped sidecar is rewritten to the new id")
     check(Int(text(suffix, in: payloads) ?? "") != nil, "and it is still a bare decimal id")
+}
+
+if CommandLine.arguments.count > 1 {
+    let result = try build(URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true))
+    check(!result.configs.isEmpty, "extracted pack yields configurations")
+    for config in result.configs {
+        check(text("/configurations/\(config.uuid)/com.apple.posterkit.role.identifier", in: result.payloads) == "PRPosterRoleLockScreen",
+              "extracted configuration has the native Lock Screen role")
+    }
 }
 
 print(failures == 0 ? "\nALL OK" : "\n\(failures) FAILURE(S)")

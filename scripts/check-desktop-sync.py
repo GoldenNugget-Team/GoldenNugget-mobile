@@ -56,12 +56,52 @@ extension URL {
         try encoded.write(to: root.appendingPathComponent("swift.code"), atomically: true, encoding: .utf8)
         let decoded = try PresetShareCode.decode(encoded)
         check((decoded["tweaks"] as? [String: [String: Any]])?["HideDICompletely"]?["enabled"] as? Bool == true, "GN1 Swift roundtrip")
+        let previousUntested = UserDefaults.standard.object(forKey: UntestedTweaks.enabledKey)
+        defer { UserDefaults.standard.set(previousUntested, forKey: UntestedTweaks.enabledKey) }
+        UserDefaults.standard.set(false, forKey: UntestedTweaks.enabledKey)
+        let versionProbe = TweakCatalog.all.first {
+            $0.minVersion == "27.0" && !$0.disabled && $0.unavailableReason == nil
+                && $0.isCompatible(deviceVersion: "27.0", isIPhone: true, deviceModel: "iPhone17,1")
+        }!
+        check(!versionProbe.isCompatible(deviceVersion: "26.5", isIPhone: true, deviceModel: "iPhone17,1"), "version bounds apply by default")
+        UserDefaults.standard.set(true, forKey: UntestedTweaks.enabledKey)
+        check(versionProbe.isCompatible(deviceVersion: "26.5", isIPhone: true, deviceModel: "iPhone17,1"), "iOS 26 opt-in bypasses version bounds")
+        check(!versionProbe.isCompatible(deviceVersion: "25.0", isIPhone: true, deviceModel: "iPhone17,1"), "opt-in does not bypass other iOS versions")
+        check(!TweakCatalog.byID["SBDisableCaptureButton"]!.isCompatible(deviceVersion: "26.5", isIPhone: true, deviceModel: "iPhone15,4"), "opt-in preserves hardware requirements")
+        UserDefaults.standard.set(false, forKey: UntestedTweaks.enabledKey)
         let dynamicIsland = TweakCatalog.byID["HideDICompletely"]!
         check(!dynamicIsland.isCompatible(deviceVersion: "27.0", isIPhone: true, deviceModel: "iPhone14,7"), "Dynamic Island tweak rejects an unsupported iPhone")
         check(dynamicIsland.isCompatible(deviceVersion: "iOS 27.0", isIPhone: true, deviceModel: "iPhone17,1"), "compatibility accepts desktop display-version strings")
         let reversed = TweakCompiler.compile(selection: TweakSelection(), deviceVersion: "27.0", isIPhone: true, deviceModel: "iPhone17,1")
-        let reversePlist = try PropertyListSerialization.propertyList(from: reversed.payloads.first!.bytes(), options: [], format: nil) as! [String: Any]
+        let reversePlist = try PropertyListSerialization.propertyList(from: reversed.payloads.first(where: { $0.relativePath.hasSuffix("com.apple.springboard.plist") })!.bytes(), options: [], format: nil) as! [String: Any]
         check(reversePlist["SBSuppressDynamicIslandCompletely"] as? Bool == false, "turning Dynamic Island tweak off writes false")
+        let split = TweakCatalog.byID["KeyboardShouldSplitInDefaultContext"]!
+        var splitSelection = TweakSelection()
+        func splitPlist(_ state: TweakSelection) throws -> [String: Any]? {
+            let compiled = TweakCompiler.compile(selection: state, deviceVersion: "27.0", isIPhone: false, deviceModel: "iPad13,4")
+            guard let payload = compiled.payloads.first(where: { $0.relativePath.hasSuffix("com.apple.keyboard.preferences.plist") }) else { return nil }
+            return try PropertyListSerialization.propertyList(from: payload.bytes(), format: nil) as? [String: Any]
+        }
+        check(try splitPlist(splitSelection) == nil, "untouched split keyboard does not write")
+        splitSelection.setOn(true, for: split)
+        check(try splitPlist(splitSelection)?[split.key] as? Bool == true, "split keyboard on writes true")
+        splitSelection.setOn(false, for: split)
+        let rolledBackSplit = try splitPlist(splitSelection)
+        check(splitSelection.hasPendingWrites && rolledBackSplit?[split.key] as? Bool == false, "split keyboard off writes rollback")
+        let untouched = GoldenNuggetPresets.document(for: TweakSelection(), deviceModel: "iPad13,4", iosVersion: "27.0", description: "", tags: [], createdAt: nil)
+        check(((untouched["tweaks"] as! [String: [String: Any]])[split.id]!["value"]) is NSNull, "untouched experiment exports null")
+        check(!TweakCatalog.byID["SBDisableCaptureButton"]!.isCompatible(deviceVersion: "27.0", isIPhone: true, deviceModel: "iPhone15,4"), "Camera Control requires physical hardware")
+        let disabledDocument = GoldenNuggetPresets.document(for: splitSelection, deviceModel: "iPad13,4", iosVersion: "27.0", description: "", tags: [], createdAt: nil)
+        let disabledPreset = try GoldenNuggetPreset.parse(JSONSerialization.data(withJSONObject: disabledDocument))
+        var restoredSplit = TweakSelection()
+        _ = GoldenNuggetPresetImport.apply(disabledPreset, to: &restoredSplit, deviceVersion: "27.0", isIPhone: false, deviceModel: "iPad13,4")
+        check(try splitPlist(restoredSplit)?[split.key] as? Bool == false, "explicit rollback survives preset roundtrip")
+        var dependencySelection = TweakSelection()
+        let dependent = TweakCatalog.all.first(where: { !$0.requires.isEmpty })!
+        dependencySelection.setOn(true, for: dependent)
+        check(dependencySelection.validationIssue() != nil, "missing experimental dependency blocks apply")
+        for id in dependent.requires { dependencySelection.setOn(true, for: TweakCatalog.byID[id]!) }
+        check(dependencySelection.validationIssue() == nil, "enabled dependencies permit apply")
         var selection = TweakSelection()
         let daemon = TweakCatalog.byID["Daemon.OTA"]!
         selection.restore(enabled: true, value: nil, multiValues: daemon.multiValues?.mapValues { _ in .bool(true) }, for: daemon)

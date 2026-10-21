@@ -317,3 +317,33 @@ func mbFileBlobShape(_ data: Data) -> String {
     return "mode=\(mode.map(String.init) ?? "UNREADABLE") "
         + "reference-valued keys=[\(references.joined(separator: ","))]"
 }
+
+private struct MBFileMetadataError: LocalizedError {
+    let message: String
+    init(_ message: String) { self.message = message }
+    var errorDescription: String? { message }
+}
+
+/// Same-path replacement, matching desktop inject.py's donor-blob strategy.
+/// Keep native inode, mode, ownership, protection and extended attributes. Only
+/// content-dependent size/digest change; keyed-archive UIDs are carried through.
+func patchMBFileContents(_ donor: Data, contents: Data) throws -> Data {
+    guard var plist = try PropertyListSerialization.propertyList(from: donor, format: nil) as? [String: Any],
+          var objects = plist["$objects"] as? [Any], objects.count > 1,
+          var root = objects[1] as? [String: Any], root["Size"] != nil else {
+        throw MBFileMetadataError("PosterBoard native file metadata could not be read; restore stopped.")
+    }
+    root["Size"] = contents.count
+    if let digest = root["Digest"] {
+        // A native UID is opaque to Swift; its integer is exposed in reflection.
+        let value = Mirror(reflecting: digest).children.first(where: { $0.label == "value" })?.value
+        let index = (value as? NSNumber)?.intValue ?? (value as? UInt32).map(Int.init) ?? (value as? Int)
+        guard let index, objects.indices.contains(index), objects[index] is Data else {
+            throw MBFileMetadataError("PosterBoard native digest metadata could not be read.")
+        }
+        objects[index] = payloadDigest(contents)
+    }
+    objects[1] = root
+    plist["$objects"] = objects
+    return try PropertyListSerialization.data(fromPropertyList: plist, format: .binary, options: 0)
+}

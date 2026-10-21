@@ -22,6 +22,9 @@ struct StatusBarView: View {
     /// delivered by the home page's single `Apply`, and a `NavigationSplitView`
     /// destroys page state on every sidebar selection — so as page state the
     /// whole selection would be lost by walking over to press the button.
+    @AppStorage("statusbar/signal_choice_done") private var signalChoiceDone = false
+    @State private var showSignalChoice = false
+    @State private var firstSignalBars = 4
     @Binding var selection: StatusBarSelection
 
     @ObservedObject private var deviceMonitor = DeviceIdentityMonitor.shared
@@ -66,6 +69,27 @@ struct StatusBarView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Status Bar")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showSignalChoice) {
+            NavigationStack {
+                Form {
+                    Stepper("Cellular signal bars: \(firstSignalBars)", value: $firstSignalBars, in: 0...5)
+                }
+                .navigationTitle("Choose cellular signal bars")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showSignalChoice = false } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            selection.overrides.signalBars.set = true
+                            selection.overrides.signalBars.value = firstSignalBars
+                            selection.enabled = true
+                            signalChoiceDone = true
+                            edited()
+                            showSignalChoice = false
+                        }
+                    }
+                }
+            }
+        }
         .task {
             // A page-level reload, like PosterBoard's: the selection is owned by
             // the shell and was loaded there, but a preset imported from a file
@@ -78,7 +102,14 @@ struct StatusBarView: View {
 
     private var enableSection: some View {
         Section {
-            toggleRow("Enable Status Bar Modifications", isOn: $selection.enabled) {
+            toggleRow("Enable Status Bar Modifications", isOn: Binding(get: { selection.enabled }, set: { enabled in
+                if enabled && !signalChoiceDone {
+                    firstSignalBars = selection.overrides.signalBars.set ? selection.overrides.signalBars.value : 4
+                    showSignalChoice = true
+                } else {
+                    selection.enabled = enabled
+                }
+            })) {
                 edited()
             }
             NativeNote(mechanism == .archive
@@ -92,8 +123,8 @@ struct StatusBarView: View {
     private var archiveNote: some View {
         Section {
             NativeNote("iOS 27 replaced the status bar override file, so only the carrier "
-                + "entry can be changed here: its name, its service badge and its signal bars. "
-                + "The badge and the bars apply to the carrier name, so set one first. An unset bar count writes zero; live signal cannot pass through a replaced cellular entry. The other "
+                + "entry can be changed here: its name, its service badge, signal bars and network type. "
+                + "The badge and the bars apply to the carrier name, so set one first. Signal bars are omitted unless explicitly set. Network type is a fixed visual badge and does not change the connection. Set a carrier name for each SIM; without a network selection its badge is hidden. The other "
                 + "options need iOS 26 or lower.")
         }
     }
@@ -129,9 +160,8 @@ struct StatusBarView: View {
             levelRow(.wifiBars, "Wi-Fi Signal Bars", range: 0...5, survivesArchive: false)
             levelRow(.batteryCapacity, "Battery Icon Capacity",
                      range: 0...100, survivesArchive: false)
-            levelRow(.dataNetworkType, "Data Network Type", range: 0...30, survivesArchive: false)
-            levelRow(.secondaryDataNetworkType, "Secondary Data Network Type",
-                     range: 0...30, survivesArchive: false)
+            networkRow(.dataNetworkType, "Data Network Type")
+            networkRow(.secondaryDataNetworkType, "Secondary Data Network Type")
         }
     }
 
@@ -279,6 +309,26 @@ struct StatusBarView: View {
                     .textFieldStyle(.roundedBorder)
                     .disabled(!field.set)
             }
+        }
+    }
+
+    private func networkRow(_ key: StatusBarOverrides.FieldKey, _ title: String) -> some View {
+        let names: [Int: String] = [0: "—", 4: "3G", 5: "4G", 7: "4G (7)", 8: "LTE", 9: "LTE (9)",
+                                  10: "5G", 11: "5G+", 12: "5G Ultra / UWB", 13: "5G UC"]
+        let current = selection.overrides.field(for: key).value
+        return VStack(alignment: .leading) {
+            Toggle(title, isOn: Binding(get: { selection.overrides.field(for: key).set }, set: { on in
+                var field = selection.overrides.field(for: key)
+                field.set = on
+                selection.overrides.set(field, for: key)
+                edited()
+            }))
+            Picker("Fixed network badge", selection: levelBinding(for: key)) {
+                ForEach(Array(Set(names.keys).union([current])).sorted(), id: \.self) { value in
+                    Text(names[value] ?? String(value)).tag(value)
+                }
+            }
+            .disabled(!selection.overrides.field(for: key).set)
         }
     }
 
