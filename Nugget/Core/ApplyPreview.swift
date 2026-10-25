@@ -98,7 +98,7 @@ struct ApplyPreview {
                                              isIPhone: isIPhone, deviceModel: deviceModel)
         var rows: [Row] = []
         var notes: [String] = []
-        for payload in try TweakCompiler.merging(community: communityPayloads, builtIn: compiled.payloads) {
+        for payload in try TweakCompiler.merging(community: communityPayloads, builtIn: compiled.payloads, deviceVersion: deviceVersion) {
             rows.append(Row(label: payload.label, byteCount: payload.byteCount))
         }
         for skipped in compiled.skipped {

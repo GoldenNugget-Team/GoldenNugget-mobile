@@ -152,14 +152,6 @@ enum DaemonGroups {
             showsSwitch: true
         ),
         DaemonGroup(
-            name: "NanoTimeKit",
-            title: "Disable Apple Watch Face Sync",
-            labels: ["com.apple.nanotimekitcompaniond"],
-            section: .disable,
-            isRecommended: false,
-            showsSwitch: true
-        ),
-        DaemonGroup(
             name: "AppleAds",
             title: "Disable Apple Ad Services",
             labels: ["com.apple.promotedcontentd", "com.apple.adprivacyd", "com.apple.adservicesd"],
@@ -195,14 +187,6 @@ enum DaemonGroups {
             name: "WebBookmarks",
             title: "Disable Safari Bookmark Service",
             labels: ["com.apple.webbookmarksd"],
-            section: .disable,
-            isRecommended: false,
-            showsSwitch: true
-        ),
-        DaemonGroup(
-            name: "AppleWatchNano",
-            title: "Disable Apple Watch Connection Helpers",
-            labels: ["com.apple.nanoregistryd", "com.apple.nanomediacontrold", "com.apple.nanopreferencesd"],
             section: .disable,
             isRecommended: false,
             showsSwitch: true
@@ -272,25 +256,9 @@ enum DaemonGroups {
             showsSwitch: true
         ),
         DaemonGroup(
-            name: "Translate",
-            title: "Disable Translation Helper",
-            labels: ["com.apple.translated"],
-            section: .disable,
-            isRecommended: false,
-            showsSwitch: true
-        ),
-        DaemonGroup(
             name: "MockLocation",
             title: "Disable Test Locations",
             labels: ["com.apple.mocksynclocationd"],
-            section: .disable,
-            isRecommended: false,
-            showsSwitch: true
-        ),
-        DaemonGroup(
-            name: "DeviceCheck",
-            title: "Disable App Device Verification",
-            labels: ["com.apple.devicecheckd"],
             section: .disable,
             isRecommended: false,
             showsSwitch: true
@@ -464,14 +432,6 @@ enum DaemonGroups {
             showsSwitch: true
         ),
         DaemonGroup(
-            name: "Decisiond",
-            title: "Disable Decision Helper",
-            labels: ["com.apple.decisiond"],
-            section: .analytics,
-            isRecommended: false,
-            showsSwitch: true
-        ),
-        DaemonGroup(
             name: "Triald",
             title: "Disable Apple Feature Trials",
             labels: ["com.apple.triald"],
@@ -549,8 +509,6 @@ enum DaemonGroups {
         "com.apple.coresymbolicationd",
         "com.apple.crash_mover",
         "com.apple.crashreportcopymobile",
-        "com.apple.decisiond",
-        "com.apple.devicecheckd",
         "com.apple.diagnosticd",
         "com.apple.diagnosticextensionsd",
         "com.apple.diagnosticservicesd",
@@ -582,10 +540,6 @@ enum DaemonGroups {
         "com.apple.mobile.NRDUpdated",
         "com.apple.mobile.softwareupdated",
         "com.apple.mocksynclocationd",
-        "com.apple.nanomediacontrold",
-        "com.apple.nanopreferencesd",
-        "com.apple.nanoregistryd",
-        "com.apple.nanotimekitcompaniond",
         "com.apple.newsd",
         "com.apple.parsecd",
         "com.apple.passd",
@@ -618,7 +572,6 @@ enum DaemonGroups {
         "com.apple.tailspind",
         "com.apple.thermalmonitord",
         "com.apple.tipsd",
-        "com.apple.translated",
         "com.apple.triald",
         "com.apple.videosubscriptionsd",
         "com.apple.voiced",

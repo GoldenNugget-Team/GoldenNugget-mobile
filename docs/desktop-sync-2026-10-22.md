@@ -6,8 +6,10 @@ Desktop sources were not modified.
 
 - Generated all 256 registry entries, including Siri AI and Reset Siri AI
   Overrides. Supported-model lists now participate in shared compatibility
-  checks. Both Siri operations require exactly iPhone17,1 / iOS 27.0, including
-  when the iOS 26 incompatible-tweaks opt-in is enabled.
+  checks. Both Siri operations require exactly iOS 27.0, including
+  when the iOS 26 incompatible-tweaks opt-in is enabled. Mobile deliberately
+  removes the desktop model allowlist for both operations, allowing any iPhone;
+  iPads remain excluded. Upstream verification is still limited to iPhone 16 Pro.
 - Siri operations emit the original Project Linwood NSKeyedArchive bytes,
   embedded by the catalog generator after desktop's SHA-256 validation. They
   never pass through the preference-dictionary writer. Turning a switch off
@@ -30,7 +32,7 @@ The five generators and page-reset differential comparison pass against this
 reference. The compile differential now includes exact Siri archive bytes,
 conflicting actions, iOS 27.0.1 and another iPhone model. The community/preset
 harness includes Siri enable/reset/off behavior, exclusivity, and the strict
-model/version gate with incompatible tweaks enabled. The existing injector
+iPhone-only/version gate with incompatible tweaks enabled. The existing injector
 harness also checks the eligibility file and every generated directory's
 ownership, mode, protection class, absence of digest/extended attributes, and
 payload bytes, alongside PosterBoard snapshot preservation.
@@ -44,3 +46,7 @@ profiles), 68 community/preset checks plus Python decoding Swift GN1 output,
 and the PosterBoard/eligibility injector harness. All five generators and
 Xcode source-list checks pass. `scripts/build-ipa.sh Release` produced
 `build/GoldenNuggetMobile.ipa` (unsigned) with Xcode 26.6 / iOS 26.5 SDK.
+
+Mobile model-policy follow-up: both Siri operations accept other iPhone models;
+2385 compile comparisons and 72 community/preset checks pass with this policy.
+The catalog generator preserves this intentional difference from desktop.

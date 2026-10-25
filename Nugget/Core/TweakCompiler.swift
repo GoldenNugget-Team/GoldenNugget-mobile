@@ -134,7 +134,7 @@ struct TweakPayloadUnavailable: Error, LocalizedError {
 enum TweakCompiler {
     /// Desktop applies community plists first, then merges built-in keys over
     /// them. Whole-file collisions are rejected rather than sent twice.
-    static func merging(community: [TweakPayload], builtIn: [TweakPayload]) throws -> [TweakPayload] {
+    static func merging(community: [TweakPayload], builtIn: [TweakPayload], deviceVersion: String = "") throws -> [TweakPayload] {
         var result = community
         for payload in builtIn {
             if let index = result.firstIndex(where: { $0.domain == payload.domain && $0.relativePath == payload.relativePath }) {
@@ -146,6 +146,18 @@ enum TweakCompiler {
                 let data = try PropertyListSerialization.data(fromPropertyList: values, format: .xml, options: 0)
                 result[index] = TweakPayload(domain: payload.domain, relativePath: payload.relativePath, contents: data, owner: payload.owner)
             } else { result.append(payload) }
+        }
+        if (TweakVersion.compare(deviceVersion, "27") ?? -1) >= 0 {
+            for payload in result where payload.domain == "ManagedPreferencesDomain" {
+                guard let mirror = TweakDomainMap.managedPreferenceMirror("/var/Managed Preferences/" + payload.relativePath) else { continue }
+                let hasExplicitMirror = community.contains { $0.domain == "HomeDomain" && $0.relativePath == mirror }
+                let hasBuiltIn = builtIn.contains { $0.domain == payload.domain && $0.relativePath == payload.relativePath }
+                if hasExplicitMirror && !hasBuiltIn { continue }
+                let mirrored = TweakPayload(domain: "HomeDomain", relativePath: mirror, contents: try payload.bytes(), owner: 501)
+                if let index = result.firstIndex(where: { $0.domain == "HomeDomain" && $0.relativePath == mirror }) {
+                    result[index] = mirrored
+                } else { result.append(mirrored) }
+            }
         }
         return result
     }
@@ -302,6 +314,12 @@ enum TweakCompiler {
             payloads.append(TweakPayload(domain: dest.domain,
                                          relativePath: dest.relativePath,
                                          contents: serialisePlist(plist)))
+            if (TweakVersion.compare(deviceVersion, "27") ?? -1) >= 0,
+               location != .globalPreferences,
+               let mirror = TweakDomainMap.managedPreferenceMirror(location.rawValue) {
+                payloads.append(TweakPayload(domain: "HomeDomain", relativePath: mirror,
+                                             contents: serialisePlist(plist), owner: 501))
+            }
             emitted.append(location)
         }
 

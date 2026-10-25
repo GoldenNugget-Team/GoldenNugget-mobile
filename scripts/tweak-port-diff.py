@@ -11,7 +11,7 @@ compares it against the reference itself:
     Python side  GoldenNugget's own `SPECS` + `BasicPlistTweak.apply_tweak` /
                  `AdvancedPlistTweak.apply_tweak` + `split_path_into_domain`
 
-The Python side deliberately reproduces the **two documented divergences** so
+The Python side deliberately reproduces the **documented divergences** so
 that everything else must match exactly:
 
   1. an enabled-but-incompatible tweak is dropped (the reference's UI hides it,
@@ -19,9 +19,11 @@ that everything else must match exactly:
   2. the HomeDomain `.GlobalPreferences.plist` mirror is written only when there
      is something to mirror (the reference writes `{}` unconditionally and would
      overwrite the device's real file with an empty dict on a run that touches
-     no GP key).
+     no GP key);
+  3. Siri eligibility operations retain upstream bytes and OS restrictions but
+     allow all iPhones instead of the desktop model allowlist.
 
-Any difference beyond those two is a bug in the port.
+Any difference beyond those is a bug in the port.
 
 Usage:
     scripts/tweak-port-diff.py [--goldennugget ~/GoldenNugget] [-v]
@@ -102,7 +104,7 @@ def build_harness(verbose: bool) -> Path:
 
 def make_reference_compiler(SPECS, FileLocation, BasicPlistTweak, AdvancedPlistTweak,
                             split_path_into_domain):
-    """The reference's `_apply_tweak_pass` compile step, with the two documented
+    """The reference's `_apply_tweak_pass` compile step, with the documented
     divergences applied so everything else must match the port exactly."""
     by_id = {spec.id.name: spec for spec in SPECS if not spec.disabled}
 
@@ -111,7 +113,8 @@ def make_reference_compiler(SPECS, FileLocation, BasicPlistTweak, AdvancedPlistT
         if spec.requires_dynamic_island and not has_dynamic_island(model):
             return False
         if spec.unavailable_reason: return False
-        if spec.supported_models and model not in spec.supported_models: return False
+        # Intentional mobile policy: Siri eligibility is available on any iPhone.
+        if spec.supported_models and spec.id.name not in {"SiriAI", "ResetSiriAIOverrides"} and model not in spec.supported_models: return False
         from src.devicemanagement import device_capabilities as caps
         for requirement, predicate in [('requires_camera_control', caps.has_camera_control), ('requires_action_button', caps.has_action_button), ('requires_home_button', caps.has_home_button), ('requires_always_on', caps.has_always_on_display)]:
             if getattr(spec, requirement) and not predicate(model):
@@ -152,7 +155,9 @@ def make_reference_compiler(SPECS, FileLocation, BasicPlistTweak, AdvancedPlistT
             if type(tweak).__name__ == "SiriAITweak":
                 if spec.exclusive_with.name in tweaks: continue
                 files = []
-                tweak.apply_tweak(files, device_version, model)
+                # Compare upstream bytes, bypassing only its model restriction.
+                from src.tweaks.siri_ai import payload_file
+                files.append(payload_file(tweak.action))
                 import base64
                 for file in files:
                     archives[f"{file.domain}/{file.restore_path}"] = {"$archive": base64.b64encode(file.contents).decode()}
@@ -163,6 +168,11 @@ def make_reference_compiler(SPECS, FileLocation, BasicPlistTweak, AdvancedPlistT
         for location, plist in other_tweaks.items():
             domain, relative_path = split_path_into_domain(location.value)
             out[f"{domain}/{relative_path}"] = plist
+            from src.tweaks.registry import managed_pref_target
+            from packaging.version import Version
+            mirror = managed_pref_target(location.value)
+            if mirror and location != FileLocation.globalPreferences and Version(device_version) >= Version("27"):
+                out[f"HomeDomain/{mirror}"] = plist
 
         gp = other_tweaks.get(FileLocation.globalPreferences)
         if gp:                                                     # divergence 2
@@ -260,7 +270,9 @@ def main() -> int:
                 ("27.0", "iPad16,2", False), ("26.5", "iPhone14,7", True),
                 ("26.0", "iPhone17,1", True), ("26.3", "iPhone17,1", True),
                 ("26.4", "iPhone17,1", True),
-                ("27.0.1", "iPhone17,1", True), ("27.0", "iPhone17,2", True)]
+                ("27.0.1", "iPhone17,1", True), ("27.0", "iPhone17,2", True),
+                ("27.1", "iPhone17,1", True), ("27.2", "iPhone14,7", True),
+                ("28.0", "iPhone17,1", True)]
 
     failures = 0
     total = 0

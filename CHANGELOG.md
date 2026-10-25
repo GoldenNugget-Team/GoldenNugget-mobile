@@ -1,9 +1,13 @@
-# GoldenNugget Mobile — Desktop 9.7.1 Sync
+# GoldenNugget Mobile — Desktop 9.7.2 Sync
 
 ## General
 
-- Add experimental Siri AI eligibility overrides for unsupported regions, plus a dedicated reset. Currently limited to iPhone 16 Pro on iOS 27.0; only build 24A437 is verified upstream. Requires Siri language English (US), an unencrypted protective backup, and a reboot.
-- Expand the preference catalog to 256 tweaks, including split keyboard controls and additional hardware-specific options.
+- Add experimental Siri AI eligibility overrides for unsupported regions, plus a dedicated reset. Available on iPhones running iOS 27.x; upstream verification covers only iPhone 16 Pro, build 24A437. Requires Siri language English (US), an unencrypted protective backup, and a reboot.
+- Expand the preference catalog to 258 tweaks, including a 60 FPS limit and the replacement Home Screen search setting for iOS 27.1+.
+- Remove obsolete Apple Watch, NanoTimeKit, Translate, DeviceCheck and Decisiond daemon controls, matching desktop's 53 groups.
+- Mirror managed preferences into HomeDomain on iOS 27; reset both copies with valid empty plists on every supported iOS version.
+- Validate the complete AFC media inventory before restore and keep originals that change during copying. Incomplete restores report a failure while keeping local copies.
+- Show untested catalog markers, import standalone community templates from Templates, and link to Batter Builder.
 - Add an option to enable untested preference tweaks on iOS 26. Hardware restrictions and the stricter Siri AI requirements remain enforced.
 - Improve iOS 27 network badges and cellular signal controls, including separate SIM settings and explicit zero-bar overrides.
 

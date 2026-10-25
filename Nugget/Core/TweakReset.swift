@@ -68,38 +68,14 @@ enum ResetPage: String, CaseIterable, Identifiable, Sendable {
 /// no reading of the device's current values — the run writes a fixed set of
 /// files that put the named pages back to stock.
 ///
-/// ## No psysbackup, on either branch
-///
-/// The reference's iOS 27 branch captures the device's original plists with
-/// psysbackup first and restores *those*, which is what makes its reset a real
-/// "put back what was there" rather than "write the same values again". This
-/// port has no capture and no materialiser, so it does what the reference
-/// itself does when its capture is unavailable — its `plistlib.dumps({})`
-/// fallback, which is a documented, deliberate path rather than a degraded one:
-///
-/// > Restore a valid empty plist instead of a zero-byte file: on iOS 26.2+ a
-/// > truncated plist (e.g. an empty com.apple.springboard.plist) makes
-/// > SpringBoard crash at boot, which sends the device into a boot loop. An
-/// > empty dict parses fine and makes the system fall back to its default
-/// > values.
-///
-/// So the two branches differ in exactly one thing, and it is the nulled
-/// file's *bytes*:
-///
-/// | branch | nulled file written as | why |
-/// |---|---|---|
-/// | iOS 26 and below | 0 bytes | the original Nugget's behaviour, and a daemon reading an empty file falls back to its defaults |
-/// | iOS 27+ | `plistlib.dumps({})` — a valid, empty XML plist | a 0-byte plist is a *truncated* plist there, and that is the boot loop above |
-///
-/// The daemons file is the stock dict on both, and neither branch reads
-/// anything back from the device first.
+/// Reset uses valid empty XML plists on every supported iOS version, matching
+/// desktop 9.7.2. Zero-byte preference files can crash SpringBoard at boot.
+/// Managed preferences and their HomeDomain copies are both cleared, so a
+/// retained cfprefs mirror cannot bring an old tweak back after restore.
 ///
 /// ## The two kinds of file
 ///
-/// * **Nulled** — 0 bytes or an empty dict, per the table above.
-///   `NullifyFileTweak`'s trick, which this port already ships for the
-///   ScreenTime daemon: the daemon that reads the file falls back to its
-///   defaults.
+/// * **Nulled** — a valid empty dictionary, letting cfprefs use system defaults.
 /// * **Daemons** — the *stock* `disabled.plist`, a six-key dict. Not empty and
 ///   not "the tweaks off": launchd's own file on a stock device disables five
 ///   of these, so an empty dict would leave `otpaird`, `bootpd`, `dhcp6d`,
@@ -171,7 +147,7 @@ enum TweakReset {
 
     /// Build the payload set for `pages`.
     ///
-    /// - Parameter ios27: which null to write. Passed in rather than read from
+    /// - Parameter ios27: which status-bar mechanism to use. Passed in rather than read from
     ///   the device here, because the caller has already read the version for
     ///   its own format fork and re-reading it would be a second handshake — and
     ///   two reads of the same fact is how the apply path once put a 27.0
@@ -189,8 +165,8 @@ enum TweakReset {
         // none, and a payload list that reorders between two runs of the same
         // request makes the log harder to read than it needs to be.
         let ordered = ResetPage.allCases.filter { pages.contains($0) }
-        let nullContents = ios27 ? TweakCompiler.serialisePlist([:]) : Data()
-        let nullKind: Kind = ios27 ? .emptyPlist : .zeroBytes
+        let nullContents = TweakCompiler.serialisePlist([:])
+        let nullKind: Kind = .emptyPlist
 
         var targets: [Target] = []
         var payloads: [TweakPayload] = []
@@ -207,6 +183,7 @@ enum TweakReset {
         // than injected as a row no device ever produced (the compiler's rule,
         // same reason).
         func addNulled(_ location: TweakFileLocation) {
+            if targets.contains(where: { $0.path == location.rawValue }) { return }
             guard let dest = TweakDomainMap.split(path: location.rawValue) else {
                 skipped.append((location.rawValue,
                                 "no backup-domain prefix matches this location"))
@@ -214,6 +191,11 @@ enum TweakReset {
             }
             append(path: location.rawValue, contents: nullContents, kind: nullKind,
                    domain: dest.domain, relativePath: dest.relativePath)
+            if let mirror = TweakDomainMap.managedPreferenceMirror(location.rawValue),
+               !targets.contains(where: { $0.path == "/var/mobile/" + mirror }) {
+                append(path: "/var/mobile/" + mirror, contents: nullContents, kind: nullKind,
+                       domain: "HomeDomain", relativePath: mirror)
+            }
         }
 
         // The status bar is written whole, through the same `StatusBarMechanism`

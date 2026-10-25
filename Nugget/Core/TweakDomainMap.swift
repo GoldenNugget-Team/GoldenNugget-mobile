@@ -40,6 +40,16 @@ enum TweakDomainMap {
         let relativePath: String
     }
 
+    /// cfprefs mirrors managed preferences into the app's HomeDomain plist.
+    static func managedPreferenceMirror(_ path: String) -> String? {
+        let prefix = "/var/Managed Preferences/"
+        guard path.hasPrefix(prefix) else { return nil }
+        var name = String(path.dropFirst(prefix.count))
+        if name.hasPrefix("mobile/") { name = String(name.dropFirst(7)) }
+        guard name.hasSuffix(".plist") else { return nil }
+        return "Library/Preferences/" + name
+    }
+
     /// `split_path_into_domain`.  Returns nil when no prefix matches.
     static func split(path: String) -> Destination? {
         for rule in rules where path.hasPrefix(rule.prefix) {

@@ -97,6 +97,10 @@ struct TemplatesView: View {
             } label: {
                 Label("Import .batter template", systemImage: "plus.circle")
             }
+            Link(destination: URL(string: "https://github.com/GoldenNugget-Team/GoldenNugget-TemplateBuilder/releases/latest")!) {
+                Label("Create a template with Batter Builder", systemImage: "square.and.pencil")
+            }
+            NavigationLink("Community template switches") { CommunityCatalogView() }
             if selection.templates.isEmpty {
                 NativeNote("No templates imported yet.")
             } else {
@@ -508,6 +512,16 @@ struct TemplatesView: View {
     private func importTemplate(_ result: Result<URL, Error>) {
         do {
             let url = try result.get()
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            if let community = try? CommunityTemplate.load(url) {
+                let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+                guard size <= 25 * 1024 * 1024 else { throw CommunityError("Template exceeds 25 MB.") }
+                try CommunityTemplateStore.shared.install(Data(contentsOf: url), id: "local-" + UUID().uuidString.lowercased())
+                status = "Imported \(community.title). Review it in Community template switches before Apply."
+                statusTone = .secondary
+                return
+            }
             let template = try TemplateImports.import(from: url, deviceVersion: identity.version)
             selection.loadFromDisk(deviceVersion: identity.version)
             status = "Imported \(template.title)."

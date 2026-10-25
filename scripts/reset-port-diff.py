@@ -178,6 +178,9 @@ class Reference:
             if not (isinstance(node, ast.For) and unparse(node.target) == "file_path"):
                 continue
             self.null_loop_line = node.lineno
+            unconditional = _contents_expr(node.body)
+            if unconditional != "<not found>":
+                self.null_fork = {"ios27": unconditional, "ios26": unconditional}
             for stmt in node.body:
                 if not isinstance(stmt, ast.If):
                     continue
@@ -333,6 +336,8 @@ class Port:
         branch writes an *empty dict* and the other writes *no bytes at all*, and not the
         other way round.
         """
+        if re.search(r"let nullContents = TweakCompiler.serialisePlist\(\[:\]\)", self.reset_src):
+            return {"ios27": "emptyDict", "ios26": "emptyDict"}
         m = re.search(r"let nullContents = ios27 \? (.+?) : (.+)", self.reset_src)
         if not m:
             # A missing fork is a difference, not a script error: report it as one so the
@@ -441,8 +446,8 @@ def compare(ref: Reference, port: Port, verbose: bool) -> list[str]:
           "emptyDict" if "plistlib.dumps({})" == ref.null_fork.get("ios27")
           else f"? {ref.null_fork.get('ios27')}",
           port.null_bytes()["ios27"])
-    check("iOS 26 null is zero bytes",
-          "emptyBytes" if _is_empty_bytes(ref.null_fork.get("ios26"))
+    check("iOS 26 null contents",
+          "emptyDict" if "plistlib.dumps({})" == ref.null_fork.get("ios26") else "emptyBytes" if _is_empty_bytes(ref.null_fork.get("ios26"))
           else f"? {ref.null_fork.get('ios26')}",
           port.null_bytes()["ios26"])
 

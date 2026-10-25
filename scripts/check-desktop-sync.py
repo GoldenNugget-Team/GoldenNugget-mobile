@@ -19,7 +19,8 @@ import zlib
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ["TweakModel", "TweakCatalog", "TweakCatalogDaemons", "TweakDomainMap", "TweakCompiler",
            "GoldenNuggetPreset", "GoldenNuggetPresets", "GoldenNuggetAutosave", "PresetShareCode",
-           "CommunityCatalog", "CommunityTemplates", "PortablePreset", "CommunityApplyRecord"]
+           "CommunityCatalog", "CommunityTemplates", "PortablePreset", "CommunityApplyRecord",
+           "TweakReset", "StatusBarModel", "StatusBarArchive", "StatusBarSelection"]
 SUPPORT = r'''
 import Foundation
 struct GoldenNuggetError: LocalizedError {
@@ -81,7 +82,13 @@ extension URL {
         UserDefaults.standard.set(true, forKey: UntestedTweaks.enabledKey)
         check(versionProbe.isCompatible(deviceVersion: "26.5", isIPhone: true, deviceModel: "iPhone17,1"), "iOS 26 opt-in bypasses version bounds")
         check(!siri.isCompatible(deviceVersion: "26.5", isIPhone: true, deviceModel: "iPhone17,1"), "Siri cannot bypass version restriction with opt-in")
-        check(!siri.isCompatible(deviceVersion: "27.0.1", isIPhone: true, deviceModel: "iPhone17,1") && !siri.isCompatible(deviceVersion: "27.0", isIPhone: true, deviceModel: "iPhone17,2"), "Siri requires exact OS and model")
+        check(siri.isCompatible(deviceVersion: "27.0.1", isIPhone: true, deviceModel: "iPhone17,1"), "Siri supports iOS 27 updates")
+        for operation in [siri, resetSiri] {
+            check(operation.isCompatible(deviceVersion: "27.2", isIPhone: true, deviceModel: "iPhone14,7"), "Siri operation supports iOS 27.x: \(operation.id)")
+            check(!operation.isCompatible(deviceVersion: "28.0", isIPhone: true, deviceModel: "iPhone17,1"), "Siri operation rejects iOS 28: \(operation.id)")
+            check(operation.isCompatible(deviceVersion: "27.0", isIPhone: true, deviceModel: "iPhone17,2") && operation.isCompatible(deviceVersion: "27.0", isIPhone: true, deviceModel: "iPhone14,7"), "Siri operation supports other iPhone models: \(operation.id)")
+            check(!operation.isCompatible(deviceVersion: "27.0", isIPhone: false, deviceModel: "iPad16,2"), "Siri operation remains iPhone-only: \(operation.id)")
+        }
         check(!versionProbe.isCompatible(deviceVersion: "25.0", isIPhone: true, deviceModel: "iPhone17,1"), "opt-in does not bypass other iOS versions")
         check(!TweakCatalog.byID["SBDisableCaptureButton"]!.isCompatible(deviceVersion: "26.5", isIPhone: true, deviceModel: "iPhone15,4"), "opt-in preserves hardware requirements")
         UserDefaults.standard.set(false, forKey: UntestedTweaks.enabledKey)
@@ -170,11 +177,15 @@ extension URL {
         check((try daemonPlist(hostile))?[forbidden] == nil, "compiler rejects unknown labels even without the importer")
         rejects("GN1 expansion bomb rejected") { _ = try PresetShareCode.decode(String(contentsOf: root.appendingPathComponent("bomb.code"), encoding: .utf8)) }
         rejects("damaged GN1 rejected") { _ = try PresetShareCode.decode("GN1.not-valid") }
+        rejects("truncated GN1 stream rejected") { _ = try PresetShareCode.decode(String(contentsOf: root.appendingPathComponent("truncated.code"), encoding: .utf8)) }
         let index = try CommunityCatalog.parse(bytes("index.json"))
         check(index.entries.count == 2 && index.rejected == 2, "catalog rejects duplicate IDs and invalid rows")
         let entry = index.entries.first { !$0.isTemplate }!
         check(entry.supports("27.9.1") && !entry.supports("28.0"), "catalog major-version upper bound covers minor releases")
         check(entry.matches("author Example"), "catalog search matches all words")
+        check(entry.untested && index.entries.first { $0.isTemplate }!.untested, "catalog retains untested markers for presets and templates")
+        let flags = try CommunityCatalog.parse(bytes("flags-index.json"))
+        check(flags.entries.count == 2 && flags.entries.allSatisfy { !$0.untested } && flags.rejected == 4, "catalog defaults untested to false and rejects non-boolean markers")
         if FileManager.default.fileExists(atPath: root.appendingPathComponent("live-index.json").path) {
             let live = try CommunityCatalog.parse(bytes("live-index.json"))
             check(!live.entries.isEmpty && live.rejected == 0, "live desktop catalog parses without rejected entries")
@@ -200,10 +211,25 @@ extension URL {
         check(payloads[0].owner == 0, "community root file owner is preserved")
         let builtIn = TweakPayload(domain: payloads[0].domain, relativePath: payloads[0].relativePath,
             contents: try PropertyListSerialization.data(fromPropertyList: ["TestInteger": 9], format: .xml, options: 0))
-        let merged = try TweakCompiler.merging(community: payloads, builtIn: [builtIn])
+        let merged = try TweakCompiler.merging(community: payloads, builtIn: [builtIn], deviceVersion: "27.0")
         let mergedDict = try PropertyListSerialization.propertyList(from: merged[0].bytes(), options: [], format: nil) as! [String: Any]
-        check(merged.count == 1 && mergedDict["TestInteger"] as? Int == 9 && mergedDict["OffState"] as? Bool == false,
+        check(merged.count == 2 && mergedDict["TestInteger"] as? Int == 9 && mergedDict["OffState"] as? Bool == false,
               "built-in keys win while unrelated community keys survive")
+        let mirror = merged.first { $0.domain == "HomeDomain" }!
+        check(mirror.contents == merged[0].contents && mirror.owner == 501, "HomeDomain mirror carries the final merged preferences with mobile ownership")
+        check(try TweakCompiler.merging(community: payloads, builtIn: [], deviceVersion: "26.5").count == 1, "iOS 26 apply keeps managed preferences delivery")
+        let communityOnly = try TweakCompiler.merging(community: payloads, builtIn: [], deviceVersion: "27.0")
+        check(communityOnly.count == 2 && communityOnly[1].contents == payloads[0].contents, "community-only preferences also get an iOS 27 mirror")
+        for ios27 in [false, true] {
+            let plan = TweakReset.plan(pages: [.springboard, .internalOptions, .daemons], ios27: ios27)
+            check(plan.skipped.isEmpty && Set(plan.targets.map(\.path)).count == plan.targets.count, "reset targets remain unique on iOS \(ios27 ? 27 : 26)")
+            for payload in plan.payloads where payload.domain == "ManagedPreferencesDomain" {
+                let values = try PropertyListSerialization.propertyList(from: payload.contents, options: [], format: nil) as? [String: Any]
+                check(values?.isEmpty == true, "reset uses valid empty preferences: \(payload.label)")
+                let path = TweakDomainMap.managedPreferenceMirror("/var/Managed Preferences/" + payload.relativePath)!
+                check(plan.payloads.contains { $0.domain == "HomeDomain" && $0.relativePath == path && $0.contents == payload.contents }, "reset clears HomeDomain mirror: \(path)")
+            }
+        }
         store.setActive(false, template: "test-package")
         check(try store.compile(version: "27.0").isEmpty, "inactive package does not emit writes_off")
         store.reload()
@@ -243,8 +269,10 @@ def code(payload):
 def fixtures(folder):
     share = code({"v": 1, "n": "Example", "t": {"HideDICompletely": {"enabled": True, "value": True}}})
     (folder / "desktop.code").write_text(share)
+    compressed = zlib.compress(json.dumps({"v": 1, "t": {}}).encode())
+    (folder / "truncated.code").write_text("GN1." + base64.urlsafe_b64encode(compressed[:-1]).decode().rstrip("="))
     (folder / "bomb.code").write_text(code({"v": 1, "t": {}, "n": "x" * 300000}))
-    row = {"id": "test-preset", "name": "Example", "author": "author", "code": share, "ios_max": "27"}
+    row = {"id": "test-preset", "name": "Example", "author": "author", "code": share, "ios_max": "27", "untested": True}
     config = {"format_version": "3", "title": "Tests", "author": "Example", "tweaks": [
         {"id": "slider", "label": "Slider", "default": True,
          "control": {"type": "slider", "min": 0, "max": 10, "step": 1, "default": 3},
@@ -295,7 +323,12 @@ def fixtures(folder):
         info.external_attr = 0o120777 << 16
         target.writestr(info, "/tmp")
     data = (folder / "valid.batter").read_bytes()
-    template = {"id": "test-template", "name": "Template", "author": "author", "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+    template = {"id": "test-template", "name": "Template", "author": "author", "size": len(data), "sha256": hashlib.sha256(data).hexdigest(), "untested": True}
+    (folder / "flags-index.json").write_text(json.dumps({"format": 1,
+        "presets": [{key: value for key, value in row.items() if key != "untested"},
+                    {**row, "id": "numeric-flag", "untested": 1}, {**row, "id": "string-flag", "untested": "true"}],
+        "templates": [{**template, "untested": False}, {**template, "id": "null-flag", "untested": None},
+                      {**template, "id": "numeric-flag", "untested": 0}]}))
     (folder / "index.json").write_text(json.dumps({"format": 1, "presets": [row, row, {"id": "../bad"}], "templates": [template]}))
     manifest = {"format": "GoldenNugget portable preset", "version": 1,
                 "preset": {"tweaks": {"Templates": {"templates": ["bundle://assets/template.batter"]}}},

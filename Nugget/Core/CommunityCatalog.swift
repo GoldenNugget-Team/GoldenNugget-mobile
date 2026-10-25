@@ -21,6 +21,7 @@ enum CommunityCatalog {
         let size: Int
         let digest: String
         let writes: [String]
+        let untested: Bool
         var isTemplate: Bool { code == nil }
         var key: String { (isTemplate ? "template:" : "preset:") + id }
         var fingerprint: String { code.map { CommunityCatalog.hash(Data($0.utf8)) } ?? digest }
@@ -91,6 +92,10 @@ enum CommunityCatalog {
         let name = try text("name", limit: 60, required: true)
         let author = try text("author", limit: 40, required: true)
         let detail = try text("description", limit: 500)
+        guard let untested = (row["untested"] ?? false) as? NSNumber,
+              CFGetTypeID(untested) == CFBooleanGetTypeID() else {
+            throw CommunityError("Catalog untested must be true or false.")
+        }
         let minimum = try text("ios_min", limit: 8), maximum = try text("ios_max", limit: 8)
         for version in [minimum, maximum] where !version.isEmpty {
             guard matches(version, "^[0-9]{1,2}(\\.[0-9]{1,2}){0,2}$") else { throw CommunityError("Invalid iOS range.") }
@@ -126,7 +131,8 @@ enum CommunityCatalog {
             code = value
         }
         return Entry(id: id, name: name, author: author, detail: detail, tags: tags,
-                     minimum: minimum, maximum: maximum, code: code, size: size, digest: digest, writes: writes)
+                     minimum: minimum, maximum: maximum, code: code, size: size, digest: digest, writes: writes,
+                     untested: untested.boolValue)
     }
 
     /// Streaming limit applies before allocation, including responses without Content-Length.

@@ -70,6 +70,36 @@ final class RegressionSuite {
             self.check(try Data(contentsOf: AppPaths.mediaStore.appendingPathComponent("DCIM/a.jpg")) == Data([3, 4]), "existing copy replaced atomically")
             self.check(try AfcMediaBackup.read().entries.count == 2, "same-path update does not duplicate journal rows")
         }
+        await run("changing AFC source is never deleted") {
+            let gateway = try self.resetStore("changing-source")
+            gateway.files = ["/DCIM/a.jpg": Data([1])]
+            gateway.afterStream = { gateway.files["/DCIM/a.jpg"] = Data([1, 2]) }
+            do { _ = try await AfcMediaBackup.pull(deletingOriginals: true); self.check(false, "changed source must stop deletion") }
+            catch {}
+            self.check(gateway.removed.isEmpty, "changed source stays on device")
+        }
+        await run("incomplete media store fails before device writes") {
+            let gateway = try self.resetStore("truncated-store")
+            gateway.files = ["/DCIM/a.jpg": Data([1]), "/DCIM/b.jpg": Data([2, 3])]
+            _ = try await AfcMediaBackup.pull(deletingOriginals: false)
+            try Data([2]).write(to: AppPaths.mediaStore.appendingPathComponent("DCIM/b.jpg"))
+            do { try await AfcMediaBackup.push(); self.check(false, "truncated media store must fail") }
+            catch {}
+            self.check(gateway.writes.isEmpty, "inventory is checked before any AFC write")
+        }
+        await run("linked media store paths cannot be restored") {
+            let gateway = try self.resetStore("linked-store")
+            gateway.files = ["/DCIM/a.jpg": Data([1])]
+            _ = try await AfcMediaBackup.pull(deletingOriginals: false)
+            let file = AppPaths.mediaStore.appendingPathComponent("DCIM/a.jpg")
+            let outside = AppPaths.root.appendingPathComponent("outside.jpg")
+            try Data([9]).write(to: outside)
+            try FileManager.default.removeItem(at: file)
+            try FileManager.default.createSymbolicLink(at: file, withDestinationURL: outside)
+            do { try await AfcMediaBackup.push(); self.check(false, "linked media must fail") }
+            catch {}
+            self.check(gateway.writes.isEmpty, "linked copy never reaches device")
+        }
         await run("media clear cannot race a live transfer") {
             let gateway = try self.resetStore("transfer-lock")
             gateway.files = ["/DCIM/a.jpg": Data([1])]

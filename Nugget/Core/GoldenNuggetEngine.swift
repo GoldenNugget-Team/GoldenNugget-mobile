@@ -285,7 +285,7 @@ class GoldenNuggetEngine {
                                              deviceVersion: deviceVersion,
                                              isIPhone: isIPhone, deviceModel: deviceModel)
 
-        let tweakPayloads = try TweakCompiler.merging(community: communityPayloads, builtIn: compiled.payloads)
+        let tweakPayloads = try TweakCompiler.merging(community: communityPayloads, builtIn: compiled.payloads, deviceVersion: deviceVersion)
 
         // The status bar is built here, on the version the page already read, and
         // for the same reason the plist compile is: a payload that cannot be built

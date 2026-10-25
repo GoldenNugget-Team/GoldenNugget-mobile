@@ -182,7 +182,10 @@ def emit(output: list[str], FileLocation, SPECS, Kind, Section) -> None:
         w(f"            iphoneOnly: {'true' if spec.iphone_only else 'false'},")
         w(f"            ipadOnly: {'true' if spec.ipad_only else 'false'},")
         w(f"            disabled: {'true' if spec.disabled else 'false'},")
-        w(f"            detail: {swift_string(spec.description) if spec.description else 'nil'},")
+        detail = spec.description
+        if spec.id.name == "SiriAI":
+            detail += " Mobile permits all iPhone models; devices without Apple Intelligence hardware are untested."
+        w(f"            detail: {swift_string(detail) if detail else 'nil'},")
         instance = spec.factory() if spec.factory is not None else None
         reversible = instance is not None and type(instance).__name__ == "ReversibleBooleanPlistTweak"
         factory = type(instance).__name__ if instance is not None else "BasicPlistTweak"
@@ -207,7 +210,10 @@ def emit(output: list[str], FileLocation, SPECS, Kind, Section) -> None:
         w(f"            requires: [{', '.join(swift_string(x.name) for x in spec.requires)}],")
         w(f"            exclusiveWith: {swift_string(spec.exclusive_with.name) if spec.exclusive_with else 'nil'},")
         w(f"            unavailableReason: {swift_string(spec.unavailable_reason) if spec.unavailable_reason else 'nil'},")
-        w(f"            supportedModels: [{', '.join(swift_string(x) for x in spec.supported_models)}]")
+        # Mobile allows both eligibility operations on any iPhone; upstream's
+        # verified device remains documented in the description and warning.
+        supported_models = () if factory == "SiriAITweak" else spec.supported_models
+        w(f"            supportedModels: [{', '.join(swift_string(x) for x in supported_models)}]")
         w(f"        ),")
     w("    ]")
     w("")

@@ -172,7 +172,7 @@ enum AfcMediaBackup {
 
         for entry in survey.files {
             let relative = String(entry.path.dropFirst())          // drop the leading "/"
-            let destination = storeRoot.appendingPathComponent(relative, conformingTo: .data)
+            let destination = try localMediaPath(relative)
             try FileManager.default.createDirectory(
                 at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
 
@@ -238,6 +238,11 @@ enum AfcMediaBackup {
 
             var deleted = false
             if deletingOriginals && entry.size <= inlineWriteLimit {
+                let current = try await gateway.afcEntryInfo(path: entry.path)
+                guard !current.isDirectory, current.linkTarget == nil,
+                      current.size == entry.size, current.modified == entry.modified else {
+                    throw GoldenNuggetError("AFC media: \(entry.path) changed during transfer. Original kept.")
+                }
                 do {
                     try await gateway.afcDelete(path: entry.path)
                     deleted = true
@@ -267,26 +272,28 @@ enum AfcMediaBackup {
         return manifest
     }
 
-    /// Put everything back, then drop the local copies.
-    ///
-    /// The mirror of `pull(deletingOriginals:)`: a file is only removed from the
-    /// store once the device reports the same size back for the path it came
-    /// from.
+    /// Put everything back after checking the complete local inventory.
+    /// Local copies remain available until the user explicitly clears the store.
     static func push(onProgress: ((String) -> Void)? = nil) async throws {
         try beginTransfer()
         defer { endTransfer() }
         let manifest = try read()
+        // Fail before writing any device file if a recorded copy is missing,
+        // truncated or linked. A partially valid store is not a successful restore.
+        for entry in manifest.entries {
+            let local = try localMediaPath(entry.storedAs)
+            let attributes = try FileManager.default.attributesOfItem(atPath: local.path)
+            guard attributes[.type] as? FileAttributeType == .typeRegular,
+                  (attributes[.size] as? NSNumber)?.int64Value == entry.size else {
+                throw GoldenNuggetError("AFC media store is incomplete: \(entry.storedAs). Restore stopped; local copies kept.")
+            }
+        }
         let gateway = try await gateway()
         var restored = 0
         var skipped = 0
 
         for entry in manifest.entries {
-            let local = storeRoot.appendingPathComponent(entry.storedAs, conformingTo: .data)
-            guard FileManager.default.fileExists(atPath: local.path) else {
-                onProgress?("AFC push: missing \(entry.storedAs) — skipped")
-                skipped += 1
-                continue
-            }
+            let local = try localMediaPath(entry.storedAs)
             // Every level has to exist before the leaf. One afcMakeDirectory call
             // for "/DCIM/100APPLE" fails when /DCIM is absent, and `try?` used to
             // swallow exactly that, so the write then failed with a message that
@@ -310,6 +317,9 @@ enum AfcMediaBackup {
             }
 
             let data = try Data(contentsOf: local)
+            guard data.count == entry.size else {
+                throw GoldenNuggetError("AFC media store changed while reading \(entry.storedAs). Restore stopped.")
+            }
             try await gateway.afcWrite(path: entry.source, data: data)
 
             // The pull verifies before deleting, so the push verifies before
@@ -326,6 +336,9 @@ enum AfcMediaBackup {
             onProgress?("AFC push: \(entry.source)")
         }
         onProgress?("AFC push: \(restored) restored, \(skipped) skipped")
+        if skipped > 0 {
+            throw GoldenNuggetError("AFC media restore incomplete: \(skipped) file(s) could not be restored. Local copies kept.")
+        }
     }
 
     /// `/DCIM/100APPLE/IMG_0001.JPG` -> `["/DCIM", "/DCIM/100APPLE"]`, outermost
@@ -360,6 +373,25 @@ enum AfcMediaBackup {
     }
 
     // MARK: - Internals
+
+    /// Keep recovery journal paths inside the two media trees, without links.
+    private static func localMediaPath(_ relative: String) throws -> URL {
+        let parts = relative.split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count >= 2, trees.contains(String(parts[0])),
+              !relative.contains("\\"), !relative.contains("\0"),
+              parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
+            throw GoldenNuggetError("Unsafe AFC media path: \(relative)")
+        }
+        var target = storeRoot
+        for part in [""] + parts.map(String.init) {
+            if !part.isEmpty { target.appendPathComponent(part) }
+            if let attributes = try? FileManager.default.attributesOfItem(atPath: target.path),
+               attributes[.type] as? FileAttributeType == .typeSymbolicLink {
+                throw GoldenNuggetError("Linked AFC media path: \(relative)")
+            }
+        }
+        return target
+    }
 
     /// Depth-first listing, `afcList` per directory, symlinks reported rather
     /// than followed. A directory that cannot be listed throws: silently
@@ -497,6 +529,15 @@ enum AfcMediaBackup {
                     manifest.entries.append(entry)
                 }
             }
+        }
+        guard manifest.version == 1 else { throw GoldenNuggetError("Unsupported AFC media journal version.") }
+        var sources = Set<String>()
+        for entry in manifest.entries {
+            guard entry.size >= 0, entry.source == "/" + entry.storedAs,
+                  sources.insert(entry.source).inserted else {
+                throw GoldenNuggetError("Invalid AFC media journal entry: \(entry.source)")
+            }
+            _ = try localMediaPath(entry.storedAs)
         }
         cacheLock.lock()
         cachedKey = key

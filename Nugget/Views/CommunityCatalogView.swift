@@ -136,6 +136,10 @@ struct CommunityCatalogView: View {
                     .buttonStyle(.borderless).accessibilityLabel("Favorite \(entry.name)")
             }
             Text("\(entry.author) · \(entry.rangeLabel)").font(.caption).foregroundStyle(.secondary)
+            if entry.untested {
+                Label("Not tested on a device", systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(.orange)
+            }
             if !entry.detail.isEmpty { Text(entry.detail).font(.footnote) }
             if !entry.writes.isEmpty {
                 DisclosureGroup("Files changed") { ForEach(entry.writes, id: \.self) { Text($0).font(.caption.monospaced()) } }
