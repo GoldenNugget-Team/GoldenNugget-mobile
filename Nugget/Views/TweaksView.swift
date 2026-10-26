@@ -19,6 +19,7 @@ import UniformTypeIdentifiers
 /// description) ride inside the same card instead of moving to a tooltip, so the
 /// page still shows everything it showed before.
 struct TweaksView: View {
+    @ObservedObject private var hotload = HotLoadService.shared
     @AppStorage(UntestedTweaks.enabledKey) private var untestedTweaks = false
     @AppStorage(UntestedTweaks.choiceKey) private var untestedChoiceDone = false
     @State private var showUntestedChoice = false
@@ -260,8 +261,10 @@ struct TweaksView: View {
     /// registry, and folding it in here would show 40 rows with no master
     /// switch and no Recommended set.
     private var visibleSpecs: [TweakSpec] {
-        TweakCatalog.all.filter {
+        let hidden = hotload.currentPolicy.hiddenTweakIDs
+        return TweakCatalog.all.filter {
             $0.section != .daemons
+                && !hidden.contains($0.id)
                 && $0.isCompatible(deviceVersion: identity.version, isIPhone: identity.isIPhone, deviceModel: identity.productType)
                 && matchesSearch($0)
         }
@@ -325,7 +328,8 @@ struct TweaksView: View {
             let preset = try GoldenNuggetPreset.parse(data)
             let report = GoldenNuggetPresetImport.apply(preset, to: &selection,
                                                         deviceVersion: identity.version,
-                                                        isIPhone: identity.isIPhone, deviceModel: identity.productType)
+                                                        isIPhone: identity.isIPhone, deviceModel: identity.productType,
+                                                        hiddenTweakIDs: HotLoadService.shared.currentPolicy.hiddenTweakIDs)
             // The log is the durable half of the report: the sheet can be
             // dismissed, the run log cannot.
             for line in report.logLines { GoldenNuggetEngine.shared.log(line) }

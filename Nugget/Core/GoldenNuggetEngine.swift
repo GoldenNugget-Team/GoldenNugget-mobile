@@ -280,10 +280,24 @@ class GoldenNuggetEngine {
         let runStage = StageTimer("RUN apply")
         defer { runStage.done() }
 
+        let identity = await DeviceIdentity.read()
+        let safety = await MainActor.run {
+            HotLoadService.shared.policy(deviceVersion: identity.version.isEmpty ? deviceVersion : identity.version,
+                                         model: identity.productType.isEmpty ? deviceModel : identity.productType)
+        }
+        var features: Set<String> = []
+        if posterBoard.isActive { features.insert("PosterBoard") }
+        if statusBar.isActive { features.insert("Status Bar") }
+        if templates.isActive || !communityPayloads.isEmpty { features.insert("Templates") }
+        try safety.requireAllowed(features: features)
+        try safety.validateCommunity(communityPayloads)
+        for warning in safety.warnings(for: selection) + safety.warnings(forFeatures: features) { log("HotLoad warning: \(warning)") }
         if let issue = selection.validationIssue() { throw GoldenNuggetError(issue) }
         let compiled = TweakCompiler.compile(selection: selection,
                                              deviceVersion: deviceVersion,
-                                             isIPhone: isIPhone, deviceModel: deviceModel)
+                                             isIPhone: isIPhone, deviceModel: deviceModel,
+                                             hiddenTweakIDs: safety.hiddenTweakIDs,
+                                             forcedDaemonKeys: safety.forcedDaemonKeys)
 
         let tweakPayloads = try TweakCompiler.merging(community: communityPayloads, builtIn: compiled.payloads, deviceVersion: deviceVersion)
 
@@ -631,6 +645,7 @@ class GoldenNuggetEngine {
         let stage = StageTimer("RUN posterboard airlift apply")
         defer { stage.done() }
 
+        try await HotLoadService.requireAllowed(features: ["PosterBoard"])
         let identity = await DeviceIdentity.read()
         try checkAirliftCanApply(posterBoard: selection,
             deviceVersion: identity.version.isEmpty ? deviceVersion : identity.version,
@@ -781,6 +796,7 @@ class GoldenNuggetEngine {
     }
 
     private func resetPagesRun(pages: Set<ResetPage>) async throws {
+        try await HotLoadService.requireAllowed(features: Set(pages.map(\.title)))
         AppLog.shared.memory.reset()
         clearCancel()
         clearProgress()
@@ -942,6 +958,7 @@ class GoldenNuggetEngine {
     /// Returns the device UDID (needed to name the backup root).  Throws
     /// `GoldenNuggetError` for the operator-facing failures.
     private func prepareRun() async throws -> String {
+        try await HotLoadService.requireAllowed()
         let minimuxer = Minimuxer.shared()
         guard await testReady(minimuxer) else {
             throw GoldenNuggetError("minimuxer is not ready. Ensure WiFi and a working tunnel (LocalDevVPN or WireGuard + em_proxy), then select a pairing file.")

@@ -91,11 +91,11 @@ enum GoldenNuggetAutosave {
     static func restore(into selection: inout TweakSelection,
                         deviceVersion: String,
                         deviceModel: String,
-                        isIPhone: Bool) -> TweakImportReport? {
+                        isIPhone: Bool, hiddenTweakIDs: Set<String> = []) -> TweakImportReport? {
         guard let preset = load() else { return nil }
         let report = GoldenNuggetPresetImport.apply(preset, to: &selection,
                                                     deviceVersion: deviceVersion,
-                                                    isIPhone: isIPhone, deviceModel: deviceModel)
+                                                    isIPhone: isIPhone, deviceModel: deviceModel, hiddenTweakIDs: hiddenTweakIDs)
         // Purge, exactly as the reference does after loading.
         save(selection, deviceModel: deviceModel, iosVersion: deviceVersion)
         return report

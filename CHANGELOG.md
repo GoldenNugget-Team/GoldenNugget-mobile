@@ -1,5 +1,11 @@
 # GoldenNugget Mobile — Desktop 9.7.2 Sync
 
+## HotLoad and updates
+
+- Port HotLoad safety rules with offline caching, device/app version scopes, feature hiding, daemon overrides, warnings and mandatory-update gates.
+- Check mobile GitHub releases automatically and from Settings, with release notes and IPA download links.
+- Keep rule and release channels specific to GoldenNugget Mobile. Install updates using the existing sideloading workflow.
+
 ## General
 
 - Add experimental Siri AI eligibility overrides for unsupported regions, plus a dedicated reset. Available on iPhones running iOS 27.x; upstream verification covers only iPhone 16 Pro, build 24A437. Requires Siri language English (US), an unencrypted protective backup, and a reboot.

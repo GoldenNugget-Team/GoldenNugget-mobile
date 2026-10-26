@@ -98,6 +98,7 @@ enum Airlift {
     /// that is up to thirty seconds stale. Falls back to the polled value when
     /// lockdown does not answer, so a slow-but-alive tunnel still gets through.
     private static func requireSupported() async throws {
+        try await HotLoadService.requireAllowed()
         var identity = await DeviceIdentity.read()
         if identity.version.isEmpty {
             identity = await MainActor.run { DeviceIdentityMonitor.shared.current }

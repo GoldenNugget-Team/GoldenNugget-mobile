@@ -14,6 +14,10 @@ import SwiftUI
 /// carried rather than made optional: a row whose kind happens to be `.text`
 /// must not lose its editor because its toggle had a special meaning.
 struct TweakRow: View {
+    @ObservedObject private var hotload = HotLoadService.shared
+    @ObservedObject private var device = DeviceIdentityMonitor.shared
+    private var safetyWarning: String? { hotload.currentPolicy.flag(for: spec) }
+    private var warningText: String { [spec.warning, safetyWarning].compactMap { $0 }.joined(separator: "\n\n") }
     let spec: TweakSpec
     @Binding private var selection: TweakSelection
     private let readOn: () -> Bool
@@ -48,7 +52,7 @@ struct TweakRow: View {
     }
 
     var body: some View {
-        Group {
+        VStack(alignment: .leading, spacing: 6) {
             switch spec.kind {
             case .toggle:
                 Toggle(isOn: toggleBinding) {
@@ -57,6 +61,7 @@ struct TweakRow: View {
             case .text:
                 VStack(alignment: .leading, spacing: 6) {
                     Text(spec.title)
+                    if let safetyWarning { NativeSafetyNote(safetyWarning) }
                     TextField("(empty = clear)", text: textBinding)
                         .textFieldStyle(.roundedBorder)
                         .autocorrectionDisabled()
@@ -66,22 +71,24 @@ struct TweakRow: View {
             case .number:
                 VStack(alignment: .leading, spacing: 6) {
                     Text(spec.title)
+                    if let safetyWarning { NativeSafetyNote(safetyWarning) }
                     TweakNumberField(spec: spec, selection: $selection)
                     TweakRowCaption(id: spec.id, detail: [spec.numberHint, spec.warning].compactMap { $0 }.joined(separator: "\n"))
                 }
             }
+            if spec.kind == .toggle, let safetyWarning { NativeSafetyNote(safetyWarning) }
         }
         .alert(spec.title, isPresented: $showWarning) {
             Button("Cancel", role: .cancel) {}
-            Button("Enable experiment", role: .destructive) { writeOn(true) }
+            Button("Continue anyway", role: .destructive) { writeOn(true) }
         } message: {
-            Text(spec.warning ?? "")
+            Text(warningText)
         }
     }
 
     private var toggleBinding: Binding<Bool> {
         Binding(get: readOn, set: { on in
-            if on && spec.warning != nil { showWarning = true }
+            if on && !warningText.isEmpty { showWarning = true }
             else { writeOn(on) }
         })
     }

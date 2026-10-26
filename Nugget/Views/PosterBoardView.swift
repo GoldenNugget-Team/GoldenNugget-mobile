@@ -30,6 +30,9 @@ import UniformTypeIdentifiers
 ///     fetched database stale, so the next apply fetches a fresh one; saying so
 ///     here is cheaper than the puzzle of a store that half-works.
 struct PosterBoardView: View {
+    @ObservedObject private var hotload = HotLoadService.shared
+    @State private var showHotLoadWarning = false
+    private var hotloadWarnings: [String] { hotload.currentPolicy.warnings(forFeatures: ["PosterBoard"]) }
     /// Everything this page edits, **owned by `RootView`**: the page picks the
     /// wallpapers and the home page's single `Apply` delivers them, so the selection has
     /// to outlive this view — which a `NavigationSplitView` destroys on every sidebar
@@ -112,6 +115,12 @@ struct PosterBoardView: View {
                 deviceVersion: identity.version, buildVersion: identity.buildVersion)
         }
         .legacyConvertPrompt($legacyPrompt, answer: answerLegacyPrompt)
+        .alert("HotLoad warning", isPresented: $showHotLoadWarning) {
+            Button("Cancel", role: .cancel) {}
+            Button("Continue anyway", role: .destructive) { applyViaAirlift() }
+        } message: {
+            Text(hotloadWarnings.joined(separator: "\n\n"))
+        }
     }
 
     // MARK: - The legacy-format answer
@@ -516,7 +525,8 @@ struct PosterBoardView: View {
                     + "apply it this way.")
             }
             Button {
-                applyViaAirlift()
+                if hotloadWarnings.isEmpty { applyViaAirlift() }
+                else { showHotLoadWarning = true }
             } label: {
                 HStack {
                     Label("Apply via AirLift", systemImage: "bolt.horizontal.circle")

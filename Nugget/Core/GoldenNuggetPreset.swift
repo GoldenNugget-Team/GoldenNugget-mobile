@@ -252,11 +252,15 @@ enum GoldenNuggetPresetImport {
     static func apply(_ preset: GoldenNuggetPreset,
                       to selection: inout TweakSelection,
                       deviceVersion: String,
-                      isIPhone: Bool, deviceModel: String = "") -> TweakImportReport {
+                      isIPhone: Bool, deviceModel: String = "", hiddenTweakIDs: Set<String> = []) -> TweakImportReport {
         var report = TweakImportReport()
         report.metadataLine = preset.metadata.summary
 
         for entry in preset.entries {
+            if hiddenTweakIDs.contains(entry.id) {
+                report.skippedIncompatible.append(entry.id)
+                continue
+            }
             // Daemons is not a registry spec: it is one upstream entry covering
             // every label, and the port carries a spec per group.
             if entry.id == "Daemons" {

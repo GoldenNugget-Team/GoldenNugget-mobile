@@ -67,10 +67,14 @@ struct ApplyConfirmSheet: View {
                 if !preview.notes.isEmpty {
                     Section("Notes") {
                         ForEach(Array(preview.notes.enumerated()), id: \.offset) { _, note in
-                            Text(note)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                            if note.hasPrefix("HotLoad") {
+                                NativeSafetyNote(note)
+                            } else {
+                                Text(note)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                     }
                 }

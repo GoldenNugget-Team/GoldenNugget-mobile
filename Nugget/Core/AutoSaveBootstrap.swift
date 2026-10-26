@@ -21,7 +21,7 @@ enum AutoSaveBootstrap {
     /// The report from the apply, for whoever ran it. Later callers get nil --
     /// not because nothing happened, but because it already happened.
     @discardableResult
-    static func apply(into selection: inout TweakSelection,
+    @MainActor static func apply(into selection: inout TweakSelection,
                       identity: DeviceIdentity) -> TweakImportReport? {
         lock.lock()
         if applied {
@@ -30,7 +30,9 @@ enum AutoSaveBootstrap {
         }
         applied = true
         lock.unlock()
-        return GoldenNuggetAutosave.restore(into: &selection, identity: identity)
+        return GoldenNuggetAutosave.restore(into: &selection, deviceVersion: identity.version,
+                                           deviceModel: identity.productType, isIPhone: identity.isIPhone,
+                                           hiddenTweakIDs: HotLoadService.shared.currentPolicy.hiddenTweakIDs)
     }
 
 }

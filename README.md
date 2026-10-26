@@ -115,6 +115,13 @@ macOS 15.6 Sequoia+ or Ubuntu 22.04+
 # Contributing and forking.
 See [CONTRIBUTING.md](https://github.com/GoldenNugget-Team/GoldenNugget-mobile/blob/main/CONTRIBUTING.md), want fork instead? Then see [FORKING.md](https://github.com/GoldenNugget-Team/GoldenNugget-mobile/blob/main/FORKING.md)
 
+## HotLoad and updates
+
+HotLoad caches mobile safety rules for offline use. Settings includes its master switch,
+manual rule refresh and update checks. Available mobile releases appear on Home and
+in Settings with release notes and IPA links; install the IPA with your sideloading tool.
+See [rule format and behavior](docs/hotload-and-updates.md).
+
 ## Credits
 - [awesomenull] Lead developer
 - [Wind0ws11Aero] for helping with development a lot.

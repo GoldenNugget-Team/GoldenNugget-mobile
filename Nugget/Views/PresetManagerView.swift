@@ -331,12 +331,17 @@ struct PresetManagerView: View {
     /// `PresetManager.load_preset`'s observable effect, ported: apply the parsed
     /// preset to the live selection, keep it as the autosave, and log the report.
     private func apply(_ preset: GoldenNuggetPreset, label: String) {
-        do { try CommunityTemplateStore.shared.loadPreset(preset) }
+        do {
+            let safety = HotLoadService.shared.currentPolicy
+            try safety.requireAllowed(features: preset.entries.contains(where: { $0.id == "Templates" }) ? ["Templates"] : [])
+            try CommunityTemplateStore.shared.loadPreset(preset)
+        }
         catch { setMessage(error.localizedDescription, .error); return }
         var mutable = selection
         var report = GoldenNuggetPresetImport.apply(preset, to: &mutable,
                                                     deviceVersion: identity.version,
-                                                    isIPhone: identity.isIPhone, deviceModel: identity.productType)
+                                                    isIPhone: identity.isIPhone, deviceModel: identity.productType,
+                                                    hiddenTweakIDs: HotLoadService.shared.currentPolicy.hiddenTweakIDs)
         selection = mutable
         if preset.entries.contains(where: { $0.id == "Templates" }) {
             report.skippedUnported.removeAll { $0.id == "Templates" }

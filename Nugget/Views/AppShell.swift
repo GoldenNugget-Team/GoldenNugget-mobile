@@ -35,6 +35,17 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
+    func allowed(by policy: HotLoadPolicy) -> Bool {
+        switch self {
+        case .posterBoard, .wallpaperDownloads: return policy.hiddenFeatures["PosterBoard"] == nil
+        case .templates: return policy.hiddenFeatures["Templates"] == nil
+        case .statusBar: return policy.hiddenFeatures["Status Bar"] == nil
+        case .daemons: return policy.hiddenFeatures["Daemons"] == nil
+        case .tweaks: return !["Liquid Glass", "Springboard", "Internal"].allSatisfy { policy.hiddenFeatures[$0] != nil }
+        default: return true
+        }
+    }
+
     /// Whether this destination gets a row of its own in the sidebar/menu.
     ///
     /// The wallpaper downloader is the one that does not.  It is a **sub-page of
@@ -108,6 +119,9 @@ struct RootView: View {
     /// the flag, so finishing the guide has to lift the gate in the same run that
     /// set it. A mirror would have made the two disagree for exactly one frame —
     /// the frame where the user is looking at the button they just pressed.
+    @ObservedObject private var hotload = HotLoadService.shared
+    @ObservedObject private var device = DeviceIdentityMonitor.shared
+
     @ObservedObject private var firstRun = FirstRunSettings.shared
 
     /// The detail stack.  The single source of truth for what is showing: empty
@@ -169,7 +183,9 @@ struct RootView: View {
             // anything at all until both prerequisites are in place, so the shell
             // behind it would be a menu of things that each fail identically.
             // A sheet would leave that same shell one swipe away.
-            if firstRun.isComplete {
+            if hotload.currentPolicy.gateReason != nil {
+                HotLoadGateView(policy: hotload.currentPolicy)
+            } else if firstRun.isComplete {
                 if width == .compact { compactShell } else { regularShell }
             } else {
                 FirstRunView()
@@ -189,6 +205,12 @@ struct RootView: View {
         // no pairing and no tunnel, so a lockdown poll can only log a device that
         // is not there yet — and finishing the guide has to start it, which a
         // scenePhase-only id would not notice until the next foreground.
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            async let rules: Void = hotload.refresh(force: false)
+            async let update: Void = AppUpdateService.shared.refresh()
+            _ = await (rules, update)
+        }
         .task(id: firstRun.isComplete ? scenePhase : nil) {
             guard scenePhase == .active, firstRun.isComplete else {
                 DeviceIdentityMonitor.shared.stop()
@@ -291,37 +313,41 @@ struct RootView: View {
                          didAutoStart: $didAutoStart,
                          autoImportDisabled: $autoImportDisabled)
             .navigationDestination(for: AppDestination.self) { destination in
-                switch destination {
-                case .home:
-                    // Unreachable: home is the stack's root, so the path never
-                    // carries it.  The switch still has to be exhaustive.
-                    EmptyView()
-                case .tweaks:
-                    TweaksView(selection: $tweakSelection)
-                case .presets:
-                    PresetManagerView(selection: $tweakSelection)
-                case .community:
-                    CommunityCatalogView()
-                case .posterBoard:
-                    PosterBoardView(selection: $posterBoardSelection)
-                case .templates:
-                    TemplatesView(selection: $templateSelection)
-                case .wallpaperDownloads:
-                    WallpaperDownloadsView(selection: $posterBoardSelection)
-                case .statusBar:
-                    StatusBarView(selection: $statusBarSelection)
-                case .wallet:
-                    WalletView()
-                case .passcode:
-                    PasscodeThemeView()
-                case .daemons:
-                    DaemonsView(selection: $tweakSelection)
-                case .media:
-                    MediaView()
-                case .files:
-                    FilesView()
-                case .settings:
-                    SettingsView()
+                if !destination.allowed(by: hotload.currentPolicy) {
+                    ContentUnavailableView("Feature unavailable", systemImage: "exclamationmark.triangle", description: Text("This feature is hidden by HotLoad safety rules. See Settings for rule status."))
+                } else {
+                    switch destination {
+                    case .home:
+                        // Unreachable: home is the stack's root, so the path never
+                        // carries it.  The switch still has to be exhaustive.
+                        EmptyView()
+                    case .tweaks:
+                        TweaksView(selection: $tweakSelection)
+                    case .presets:
+                        PresetManagerView(selection: $tweakSelection)
+                    case .community:
+                        CommunityCatalogView()
+                    case .posterBoard:
+                        PosterBoardView(selection: $posterBoardSelection)
+                    case .templates:
+                        TemplatesView(selection: $templateSelection)
+                    case .wallpaperDownloads:
+                        WallpaperDownloadsView(selection: $posterBoardSelection)
+                    case .statusBar:
+                        StatusBarView(selection: $statusBarSelection)
+                    case .wallet:
+                        WalletView()
+                    case .passcode:
+                        PasscodeThemeView()
+                    case .daemons:
+                        DaemonsView(selection: $tweakSelection)
+                    case .media:
+                        MediaView()
+                    case .files:
+                        FilesView()
+                    case .settings:
+                        SettingsView()
+                    }
                 }
             }
     }
@@ -387,6 +413,7 @@ extension View {
 /// selection target is a `NavigationStack` *path* in the other column, not the
 /// split view's own: a link would push onto this list and replace it.
 private struct AppDestinationList: View {
+    @ObservedObject private var hotload = HotLoadService.shared
     @ObservedObject private var device = DeviceIdentityMonitor.shared
     let current: AppDestination
     let select: (AppDestination) -> Void
@@ -399,7 +426,7 @@ private struct AppDestinationList: View {
             // on the enum while letting one of them stay reachable only from the
             // page that owns it.
             ForEach(AppDestination.allCases.filter { destination in
-                destination.showsInSidebar && (!(destination == .wallet || destination == .passcode)
+                destination.showsInSidebar && destination.allowed(by: hotload.currentPolicy) && (!(destination == .wallet || destination == .passcode)
                     || !AirliftAvailability.isHidden(deviceVersion: device.current.version,
                                                     buildVersion: device.current.buildVersion))
             }) { destination in

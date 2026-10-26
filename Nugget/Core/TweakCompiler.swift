@@ -179,7 +179,9 @@ enum TweakCompiler {
         selection: TweakSelection,
         deviceVersion: String,
         isIPhone: Bool,
-        deviceModel: String = ""
+        deviceModel: String = "",
+        hiddenTweakIDs: Set<String> = [],
+        forcedDaemonKeys: Set<String> = []
     ) -> Result {
         // Insertion-ordered, like Python's dict: the reference iterates
         // `basic_plists.items()` in first-write order and that is the order the
@@ -192,20 +194,26 @@ enum TweakCompiler {
         var nullified: [TweakFileLocation] = []
         var skipped: [(label: String, reason: String)] = []
         var archives: [TweakPayload] = []
+        for id in hiddenTweakIDs.sorted() where selection.enabled.contains(id) {
+            skipped.append((id, "hidden by HotLoad safety rules"))
+        }
 
         // Write explicit false values too: omitting the last switched-off group
         // would leave the previous disabled override on the device. Only catalog
         // labels can reach launchd, even if selection came from a legacy preset.
-        if selection.daemonModificationsEnabled {
+        let daemonsHidden = hiddenTweakIDs.contains("Daemons")
+        let forced = forcedDaemonKeys.intersection(DaemonGroups.allowedKeys)
+        if !daemonsHidden && (selection.daemonModificationsEnabled || !forced.isEmpty) {
             var disabled: [String: Any] = Dictionary(uniqueKeysWithValues:
                 DaemonGroups.allowedKeys.map { ($0, false) })
             for group in DaemonGroups.all {
-                guard let spec = TweakCatalog.byID["Daemon.\(group.name)"], selection.isOn(spec) else { continue }
+                guard selection.daemonModificationsEnabled, let spec = TweakCatalog.byID["Daemon.\(group.name)"], !hiddenTweakIDs.contains(spec.id), selection.isOn(spec) else { continue }
                 let values = selection.multiOverrides[spec.id]
                 for label in group.labels where DaemonGroups.allowedKeys.contains(label) {
                     disabled[label] = values?[label]?.coerced(to: spec).plistObject ?? true
                 }
             }
+            for label in forced { disabled[label] = true }
             order.append(.disabledDaemons)
             plists[.disabledDaemons] = disabled
         }
@@ -213,7 +221,7 @@ enum TweakCompiler {
         // `allWithDaemons`, not `all`: the daemon group specs are not registry
         // rows, and compiling only the registry would drop the launchd
         // `disabled.plist` entirely.
-        for spec in TweakCatalog.allWithDaemons where !spec.disabled {
+        for spec in TweakCatalog.allWithDaemons where !spec.disabled && !hiddenTweakIDs.contains(spec.id) {
             if spec.location == .disabledDaemons { continue }
             if spec.section == .daemons && !selection.daemonModificationsEnabled { continue }
             guard selection.isOn(spec) || spec.reversibleBoolean || (spec.offValue != nil && selection.values[spec.id] != nil) else { continue }

@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "comment": "Mobile-only HotLoad channel. Same rule schema as desktop. App version scopes refer to CFBundleShortVersionString in GoldenNugget-mobile. Rules are active by default; disabled:false makes a rule inert. Supported actions: kill_app, badNews, hide_feature, disable_daemon, risk; omit action for a tweak warning. Updates are installed from GoldenNugget-mobile releases. Keep kill_app and badNews narrowly scoped so fixed mobile builds are excluded.",
+  "rules": []
+}

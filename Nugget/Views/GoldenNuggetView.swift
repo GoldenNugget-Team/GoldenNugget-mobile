@@ -16,6 +16,7 @@ import Foundation
 /// the copy that goes stale is the one on the page they are reading.  The
 /// sections are reachable from the sidebar and from nowhere else.
 struct GoldenNuggetView: View {
+    @ObservedObject private var hotload = HotLoadService.shared
     @ObservedObject private var community = CommunityTemplateStore.shared
     @AppStorage(PairingRecord.Key.stored) var pairingFileRaw: String?
     // The tunnel addressing, persisted under the same keys `Tunnel` reads (see
@@ -159,6 +160,7 @@ struct GoldenNuggetView: View {
         List {
             header
             connectionLine
+            UpdateStatusSection()
             applyCard
             clearCard
             if !status.isEmpty { processStatus }
@@ -713,7 +715,7 @@ struct GoldenNuggetView: View {
     /// Either source of work is enough: a run is worth starting when there are tweaks,
     /// when there are wallpapers, when there are templates, or any combination.
     private var canApply: Bool {
-        paired && !running && (tweakSelection.hasPendingWrites || tweakSelection.daemonModificationsEnabled || posterBoardSelection.isActive
+        paired && !running && (!hotload.currentPolicy.forcedDaemonKeys.isEmpty || tweakSelection.hasPendingWrites || tweakSelection.daemonModificationsEnabled || posterBoardSelection.isActive
                                || templateSelection.usesDomains || !community.templates.isEmpty)
     }
 
@@ -728,7 +730,7 @@ struct GoldenNuggetView: View {
     /// full backup and change nothing.
     private var applyTitle: String {
         let names = [
-            tweakSelection.hasPendingWrites || tweakSelection.daemonModificationsEnabled ? "Tweaks" : nil,
+            tweakSelection.hasPendingWrites || tweakSelection.daemonModificationsEnabled || !hotload.currentPolicy.forcedDaemonKeys.isEmpty ? "Tweaks" : nil,
             posterBoardSelection.isActive ? "Wallpapers" : nil,
             templateSelection.usesDomains ? "Templates" : nil,
         ].compactMap { $0 }
@@ -1037,13 +1039,25 @@ struct GoldenNuggetView: View {
         // summary.  A status-bar payload that cannot be built fails here, before
         // a confirmation the apply would then refuse.
         do {
+            let safety = HotLoadService.shared.currentPolicy
+            var features: Set<String> = []
+            if posterBoardSelection.isActive { features.insert("PosterBoard") }
+            if statusBarSelection.isActive { features.insert("Status Bar") }
+            if templateSelection.isActive { features.insert("Templates") }
+            try safety.requireAllowed(features: features)
+            let community = try CommunityTemplateStore.shared.compile(version: identity.version)
+            if !community.isEmpty { try safety.requireAllowed(features: ["Templates"]) }
+            try safety.validateCommunity(community)
             applyPreview = try ApplyPreview.build(
                 selection: tweakSelection,
                 statusBar: statusBarSelection,
                 skipSetupEnabled: SkipSetupSettings.shared.skipSetupEnabled,
                 deviceVersion: identity.version,
                 isIPhone: identity.isIPhone, deviceModel: identity.productType,
-                communityPayloads: try CommunityTemplateStore.shared.compile(version: identity.version))
+                communityPayloads: community,
+                hiddenTweakIDs: safety.hiddenTweakIDs,
+                forcedDaemonKeys: safety.forcedDaemonKeys,
+                safetyWarnings: safety.warnings(for: tweakSelection) + safety.warnings(forFeatures: features))
             showApplyConfirm = true
         } catch {
             errorText = error.localizedDescription

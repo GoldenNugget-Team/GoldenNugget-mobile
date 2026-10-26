@@ -92,12 +92,15 @@ struct ApplyPreview {
                       statusBar: StatusBarSelection,
                       skipSetupEnabled: Bool,
                       deviceVersion: String,
-                      isIPhone: Bool, deviceModel: String = "", communityPayloads: [TweakPayload] = []) throws -> ApplyPreview {
+                      isIPhone: Bool, deviceModel: String = "", communityPayloads: [TweakPayload] = [],
+                      hiddenTweakIDs: Set<String> = [], forcedDaemonKeys: Set<String> = [],
+                      safetyWarnings: [String] = []) throws -> ApplyPreview {
         let compiled = TweakCompiler.compile(selection: selection,
                                              deviceVersion: deviceVersion,
-                                             isIPhone: isIPhone, deviceModel: deviceModel)
+                                             isIPhone: isIPhone, deviceModel: deviceModel,
+                                             hiddenTweakIDs: hiddenTweakIDs, forcedDaemonKeys: forcedDaemonKeys)
         var rows: [Row] = []
-        var notes: [String] = []
+        var notes: [String] = safetyWarnings
         for payload in try TweakCompiler.merging(community: communityPayloads, builtIn: compiled.payloads, deviceVersion: deviceVersion) {
             rows.append(Row(label: payload.label, byteCount: payload.byteCount))
         }

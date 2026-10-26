@@ -12,6 +12,7 @@ import SwiftUI
 /// (`showsSwitch == false`) are deliberately not rendered — they belong to the
 /// Recommended set, and the reference offers no way to toggle them alone.
 struct DaemonsView: View {
+    @ObservedObject private var hotload = HotLoadService.shared
     @Binding var selection: TweakSelection
 
     /// Matches desktop's install-level acknowledgement, outside autosave/presets.
@@ -125,6 +126,9 @@ struct DaemonsView: View {
     private var headerSection: some View {
         Section {
             masterRow
+            if !hotload.currentPolicy.forcedDaemons.isEmpty {
+                NativeSafetyNote("HotLoad forces \(hotload.currentPolicy.forcedDaemons.count) daemon label(s) disabled, even when daemon modifications are off.")
+            }
             recommendedRow
             NativeNote("Writes "
                 + "/var/db/com.apple.xpc.launchd/disabled.plist. Disabling a "
@@ -180,7 +184,14 @@ struct DaemonsView: View {
     private func groupRow(_ group: DaemonGroup) -> some View {
         if let spec = spec(group) {
             TweakRow(spec: spec, selection: $selection,
-                     isOn: { isOn(spec) }, setOn: { requestSetOn($0, for: spec) })
+                     isOn: { group.labels.allSatisfy { hotload.currentPolicy.forcedDaemons[$0] != nil } || isOn(spec) },
+                     setOn: { requestSetOn($0, for: spec) })
+                .disabled(group.labels.allSatisfy { hotload.currentPolicy.forcedDaemons[$0] != nil })
+            let forced = group.labels.filter { hotload.currentPolicy.forcedDaemons[$0] != nil }
+            if !forced.isEmpty {
+                NativeSafetyNote("HotLoad: \(forced.count)/\(group.labels.count) labels forced disabled. "
+                    + (forced.first.flatMap { hotload.currentPolicy.forcedDaemons[$0] } ?? ""))
+            }
         } else {
             // A group with no spec would be a switch that does nothing. Say so
             // rather than rendering a row that cannot be tapped.
@@ -221,7 +232,7 @@ struct DaemonsView: View {
     }
 
     private func isOn(_ group: DaemonGroup) -> Bool {
-        spec(group).map(isOn) ?? false
+        group.labels.allSatisfy { hotload.currentPolicy.forcedDaemons[$0] != nil } || (spec(group).map(isOn) ?? false)
     }
 
     private func isOn(_ spec: TweakSpec) -> Bool { selection.isOn(spec) }
