@@ -1,4 +1,5 @@
-Latest synchronization: [2026-10-25](desktop-sync-2026-10-25.md), desktop `6f4f882` (9.7.2).
+Latest synchronization: [2026-10-26](desktop-sync-2026-10-26.md), desktop `747adb7` (9.7.2).
+Previous update: [2026-10-25](desktop-sync-2026-10-25.md).
 Previous update: [2026-10-22](desktop-sync-2026-10-22.md).
 
 # Desktop synchronization — 2026-10-18

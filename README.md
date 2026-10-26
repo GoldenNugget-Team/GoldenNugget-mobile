@@ -118,12 +118,17 @@ See [CONTRIBUTING.md](https://github.com/GoldenNugget-Team/GoldenNugget-mobile/b
 ## Credits
 - [awesomenull] Lead developer
 - [Wind0ws11Aero] for helping with development a lot.
+- [kik4311](https://github.com/kik4311) Co-developer.
 - [@mak5er](https://github.com/mak5er): AirCard developer.
 - [NeoSpring](https://github.com/rooootdev/neospring): Swift implementation by **[@skadz108](https://github.com/skadz108)** and **[@rooootdev](https://github.com/rooootdev)**, and **[@neonmodder123](https://github.com/neonmodder123)** for the WebKit GPU process respring technique.
 - [LeminLimez] for creating Nugget.
 - [0xjonhnnydev] for [AirLift]
 - [iTechExpert][iTechExpertTwitter] for various Springboard/Internal Options
 - [Mikasa-san][Mikasa-sanGitHub] for [Quiet Daemon][QuietDaemonGitHub]
+- [MiniVoidyy](https://github.com/MiniVoidyy) for additional system and analytics daemon lists.
+- [Snoolie](https://github.com/0xilis) for AAR handling.
+- [mattisklein](https://github.com/mattisklein) for Siri AI eligibility archives from Project Linwood.
+- [Prognosticate-X](https://github.com/Prognosticate-X/) for [iOS 27 status bar research](https://github.com/Prognosticate-X/ios27-carrier-lockscreen-research).
 
 [caplayground]: https://caplayground.vercel.app/wallpapers
 [i18n]: https://github.com/awesomenull-dev/gNugget-i18n

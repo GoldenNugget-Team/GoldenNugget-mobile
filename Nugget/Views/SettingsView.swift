@@ -122,8 +122,8 @@ struct SettingsView: View {
 
     // MARK: - Credits
 
-    /// What the app is built on, and by whom. Every row is a component that is
-    /// really in the binary — the two static Rust/C archives are linked into the
+    /// What the app is built on, and by whom. Contributor links follow desktop
+    /// credits for the features used by this port. The static Rust/C archives link into the
     /// executable rather than embedded as frameworks (only `EMProxy.framework`
     /// ships as a dynamic framework in the IPA).
     private var creditsSection: some View {
@@ -138,9 +138,27 @@ struct SettingsView: View {
                       systemImage: "network")
             creditRow("ZIPFoundation", "Archive handling",
                       systemImage: "archivebox")
+            contributorRow("awesomenull", "GoldenNugget developer", "https://github.com/awesomenull-dev")
+            contributorRow("Windows11Aero", "Co-developer", "https://github.com/Wind0ws11Aero")
+            contributorRow("kik4311", "Co-developer", "https://github.com/kik4311")
+            contributorRow("leminlimez", "Nugget creator", "https://github.com/leminlimez")
+            contributorRow("PosterRestore Team", "PosterBoard research", "https://discord.com/invite/gWtzTVhMvh")
+            contributorRow("iTechExpert", "Springboard / Internal Options", "https://x.com/iTechExpert21")
+            contributorRow("Mikasa-san", "Quiet Daemon", "https://github.com/Mikasa-san")
+            contributorRow("MiniVoidyy", "Additional daemons", "https://github.com/MiniVoidyy")
+            contributorRow("Snoolie", "AAR handling", "https://github.com/0xilis")
+            contributorRow("mattisklein (Project Linwood)", "Siri AI eligibility archives", "https://github.com/mattisklein")
+            contributorRow("0xjohnnydev", "AirLift", "https://github.com/0xjohnnydev")
+            contributorRow("Prognosticate-X", "iOS 27 status bar research", "https://github.com/Prognosticate-X/")
             NativeNote("The vendored copies carry local patches, listed with "
                 + "the reason for each in Vendor/patches/README.md. SideStore's minimuxer "
                 + "is © 2026 SideStore.")
+        }
+    }
+
+    private func contributorRow(_ name: String, _ role: String, _ address: String) -> some View {
+        Link(destination: URL(string: address)!) {
+            creditRow(name, role, systemImage: "person")
         }
     }
 
