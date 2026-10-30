@@ -188,15 +188,26 @@ streaming it. The verification order the file's own doc comment insists on
 (`AfcMediaBackup.swift:128-133`) is preserved — write, verify, then delete — only the
 "we already have an identical copy" fast path is new.
 
+The skip is now load-bearing for a second caller, not just the apply path: the container
+is topped up automatically once the setup guide finishes and once per launch
+(`GoldenNuggetEngine.startAutomaticMediaPull`, rate-limited to one an hour), so the
+repeat case is the *normal* case rather than an optimization for a double apply. The
+log line `N file(s) already stored, N byte(s) not transferred` is what tells the two
+apart in a bug report.
+
 Two follow-ups worth deciding explicitly (they are product calls, not engineering ones):
 
 - The apply path pulls media on **every** iOS 27 apply (`GoldenNuggetEngine.swift:484-488`),
   with `skipAfcMedia` as the only escape. With 2.2 the repeat cost collapses, but the
   survey (an AFC directory walk) still runs. Consider making the apply-time pull
-  conditional on the survey reporting files the manifest does not already cover.
+  conditional on the survey reporting files the manifest does not already cover. An
+  apply also now skips the stage outright while an automatic top-up holds the store
+  (`AfcMediaBackup.isTransferActive`), which is a log line, not a failure.
 - `deletingOriginals: false` means permanent 2× storage. The flag exists and the code
   already handles the destructive half safely (`AfcMediaBackup.swift:192-202`). This is
-  a user-visible choice, not a default to flip silently.
+  a user-visible choice, not a default to flip silently. Both automatic callers pass
+  `false`; only the Media page's own switch asks for the delete.
+
 
 ---
 

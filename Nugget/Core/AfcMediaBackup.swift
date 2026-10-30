@@ -142,6 +142,24 @@ enum AfcMediaBackup {
         return values?.volumeAvailableCapacityForImportantUsage ?? 0
     }
 
+    /// Whether a transfer owns the store right now. A read-only view of the lock
+    /// `beginTransfer` takes, for callers that would otherwise collide with it:
+    /// an apply's media stage and the home page's Restore button.
+    static var isTransferActive: Bool {
+        transferLock.lock()
+        defer { transferLock.unlock() }
+        return transferActive
+    }
+
+    /// What the store holds, for the UI — `nil` when its manifest cannot be read.
+    ///
+    /// `read()` is memoised on the manifest's own size and date, so this is a
+    /// `stat` per call and a decode only when the store actually changed.
+    static func storeTotals() -> (files: Int, bytes: Int64)? {
+        guard let manifest = try? read() else { return nil }
+        return (manifest.entries.count, manifest.entries.reduce(0) { $0 + $1.size })
+    }
+
     // MARK: - Transfer
 
     /// Pull every media file into the store, then — only if `deletingOriginals`
@@ -169,10 +187,47 @@ enum AfcMediaBackup {
         var indices: [String: Int] = [:]
         for (index, row) in manifest.entries.enumerated() { indices[row.source] = index }
         var done: Int64 = 0
+        var alreadyStored = 0
+        var alreadyStoredBytes: Int64 = 0
 
         for entry in survey.files {
             let relative = String(entry.path.dropFirst())          // drop the leading "/"
             let destination = try localMediaPath(relative)
+
+            // Already held, at the size and modification date the device reports
+            // now: streaming it again would rewrite an identical file. This is
+            // what makes the automatic top-up (setup finish, then every launch)
+            // a directory walk instead of a second full copy of the library.
+            //
+            // The modification date is the tie-breaker, not the size: a photo
+            // edited in place keeps its path and can keep its size, and the same
+            // date on both sides is the device saying "unchanged since the pull
+            // that stored this".
+            if let index = indices[entry.path] {
+                let row = manifest.entries[index]
+                let attributes = try? FileManager.default.attributesOfItem(atPath: destination.path)
+                if row.size == entry.size, row.modified == entry.modified,
+                   attributes?[.type] as? FileAttributeType == .typeRegular,
+                   (attributes?[.size] as? NSNumber)?.int64Value == entry.size {
+                    done += entry.size
+                    alreadyStored += 1
+                    alreadyStoredBytes += entry.size
+                    // The copy is already good, but the destructive half still
+                    // has to happen when it was asked for: the automatic top-up
+                    // fills this store, so the Media page's switch would
+                    // otherwise find every file already stored and delete
+                    // nothing.
+                    if deletingOriginals,
+                       let marked = try await deleteOriginal(afterStored: entry,
+                                                             storedAs: row.storedAs,
+                                                             onProgress: onProgress) {
+                        manifest.entries[index] = marked
+                        try appendJournal(marked)
+                    }
+                    continue
+                }
+            }
+
             try FileManager.default.createDirectory(
                 at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
 
@@ -265,11 +320,55 @@ enum AfcMediaBackup {
                 + "total \(ByteCountFormatter.string(fromByteCount: done, countStyle: .file))")
         }
 
+        if alreadyStored > 0 {
+            onProgress?("AFC media: \(alreadyStored) file(s) already stored, "
+                + "\(ByteCountFormatter.string(fromByteCount: alreadyStoredBytes, countStyle: .file)) "
+                + "not transferred")
+        }
         if survey.skippedSymlinks > 0 {
             onProgress?("AFC media: skipped \(survey.skippedSymlinks) symlink(s)")
         }
         try write(manifest)
         return manifest
+    }
+
+    /// The destructive half for a file whose copy is already in the store.
+    ///
+    /// Same rules as the streamed path: the original is removed only after the
+    /// device itself still reports the size and date the stored copy was
+    /// verified against, and a file above the AFC write limit keeps its original
+    /// because `push` could not put it back.
+    ///
+    /// Returns the row to journal as `deleted`, or `nil` when the original was
+    /// kept — a kept original is logged, never fatal: the copy is intact either
+    /// way, and the pull's own job is already done.
+    private static func deleteOriginal(
+        afterStored entry: AfcFsEntry,
+        storedAs: String,
+        onProgress: ((String) -> Void)?
+    ) async throws -> Entry? {
+        guard entry.size <= inlineWriteLimit else {
+            onProgress?("AFC media: original kept for \(storedAs) — exceeds the 64 MiB restore limit")
+            return nil
+        }
+        let gateway = try await gateway()
+        guard let current = try? await gateway.afcEntryInfo(path: entry.path) else {
+            onProgress?("AFC media: could not re-check \(entry.path) — original kept, copy is intact")
+            return nil
+        }
+        guard !current.isDirectory, current.linkTarget == nil,
+              current.size == entry.size, current.modified == entry.modified else {
+            onProgress?("AFC media: \(entry.path) changed during transfer — original kept")
+            return nil
+        }
+        do {
+            try await gateway.afcDelete(path: entry.path)
+        } catch {
+            onProgress?("AFC media: could not remove \(entry.path) — copy is intact")
+            return nil
+        }
+        return Entry(source: entry.path, storedAs: storedAs, size: entry.size,
+                     modified: entry.modified, deleted: true)
     }
 
     /// Put everything back after checking the complete local inventory.

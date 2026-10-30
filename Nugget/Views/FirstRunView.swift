@@ -248,6 +248,14 @@ struct FirstRunView: View {
                     + "state this guide exists to prevent.")
             NativePrimaryButton(title: "Finish setup", systemImage: "checkmark", disabled: !canFinish) {
                 firstRun.complete(reason: "tunnel and pairing record both ready")
+                // Start the photo/video copy here, while the tunnel is known to
+                // be up and the user is still on a screen that explains it. The
+                // order matters: the record is already complete, so a pull that
+                // outlives this page is not tied to it. The engine waits for
+                // minimuxer before it touches AFC, which is why this call can
+                // happen before the home page's `.task` starts it.
+                GoldenNuggetEngine.shared.startAutomaticMediaPull(
+                    reason: "setup finished", force: true)
                 onClose?()
             }
             Button("Skip setup for now") {
@@ -256,6 +264,11 @@ struct FirstRunView: View {
             }
             .foregroundStyle(.secondary)
             NativeNote("Skipping is not a dead end: this guide is in Settings afterwards.")
+            NativeNote("Finishing also starts copying this device's photos and videos into "
+                + "the app's container. It runs in the background — you can keep using the "
+                + "app — and the copy is what the “Restore media” button on the home page "
+                + "puts back after a reset. Videos take a while the first time; later "
+                + "launches only collect new files.")
         }
     }
 

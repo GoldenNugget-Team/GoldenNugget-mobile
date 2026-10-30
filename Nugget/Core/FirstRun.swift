@@ -35,6 +35,12 @@ final class FirstRunSettings: ObservableObject {
     ///   tell them apart — a first report that starts with a guide the user never
     ///   dismissed looks like a broken launch.
     func complete(reason: String) {
+        // Announced before the write, because `@AppStorage` inside an
+        // `ObservableObject` does not publish anything on its own: the gate used
+        // to lift only when something else happened to re-render `RootView`
+        // (the identity poll), and reading `isComplete` in a body that never
+        // re-ran was one poll away from leaving the user on the guide.
+        objectWillChange.send()
         let wasComplete = completed
         completed = true
         GoldenNuggetEngine.shared.log(wasComplete

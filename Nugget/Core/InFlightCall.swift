@@ -70,6 +70,15 @@ final class InFlightCall: @unchecked Sendable {
         return depth > 0
     }
 
+    /// Whether a user-visible run owns the device right now — the flag
+    /// `beginRun` sets. Work that must not start mid-run (the background media
+    /// copy) reads this instead of trying to begin a run of its own.
+    var isRunActive: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return runActive
+    }
+
     var abandonedDescription: String {
         lock.lock()
         defer { lock.unlock() }

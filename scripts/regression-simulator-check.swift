@@ -70,6 +70,38 @@ final class RegressionSuite {
             self.check(try Data(contentsOf: AppPaths.mediaStore.appendingPathComponent("DCIM/a.jpg")) == Data([3, 4]), "existing copy replaced atomically")
             self.check(try AfcMediaBackup.read().entries.count == 2, "same-path update does not duplicate journal rows")
         }
+        await run("unchanged media is not streamed twice") {
+            let gateway = try self.resetStore("media-skip")
+            gateway.files = ["/DCIM/a.jpg": Data([1, 2, 3])]
+            _ = try await AfcMediaBackup.pull(deletingOriginals: false)
+            let afterFirst = gateway.streamCount
+            self.check(afterFirst == 1, "the first pull streams the file once")
+            _ = try await AfcMediaBackup.pull(deletingOriginals: false)
+            self.check(gateway.streamCount == afterFirst,
+                       "a second pull of the same size and date skips the file")
+            self.check(AfcMediaBackup.storeTotals()?.files == 1,
+                       "the skip still leaves the file counted in the store")
+            gateway.files = ["/DCIM/a.jpg": Data([1, 2, 3, 4])]
+            _ = try await AfcMediaBackup.pull(deletingOriginals: false)
+            self.check(gateway.streamCount == afterFirst + 1,
+                       "a file whose size changed is streamed again")
+            self.check(try Data(contentsOf: AppPaths.mediaStore.appendingPathComponent("DCIM/a.jpg"))
+                        == Data([1, 2, 3, 4]), "the changed file replaces the stored copy")
+        }
+        await run("deleting originals still removes an already stored file") {
+            let gateway = try self.resetStore("media-skip-delete")
+            gateway.files = ["/DCIM/a.jpg": Data([1, 2, 3])]
+            _ = try await AfcMediaBackup.pull(deletingOriginals: false)
+            self.check(gateway.removed.isEmpty,
+                       "a non-destructive pull removes nothing")
+            let manifest = try await AfcMediaBackup.pull(deletingOriginals: true)
+            self.check(gateway.removed == ["/DCIM/a.jpg"],
+                       "an already stored file's original is still removed")
+            self.check(manifest.entries.first?.deleted == true,
+                       "the skipped row is journaled as deleted")
+            self.check(AfcMediaBackup.storeTotals()?.files == 1,
+                       "the copy is still counted after its original is gone")
+        }
         await run("changing AFC source is never deleted") {
             let gateway = try self.resetStore("changing-source")
             gateway.files = ["/DCIM/a.jpg": Data([1])]
@@ -211,10 +243,21 @@ final class RegressionSuite {
             try Data("debug {\"private_key\": [1,2,3]}".utf8).write(to: leaked)
             try Data("safe diagnostics".utf8).write(to: clean)
             try Data("pairing record".utf8).write(to: AppPaths.pairingFile)
-            try PairingLogPrivacy.removeLegacyDumps(at: [leaked, clean])
+            let reclaimed = PairingLogPrivacy.removeLegacyDumps(at: [leaked, clean])
+            self.check(reclaimed.files == ["old.log"], "only the leaking log is reclaimed")
             self.check(!(try String(contentsOf: leaked, encoding: .utf8)).contains("private_key"), "legacy secret field removed")
             self.check(try String(contentsOf: clean, encoding: .utf8) == "safe diagnostics", "clean logs retained")
             self.check(try String(contentsOf: AppPaths.pairingFile, encoding: .utf8) == "pairing record", "pairing record retained")
+
+            // The 18.7 GB case. Over the cap the file is deleted *unread* — that
+            // ordering is the fix: the read is what failed, the sink then stayed
+            // off, and the bytes stayed on the volume the device measures.
+            let huge = AppPaths.root.appendingPathComponent("huge.log")
+            try Data(repeating: 0x41, count: 4096).write(to: huge)
+            let oversized = PairingLogPrivacy.removeLegacyDumps(at: [huge], limit: 1024)
+            self.check(oversized.files == ["huge.log"] && oversized.bytes == 4096,
+                       "oversized log reclaimed without being read")
+            self.check(!FileManager.default.fileExists(atPath: huge.path), "oversized log is gone")
         }
         await run("statusbar native archive class names and values") {
             var overrides = StatusBarOverrides()

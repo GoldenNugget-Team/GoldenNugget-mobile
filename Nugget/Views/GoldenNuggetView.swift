@@ -111,6 +111,16 @@ struct GoldenNuggetView: View {
     /// have the Apply button report a reset's progress as its own.
     @State private var showResetSheet = false
     @State private var resetting = false
+    /// What the container's media store holds, for the Media card. Read off the
+    /// main actor (`refreshMediaTotals`) rather than computed in `body`: a cold
+    /// store costs a `stat`, but the first read of a full manifest is a JSON
+    /// decode, and a decode in a body pass is the same mistake `RunLog`'s note
+    /// describes.
+    @State private var mediaTotals: MediaTotals?
+    /// The restore run's own flag, apart from `running`/`resetting` for the same
+    /// reason those two are apart: all three write to the device and none may
+    /// report another's progress as its own.
+    @State private var restoringMedia = false
     @State private var tunnelExpanded = false
     /// The tunnel status line's two halves, **cached** rather than computed in
     /// the body.
@@ -163,6 +173,7 @@ struct GoldenNuggetView: View {
             UpdateStatusSection()
             applyCard
             clearCard
+            mediaCard
             if !status.isEmpty { processStatus }
             connectionSection
             diagnosticsSection
@@ -227,6 +238,22 @@ struct GoldenNuggetView: View {
                 startMinimuxer()
             }
             await readDevice()
+            // The media store's totals, whether or not a top-up runs: the card is
+            // on the page from the first frame, and a session that never gets a
+            // gateway still shows what the container already holds.
+            refreshMediaTotals()
+            // Top up the container's photo/video copy. Only after the device has
+            // answered: a pull started before minimuxer's gateway exists would be
+            // a log line about a tunnel that is actually fine. The pull is
+            // rate-limited to one an hour and skips every file already stored at
+            // the same size and date, so a launch costs a directory walk.
+            //
+            // `isComplete` is the setup guide's gate: a copy that starts while the
+            // user is still on the guide is the one case where the stored files
+            // precede the explanation of what they are for.
+            if FirstRunSettings.shared.isComplete, paired, !identity.version.isEmpty {
+                GoldenNuggetEngine.shared.startAutomaticMediaPull(reason: "app launch")
+            }
         }
         .onOpenURL { url in
             guard PairingRecord.hasKnownExtension(url.pathExtension) else { return }
@@ -412,6 +439,104 @@ struct GoldenNuggetView: View {
             NativeDangerButton(title: "Reset Tweaks",
                                disabled: running || resetting) {
                 showResetSheet = true
+            }
+        }
+    }
+
+    /// The container's media totals. A struct rather than a tuple so SwiftUI can
+    /// tell one reading from the next without comparing a stored tuple.
+    private struct MediaTotals: Equatable {
+        var files: Int
+        var bytes: Int64
+    }
+
+    /// The photos and videos kept in the container, and the one button that puts
+    /// them back.
+    ///
+    /// The **copy** is automatic — finishing the setup guide starts it and each
+    /// launch afterwards tops it up — so this card's own action is the restore.
+    /// It sits on the home page because that page is where a user lands after the
+    /// reset that makes a restore necessary; the Media page keeps the manual
+    /// survey / pull / empty tools for the same store.
+    ///
+    /// "Restore media" is deliberately a button of its own rather than a renamed
+    /// "push back" on the Media page: the two read the same store, but this one
+    /// is the follow-up to a device reset and has to be reachable without knowing
+    /// that a Media page exists.
+    private var mediaCard: some View {
+        Section("Media") {
+            if let totals = mediaTotals, totals.files > 0 {
+                Text("\(totals.files) photo(s) and video(s) — "
+                    + ByteCountFormatter.string(fromByteCount: totals.bytes, countStyle: .file)
+                    + " kept in the app")
+                    .font(.subheadline)
+            } else {
+                Text("No photos or videos copied yet")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            NativePrimaryButton(title: restoringMedia ? "Restoring…" : "Restore media",
+                                systemImage: "arrow.uturn.backward.circle",
+                                running: restoringMedia,
+                                disabled: !canRestoreMedia) {
+                restoreMedia()
+            }
+            NativeNote("Writes every kept photo and video back to this device's Media "
+                + "folder, verifying each one. Setup starts the copy automatically and "
+                + "each launch adds new files; if the count above stays at zero, the "
+                + "tunnel may be down — the Media page can pull by hand.")
+            NavigationLink(value: AppDestination.media) {
+                Label("Media page", systemImage: "photo.on.rectangle")
+            }
+        }
+    }
+
+    /// A restore needs a device to write to, a store with something in it, and no
+    /// other run writing to the same device.
+    private var canRestoreMedia: Bool {
+        paired && !running && !resetting && !restoringMedia && (mediaTotals?.files ?? 0) > 0
+    }
+
+    /// Re-read the store's totals off the main actor.
+    private func refreshMediaTotals() {
+        Task {
+            // `storeTotals()` stats the manifest and decodes it only when the
+            // store changed, but a first read of a large library is still a
+            // decode — never on the page's thread.
+            let totals = await Task.detached { AfcMediaBackup.storeTotals() }.value
+            await MainActor.run {
+                mediaTotals = totals.map { MediaTotals(files: $0.files, bytes: $0.bytes) }
+            }
+        }
+    }
+
+    /// The card's action: put the container's copy back on the device.
+    ///
+    /// Runs through the engine as a run, so it cannot overlap an apply or a
+    /// reset, and its status line follows the same six-second pattern the other
+    /// two use.
+    private func restoreMedia() {
+        restoringMedia = true
+        RunLog.shared.clear()
+        showStatus("Restoring media…", .accent, autoHide: false)
+        Task {
+            var text = ""
+            var tone: GoldenTone = .primary
+            do {
+                try await GoldenNuggetEngine.shared.restoreMedia()
+                text = "Media restored to the device."
+                tone = .success
+            } catch let failure as TransportFailure where failure.isCancellation {
+                text = "⏹ stopped by the user (\(failure.label))"
+                tone = .warning
+            } catch {
+                text = "❌ \(error.localizedDescription)"
+                tone = .error
+            }
+            await MainActor.run {
+                restoringMedia = false
+                showStatus(text, tone)
+                refreshMediaTotals()
             }
         }
     }
@@ -749,6 +874,11 @@ struct GoldenNuggetView: View {
         } else {
             lines.append("Nothing is selected on the PosterBoard page, so this run carries "
                 + "no wallpapers.")
+        }
+        if posterBoardSelection.fullReset || !posterBoardSelection.resetModes.isEmpty {
+            lines.append("⚠️ A PosterBoard reset is armed (\(posterBoardSelection.describe)). "
+                + "A reset run clears the store and installs no wallpapers, so with wallpapers "
+                + "selected as well Apply refuses until one of the two is turned off.")
         }
         if templateSelection.isActive {
             if templateSelection.usesDomains {

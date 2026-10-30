@@ -47,6 +47,9 @@ final class IdeviceGateway {
     var writes: [String] = []
     var largePath: String?
     var largeSize: Int64 = 0
+    /// How many times a file body was actually streamed. The pull's skip is only
+    /// real if a second pull leaves this unchanged.
+    var streamCount = 0
 
     func afcEntryInfo(path: String) async throws -> AfcFsEntry {
         if path == "/DCIM" { return .init(path: path, name: "DCIM", isDirectory: true, size: 0) }
@@ -64,6 +67,7 @@ final class IdeviceGateway {
     func afcStreamFile(path: String, chunkSize: Int, _ consume: (Data) throws -> Void) async throws -> Int64 {
         if path == failurePath { throw GoldenNuggetError("Injected AFC disconnect") }
         if path == largePath {
+            streamCount += 1
             var remaining = largeSize
             while remaining > 0 {
                 let count = Int(min(Int64(chunkSize), remaining))
@@ -72,6 +76,7 @@ final class IdeviceGateway {
             }
             return largeSize
         }
+        streamCount += 1
         let data = files[path]!
         try consume(data)
         try afterStream?()
