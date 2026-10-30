@@ -34,6 +34,9 @@
 
 ## UI
 
+- Replace the phone's burger menu with the platform's tab bar: Home, Tweaks, Wallpapers, Media and a grouped **More** list for the remaining pages. The iPad keeps its sidebar, where both columns fit.
+- Merge the Daemons page into Tweaks behind a Tweaks / Daemons switch, so one selection, one autosave and one Apply cover both halves.
+- Trim the home page to the run: one line under Apply, a single folded row for pairing and the tunnel, a compact media card, and a one-sentence reset. The diagnostics dump and its share rows moved to Settings → Logs.
 - Browse tweaks and daemon groups in collapsible categories using the native SwiftUI interface.
 - Show experimental warnings, hardware requirements, and conflicting-tweak restrictions before applying changes.
 - Ask for a cellular signal override when status-bar modifications are first enabled.

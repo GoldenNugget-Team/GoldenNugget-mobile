@@ -1,6 +1,28 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Which half of the device's tweaks this page is showing.
+///
+/// Upstream splits them into two pages — `IOSTweaksPage` over the registry and
+/// `IOSDaemonsContent` over `load_daemons()` — because the desktop has a
+/// sidebar to put them in.  A phone has a tab bar with five slots, and these
+/// two share everything that matters: the selection, its autosave, the preset
+/// import, and the one Apply on the home page.  So they are one page with a
+/// switch at the top, not two pages and a fourth menu row.
+enum TweaksMode: String, CaseIterable, Identifiable, Hashable {
+    case tweaks
+    case daemons
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .tweaks: "Tweaks"
+        case .daemons: "Daemons"
+        }
+    }
+}
+
 /// The tweaks page: GoldenNugget's three registry sections, rendered from the
 /// generated catalog with the registry's own editors, defaults and gating.
 ///
@@ -18,6 +40,11 @@ import UniformTypeIdentifiers
 /// title.  The two extra lines this app renders (the tweak id and the registry's
 /// description) ride inside the same card instead of moving to a tooltip, so the
 /// page still shows everything it showed before.
+///
+/// The daemons half is `DaemonsView` itself, embedded rather than copied: it is
+/// a page with its own master switch, Recommended set and confirmation sheet,
+/// and a second rendering of forty-odd group switches inside this list would be
+/// the same code twice with one of the two going stale.
 struct TweaksView: View {
     @ObservedObject private var hotload = HotLoadService.shared
     @AppStorage(UntestedTweaks.enabledKey) private var untestedTweaks = false
@@ -68,8 +95,57 @@ struct TweaksView: View {
     /// The search field's text. Filtering happens through `visibleSpecs`, so a
     /// section with no matches disappears and the count line tracks the query.
     @State private var searchText = ""
+    /// Tweaks or daemons. Session-scoped like the rest of this page's view
+    /// state: the mode is where the user is looking, not a setting.
+    @State private var mode: TweaksMode = .tweaks
 
     var body: some View {
+        Group {
+            switch mode {
+            case .tweaks: tweaksPage
+            // Its own title, search field and confirmation sheet: the mode is
+            // the page, so nothing about it is re-implemented here.
+            case .daemons: DaemonsView(selection: $selection)
+            }
+        }
+        // In the bar rather than in a band above the list: the search field
+        // already takes a drawer under the title, and a third band of chrome on
+        // a phone leaves the page starting a fifth of the way down. A principal
+        // item also keeps the switch one tap away however far the user has
+        // scrolled.
+        .toolbar {
+            if daemonsAllowed {
+                ToolbarItem(placement: .principal) { modePicker }
+            }
+        }
+        // HotLoad can start hiding the daemon groups mid-session (a rule
+        // refresh), and a segment that leads to "Feature unavailable" is
+        // worse than a segment that is not there.
+        .onChange(of: daemonsAllowed) { _, allowed in
+            if !allowed { mode = .tweaks }
+        }
+    }
+
+    /// Whether HotLoad leaves the daemon groups visible.
+    ///
+    /// The same `Daemons` key that used to hide the destination: the page is
+    /// gone, the rule is not.
+    private var daemonsAllowed: Bool {
+        hotload.currentPolicy.hiddenFeatures["Daemons"] == nil
+    }
+
+    private var modePicker: some View {
+        Picker("Catalog", selection: $mode) {
+            ForEach(TweaksMode.allCases) { mode in
+                Text(mode.title).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 190)
+        .accessibilityLabel("Tweaks or daemons")
+    }
+
+    private var tweaksPage: some View {
         List {
             identitySection
             importSection
@@ -87,9 +163,6 @@ struct TweaksView: View {
         .searchable(text: $searchText,
                     placement: .navigationBarDrawer(displayMode: .always),
                     prompt: "Search tweaks")
-        // Compact widths only -- on a tablet the split view draws its own sidebar
-        // toggle, and a second button beside it is the duplicate-controls mess.
-        .goldenSidebarButton()
         .navigationBarTitleDisplayMode(.inline)
         .task {
             // Read before restoring, and the order is load-bearing: the stored
@@ -255,11 +328,11 @@ struct TweaksView: View {
     /// A tweak the device cannot run is hidden, not disabled — that is what
     /// `gui/ios/tweaks.py` does with `is_tweak_compatible`, and an always-inert
     /// switch would be a worse lie than an absent one.
-    /// The registry tweaks only. `daemons` is a section of its own with a page
-    /// of its own (`DaemonsView`), because upstream renders it from
-    /// `load_daemons()` and a hand-built widget list rather than from the
-    /// registry, and folding it in here would show 40 rows with no master
-    /// switch and no Recommended set.
+    /// The registry tweaks only. The `daemons` section is the page's other
+    /// mode (`DaemonsView`), because upstream renders it from `load_daemons()`
+    /// and a hand-built widget list rather than from the registry, and folding
+    /// it into this one would show 40 rows with no master switch and no
+    /// Recommended set.
     private var visibleSpecs: [TweakSpec] {
         let hidden = hotload.currentPolicy.hiddenTweakIDs
         return TweakCatalog.all.filter {

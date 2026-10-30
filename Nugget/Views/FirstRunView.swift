@@ -86,9 +86,9 @@ struct FirstRunView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Set Up")
         .navigationBarTitleDisplayMode(.inline)
-        // No `goldenSidebarButton()`: there is no sidebar behind this page in
-        // either state. As the gate this is the root; as a Settings page it is
-        // pushed onto the detail stack, where the bar already carries "back".
+        // No menu button: there is no sidebar behind this page in either state.
+        // As the gate this is the root; as a Settings page it is pushed onto a
+        // stack, where the bar already carries "back".
         .toolbar {
             if let onClose {
                 ToolbarItem(placement: .confirmationAction) {

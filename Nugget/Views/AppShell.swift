@@ -1,22 +1,54 @@
 import SwiftUI
 import UIKit
 
-/// The app's shell: a sidebar next to a detail column.
+/// The app's shell: a **sidebar** on a tablet, a **tab bar** on a phone.
 ///
-/// It is a `NavigationSplitView` on purpose, and the reason is the iPad itself —
-/// this app runs in a window whose width the system picks (Slide Over 320,
-/// Split View, iPadOS 26's free resizing), so the navigation has to survive a
-/// window that is a third of the screen.  A split view does that **by itself**:
-/// in a compact width it collapses to one column with the sidebar reachable from
-/// the detail's bar, and in a regular width both columns are on screen at once.
-/// A plain `NavigationStack` can only do the second of those.
+/// Each is the platform's own idiom, and each is there for the reason its device
+/// has it. A tablet gets the sidebar: `NavigationSplitView` keeps every section
+/// one tap away and handles a window whose width iOS picks itself (Slide Over
+/// 320, Split View, iPadOS 26's free resizing) — in a narrow window it collapses
+/// to one column without being told. A phone gets the tab bar, because that is
+/// what the platform's apps use and what a thumb reaches: the four pages a
+/// session actually visits stay permanently on screen and everything else lives
+/// one tap further, behind **More**.
 ///
-/// The home page stays the **root of the detail column** rather than becoming one
-/// of the sidebar's selections.  That is what keeps it alive: a split view
-/// destroys the detail view when the selection changes, and the home page owns
-/// the run (Apply, progress, log) and the launch bootstrap — losing it mid-run
-/// would drop the progress and re-run the auto-start.  Selecting a destination
-/// pushes onto the detail stack instead, so home is never removed, only covered.
+/// **The home page is never pushed away.** On a tablet it is the detail column's
+/// root, so selecting a destination covers it rather than destroying it; on a
+/// phone it is a tab root, and `TabView` keeps every tab's view alive. Either
+/// way the run (Apply, progress, log) and the launch bootstrap survive a trip to
+/// another section.
+enum AppTab: String, CaseIterable, Identifiable, Hashable {
+    case home
+    case tweaks
+    case posterBoard
+    case media
+    case more
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .home: "Home"
+        case .tweaks: "Tweaks"
+        // The page calls itself PosterBoard; the tab is named for what a user
+        // picks there, because "PosterBoard" means nothing on a phone.
+        case .posterBoard: "Wallpapers"
+        case .media: "Media"
+        case .more: "More"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .home: "house"
+        case .tweaks: "slider.horizontal.3"
+        case .posterBoard: "photo.artframe"
+        case .media: "photo.on.rectangle"
+        case .more: "ellipsis.circle"
+        }
+    }
+}
+
 enum AppDestination: String, CaseIterable, Identifiable, Hashable {
     case home
     case tweaks
@@ -28,7 +60,6 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
     case statusBar
     case wallet
     case passcode
-    case daemons
     case media
     case files
     case settings
@@ -40,13 +71,43 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
         case .posterBoard, .wallpaperDownloads: return policy.hiddenFeatures["PosterBoard"] == nil
         case .templates: return policy.hiddenFeatures["Templates"] == nil
         case .statusBar: return policy.hiddenFeatures["Status Bar"] == nil
-        case .daemons: return policy.hiddenFeatures["Daemons"] == nil
         case .tweaks: return !["Liquid Glass", "Springboard", "Internal"].allSatisfy { policy.hiddenFeatures[$0] != nil }
         default: return true
         }
     }
 
-    /// Whether this destination gets a row of its own in the sidebar/menu.
+    /// Whether the shells may offer this destination at all.
+    ///
+    /// Two questions in one place, because both shells ask both: the HotLoad
+    /// policy can hide a feature for a device/version pair, and Airlift's
+    /// availability gate makes the two RemotePairing-dependent pages pointless
+    /// on a device that cannot use them. A row that opens a page saying "not
+    /// available" is worse than no row.
+    func isAvailable(policy: HotLoadPolicy, device: DeviceIdentity) -> Bool {
+        guard allowed(by: policy) else { return false }
+        if self == .wallet || self == .passcode {
+            return !AirliftAvailability.isHidden(deviceVersion: device.version,
+                                                 buildVersion: device.buildVersion)
+        }
+        return true
+    }
+
+    /// The phone tab this destination is the root of, if it is one.
+    ///
+    /// Four pages earn a tab: the two the app exists for (home, which carries
+    /// Apply, and Tweaks), the wallpaper page — the other half of what Apply
+    /// delivers — and Media. Everything else is one tap further, behind More.
+    var tab: AppTab? {
+        switch self {
+        case .home: .home
+        case .tweaks: .tweaks
+        case .posterBoard: .posterBoard
+        case .media: .media
+        default: nil
+        }
+    }
+
+    /// Whether this destination gets a row of its own in the tablet's sidebar.
     ///
     /// The wallpaper downloader is the one that does not.  It is a **sub-page of
     /// PosterBoard**, not a section of its own: it edits the very selection the
@@ -56,11 +117,13 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
     /// (`Wallpaper packs`) it fills.  `PosterBoardView` pushes it with a
     /// `NavigationLink` in that section, which is also where the desktop build
     /// reaches its downloader from (`wallpaper_downloader.py`).
-    ///
-    /// The case itself stays — a destination has to exist to be pushed — only its
-    /// row goes, so the two shells (sidebar on a tablet, sheet on a phone) both
-    /// stop offering it without either needing to know about the other.
     var showsInSidebar: Bool { self != .wallpaperDownloads }
+
+    /// Whether the phone's **More** list offers this destination.
+    ///
+    /// Exactly the pages that are not tabs, minus the wallpaper downloader for
+    /// the same reason it has no sidebar row.
+    var isInMoreMenu: Bool { tab == nil && showsInSidebar }
 
     var title: String {
         switch self {
@@ -74,7 +137,6 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
         case .statusBar: "Status Bar"
         case .wallet: "Wallet"
         case .passcode: "Passcode"
-        case .daemons: "Daemons"
         case .media: "Media"
         case .files: "Files"
         case .settings: "Settings"
@@ -93,7 +155,6 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
         case .statusBar: "antenna.radiowaves.left.and.right"
         case .wallet: "creditcard.fill"
         case .passcode: "lock.rectangle"
-        case .daemons: "server.rack"
         case .media: "photo.on.rectangle"
         case .files: "folder"
         case .settings: "gearshape"
@@ -102,14 +163,12 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
 }
 
 struct RootView: View {
-    /// Which of the two shells below is in charge.
-    ///
-    /// `.compact` is the iPhone, and it is the entire reason this view has two
-    /// bodies instead of one.
+    /// Which shell is showing.  `.compact` is the phone (and an iPad window
+    /// narrowed to one), where the tab bar takes over from the sidebar.
     @Environment(\.horizontalSizeClass) private var width
     /// Drives the device-identity poll: read on the way to the foreground, stopped
     /// on the way out.  Owned here because this is the one view that outlives every
-    /// destination — the split view replaces the detail on each selection, and a
+    /// destination — a stack replaces its pushed page on each selection, and a
     /// poll bound to a page would stop and restart as the user moves around.
     @Environment(\.scenePhase) private var scenePhase
 
@@ -124,20 +183,26 @@ struct RootView: View {
 
     @ObservedObject private var firstRun = FirstRunSettings.shared
 
-    /// The detail stack.  The single source of truth for what is showing: empty
-    /// means home, which is also why the menu's "current" is `path.last ?? .home`
-    /// and there is no second variable to keep in sync.
+    /// The tablet's detail stack.  The single source of truth for what is
+    /// showing: empty means home, which is also why the sidebar's "current" is
+    /// `path.last ?? .home`.
     @State private var path: [AppDestination] = []
-    /// Regular widths only.  See `regular`.
+    /// Regular widths only.  See `regularShell`.
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
-    /// The compact shell's menu, presented as a sheet.
-    @State private var menuPresented = false
 
-    /// Owned here, above whichever shell is showing, because two columns need it at
-    /// once: the home page counts and applies it, and Tweaks/Daemons edit it.  It
-    /// was `@State` on the home page, which worked only while that page was the one
-    /// thing in the hierarchy — a split view replaces the detail on every selection
-    /// change, and the selection would have gone with it.
+    /// The phone's selected tab.
+    @State private var tab: AppTab = .home
+    /// The More tab's stack.  Bound (unlike the four page tabs) because the
+    /// shell has to be able to push a page into it: `open(_:)` sends Settings
+    /// and the rest here from anywhere in the app.
+    @State private var morePath: [AppDestination] = []
+
+    /// Owned here, above whichever shell is showing, because the two platforms
+    /// disagree about view lifetime and the selection must not depend on which
+    /// one is in charge: on a tablet the detail view is replaced on every
+    /// selection, and on a phone the tabs are kept alive but the page that edits
+    /// it must still outlive the page that applies it.  A selection owned by a
+    /// page would be destroyed by the act of walking over to press Apply.
     @State private var tweakSelection = TweakSelection()
     /// The PosterBoard page's selection, hoisted for exactly the same reason and with a
     /// sharper edge: the wallpapers and the reset choice are edited on one page and
@@ -191,6 +256,11 @@ struct RootView: View {
                 FirstRunView()
             }
         }
+        // One way for any page to reach another, whichever shell is showing.
+        // Provided above the shells so a page pressed in either one asks the
+        // shell, not a hardcoded `NavigationLink` that would push a second copy
+        // of a page which already owns a tab.
+        .environment(\.openDestination, open)
         // The native screens resolve every colour and text style from the system,
         // so the app follows the device appearance.
         // The device line and the version bounds it gates refresh themselves, and
@@ -235,43 +305,58 @@ struct RootView: View {
 
     // MARK: - Compact (iPhone)
 
-    /// A plain stack with the menu in a sheet, because a split view cannot do this
-    /// job in one column.
+    /// The platform's tab bar: four page tabs and one More list.
     ///
-    /// In a compact width a `NavigationSplitView` shows its **first** column at
-    /// launch and pushes the second on top. The first column is the sidebar, so
-    /// the app opens on a menu with Home buried behind it — and no amount of
-    /// `columnVisibility` changes that: with room for one column there is nothing
-    /// to select between, and `.detailOnly` and `.prominentDetail` are both
-    /// dropped on the floor. Reversing the columns would fix the launch and put
-    /// the menu on the *right* in a regular width, which is worse.
-    ///
-    /// So the split view stays where it works — a tablet — and the phone gets the
-    /// arrangement the phone idiom is built on: content at the root, menu behind a
-    /// burger. It also settles the leading controls: a sheet cannot leave a
-    /// back-chevron behind, so there is exactly one button at the top left instead
-    /// of the system's toggle and a custom burger arguing over the same slot.
+    /// Each tab owns a `NavigationStack`, so the page's own title bar and any
+    /// sub-page it pushes (`PosterBoard` → `Download Wallpapers`) stay inside the
+    /// tab instead of replacing the tab bar. The four page stacks keep their own
+    /// path internally — `TabView` keeps the views alive, so a page the user
+    /// pushed is still there after a detour — and only More's path is bound,
+    /// because that is the one the shell pushes into itself.
     @ViewBuilder
     private var compactShell: some View {
-        NavigationStack(path: $path) {
-            detail
-        }
-        .environment(\.showSidebar) { menuPresented = true }
-        .sheet(isPresented: $menuPresented) {
-            NavigationStack {
-                AppDestinationList(current: path.last ?? .home) { destination in
-                    menuPresented = false
-                    path = destination == .home ? [] : [destination]
-                }
-                .navigationTitle("GoldenNugget")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Close") { menuPresented = false }
-                    }
-                }
+        TabView(selection: $tab) {
+            Tab(value: AppTab.home) {
+                stack { homePage }
+            } label: {
+                Label(AppTab.home.title, systemImage: AppTab.home.systemImage)
             }
-            .presentationDetents([.medium, .large])
+            Tab(value: AppTab.tweaks) {
+                stack { page(for: .tweaks) }
+            } label: {
+                Label(AppTab.tweaks.title, systemImage: AppTab.tweaks.systemImage)
+            }
+            Tab(value: AppTab.posterBoard) {
+                stack { page(for: .posterBoard) }
+            } label: {
+                Label(AppTab.posterBoard.title, systemImage: AppTab.posterBoard.systemImage)
+            }
+            Tab(value: AppTab.media) {
+                stack { page(for: .media) }
+            } label: {
+                Label(AppTab.media.title, systemImage: AppTab.media.systemImage)
+            }
+            Tab(value: AppTab.more) {
+                NavigationStack(path: $morePath) {
+                    MoreView()
+                        .navigationDestination(for: AppDestination.self) { page(for: $0) }
+                }
+            } label: {
+                Label(AppTab.more.title, systemImage: AppTab.more.systemImage)
+            }
+        }
+    }
+
+    /// A tab's stack, with the destination routes every stack needs.
+    ///
+    /// The routes are attached to each stack rather than to one: a page that
+    /// pushes another (`PosterBoard` → `Download Wallpapers`) must resolve it in
+    /// its own stack, and a stack without the routes would push an empty page.
+    @ViewBuilder
+    private func stack<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        NavigationStack {
+            content()
+                .navigationDestination(for: AppDestination.self) { page(for: $0) }
         }
     }
 
@@ -297,117 +382,154 @@ struct RootView: View {
             }
             .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
         } detail: {
-            NavigationStack(path: $path) { detail }
+            NavigationStack(path: $path) {
+                homePage
+                    .navigationDestination(for: AppDestination.self) { page(for: $0) }
+            }
         }
         .navigationSplitViewStyle(.prominentDetail)
     }
 
-    /// The pages, shared by both shells.  The order of the arguments is the
+    // MARK: - Pages
+
+    /// The home page, as both shells' root.  The order of the arguments is the
     /// explicit initializer's, not the property declaration order.
-    @ViewBuilder
-    private var detail: some View {
+    private var homePage: some View {
         GoldenNuggetView(tweakSelection: $tweakSelection,
                          posterBoardSelection: $posterBoardSelection,
                          statusBarSelection: $statusBarSelection,
                          templateSelection: $templateSelection,
                          didAutoStart: $didAutoStart,
                          autoImportDisabled: $autoImportDisabled)
-            .navigationDestination(for: AppDestination.self) { destination in
-                if !destination.allowed(by: hotload.currentPolicy) {
-                    ContentUnavailableView("Feature unavailable", systemImage: "exclamationmark.triangle", description: Text("This feature is hidden by HotLoad safety rules. See Settings for rule status."))
-                } else {
-                    switch destination {
-                    case .home:
-                        // Unreachable: home is the stack's root, so the path never
-                        // carries it.  The switch still has to be exhaustive.
-                        EmptyView()
-                    case .tweaks:
-                        TweaksView(selection: $tweakSelection)
-                    case .presets:
-                        PresetManagerView(selection: $tweakSelection)
-                    case .community:
-                        CommunityCatalogView()
-                    case .posterBoard:
-                        PosterBoardView(selection: $posterBoardSelection)
-                    case .templates:
-                        TemplatesView(selection: $templateSelection)
-                    case .wallpaperDownloads:
-                        WallpaperDownloadsView(selection: $posterBoardSelection)
-                    case .statusBar:
-                        StatusBarView(selection: $statusBarSelection)
-                    case .wallet:
-                        WalletView()
-                    case .passcode:
-                        PasscodeThemeView()
-                    case .daemons:
-                        DaemonsView(selection: $tweakSelection)
-                    case .media:
-                        MediaView()
-                    case .files:
-                        FilesView()
-                    case .settings:
-                        SettingsView()
-                    }
-                }
-            }
     }
-}
 
-/// Carries the menu-opening action down to the pages that draw the burger.
-///
-/// A closure and not a `Bool`: the pages must not be able to *set* the menu's
-/// visibility, only ask for it.  `defaultValue` is a no-op rather than a crash so
-/// a page previewed or rendered outside the shell draws its bar instead of
-/// trapping.
-private struct ShowSidebarKey: EnvironmentKey {
-    static let defaultValue: () -> Void = {}
-}
-
-extension EnvironmentValues {
-    var showSidebar: () -> Void {
-        get { self[ShowSidebarKey.self] }
-        set { self[ShowSidebarKey.self] = newValue }
-    }
-}
-
-/// Puts the burger in the bar, but only where the system draws no toggle itself.
-///
-/// In a regular width the split view's prominent-detail style already puts a
-/// sidebar toggle in the leading slot, and that is the one that is correct: it
-/// agrees with the system about whether the column is up, and it comes with the
-/// edge swipe. A hand-rolled button next to it is where the duplicate leading
-/// controls came from.
-///
-/// A `ViewModifier` struct rather than a bare `View` extension because reading
-/// `@Environment` needs somewhere to hang it; an extension method on `View` has
-/// no `self` to hold the property wrapper.
-struct GoldenSidebarButton: ViewModifier {
-    @Environment(\.showSidebar) private var showSidebar
-    @Environment(\.horizontalSizeClass) private var width
-
+    /// One destination → its page.  Used by every stack, including the tab roots,
+    /// so a feature the HotLoad policy hides says so in place of the page rather
+    /// than disappearing from a tab bar that cannot hide it.
     @ViewBuilder
-    func body(content: Content) -> some View {
-        if width == .compact {
-            content.toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(action: showSidebar) {
-                        Image(systemName: "line.3.horizontal")
-                    }
-                    .accessibilityLabel("Menu")
-                }
-            }
+    private func page(for destination: AppDestination) -> some View {
+        if !destination.allowed(by: hotload.currentPolicy) {
+            ContentUnavailableView("Feature unavailable",
+                                   systemImage: "exclamationmark.triangle",
+                                   description: Text("This feature is hidden by HotLoad safety "
+                                                     + "rules. See Settings for rule status."))
         } else {
-            content
+            switch destination {
+            case .home:
+                // Unreachable: home is every stack's root, so a path never
+                // carries it.  The switch still has to be exhaustive.
+                EmptyView()
+            case .tweaks:
+                TweaksView(selection: $tweakSelection)
+            case .presets:
+                PresetManagerView(selection: $tweakSelection)
+            case .community:
+                CommunityCatalogView()
+            case .posterBoard:
+                PosterBoardView(selection: $posterBoardSelection)
+            case .templates:
+                TemplatesView(selection: $templateSelection)
+            case .wallpaperDownloads:
+                WallpaperDownloadsView(selection: $posterBoardSelection)
+            case .statusBar:
+                StatusBarView(selection: $statusBarSelection)
+            case .wallet:
+                WalletView()
+            case .passcode:
+                PasscodeThemeView()
+            case .media:
+                MediaView()
+            case .files:
+                FilesView()
+            case .settings:
+                SettingsView()
+            }
+        }
+    }
+
+    /// Send the user to a page from anywhere: a tab on a phone, a push on a
+    /// tablet.
+    ///
+    /// The home page uses this for its Media row. As a `NavigationLink` it would
+    /// have pushed a second copy of the Media page inside the home tab — a page
+    /// that owns a tab of its own — so on a phone the row would look like it
+    /// worked while the tab bar still pointed at Home.
+    private func open(_ destination: AppDestination) {
+        guard width == .compact else {
+            path = destination == .home ? [] : [destination]
+            return
+        }
+        if let target = destination.tab {
+            tab = target
+        } else {
+            // Everything else lives behind More, which owns the stack these
+            // pages are pushed onto.
+            tab = .more
+            morePath = [destination]
         }
     }
 }
 
-extension View {
-    func goldenSidebarButton() -> some View { modifier(GoldenSidebarButton()) }
+/// Carries `RootView`'s page-switching action down the view tree.
+///
+/// A closure rather than a binding to the tab or the path: a page may ask to
+/// show another page, never to decide how the shell gets there.
+private struct OpenDestinationKey: EnvironmentKey {
+    static let defaultValue: (AppDestination) -> Void = { _ in }
 }
 
-/// The list of destinations, used as the sidebar column in a regular width and as
-/// the sheet's contents in a compact one.
+extension EnvironmentValues {
+    var openDestination: (AppDestination) -> Void {
+        get { self[OpenDestinationKey.self] }
+        set { self[OpenDestinationKey.self] = newValue }
+    }
+}
+
+/// The phone's fifth tab: every page that is not a tab, one tap from the bar.
+///
+/// It exists because a tab bar holds five items and the four page tabs are
+/// spoken for. Grouping is the reason it is a list of sections rather than a
+/// flat dump of nine rows: the sections say what kind of thing each page
+/// changes, and a reader who does not recognize a name can still guess where it
+/// belongs.
+private struct MoreView: View {
+    @ObservedObject private var hotload = HotLoadService.shared
+    @ObservedObject private var device = DeviceIdentityMonitor.shared
+
+    /// The sections in display order, with the pages that belong to each.
+    private static let sections: [(title: String, pages: [AppDestination])] = [
+        ("Library", [.presets, .community, .templates]),
+        ("Personalize", [.statusBar, .wallet, .passcode]),
+        ("Device", [.files]),
+        ("App", [.settings]),
+    ]
+
+    var body: some View {
+        List {
+            // A section whose every row is hidden disappears with its rows: a
+            // header over nothing reads like a bug, and the HotLoad policy can
+            // hide a whole group at once.
+            ForEach(Self.sections, id: \.title) { section in
+                let pages = section.pages.filter {
+                    $0.isAvailable(policy: hotload.currentPolicy, device: device.current)
+                }
+                if !pages.isEmpty {
+                    Section(section.title) {
+                        ForEach(pages) { destination in
+                            NavigationLink(value: destination) {
+                                Label(destination.title, systemImage: destination.systemImage)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("More")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// The list of destinations, used as the tablet's sidebar column.
 ///
 /// A `List` of buttons rather than a `List` of `NavigationLink`s, because the
 /// selection target is a `NavigationStack` *path* in the other column, not the
@@ -426,9 +548,8 @@ private struct AppDestinationList: View {
             // on the enum while letting one of them stay reachable only from the
             // page that owns it.
             ForEach(AppDestination.allCases.filter { destination in
-                destination.showsInSidebar && destination.allowed(by: hotload.currentPolicy) && (!(destination == .wallet || destination == .passcode)
-                    || !AirliftAvailability.isHidden(deviceVersion: device.current.version,
-                                                    buildVersion: device.current.buildVersion))
+                destination.showsInSidebar
+                    && destination.isAvailable(policy: hotload.currentPolicy, device: device.current)
             }) { destination in
                 Button { select(destination) } label: {
                     Label(destination.title, systemImage: destination.systemImage)

@@ -1,12 +1,14 @@
 import SwiftUI
 
-/// The Daemons page — a port of GoldenNugget's `IOSDaemonsContent`
-/// (`src/gui/ios/daemons.py`).
+/// The Daemons half of the Tweaks page — a port of GoldenNugget's
+/// `IOSDaemonsContent` (`src/gui/ios/daemons.py`).
 ///
 /// Everything a group switch does is a `TweakSpec` in the catalog, so Apply,
 /// autosave and preset import work on it unchanged. This view is only the
 /// reference's arrangement: a master switch, the one-tap Recommended set, the
-/// two switch groups, and the ScreenTime nullify underneath.
+/// two switch groups, and the ScreenTime nullify underneath.  It is rendered
+/// inside `TweaksView` behind its Tweaks/Daemons switch, and keeps its own
+/// title and search field there — the two halves search different things.
 ///
 /// The six groups upstream marks interface-visible but gives no switch
 /// (`showsSwitch == false`) are deliberately not rendered — they belong to the
@@ -71,9 +73,6 @@ struct DaemonsView: View {
         .searchable(text: $searchText,
                     placement: .navigationBarDrawer(displayMode: .always),
                     prompt: "Search daemons")
-        // Compact widths only -- on a tablet the split view draws its own sidebar
-        // toggle, and a second button beside it is the duplicate-controls mess.
-        .goldenSidebarButton()
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $pendingEnable) { action in
             DaemonEnableWarningSheet {

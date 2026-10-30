@@ -146,9 +146,6 @@ struct FilesView: View {
         .animation(.easeInOut(duration: 0.18), value: banner)
         .refreshable { await load() }
         .navigationTitle("Files")
-        // Compact widths only -- on a tablet the split view draws its own sidebar
-        // toggle, and a second button beside it is the duplicate-controls mess.
-        .goldenSidebarButton()
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {

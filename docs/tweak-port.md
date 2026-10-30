@@ -110,6 +110,12 @@ silently dropped.
 > the last row records the state as of 2026-09-24, not today. It is also the page a reset
 > can act on (§2.4).
 >
+> **Amended 2026-10-30:** `DaemonsView` is no longer a page of its own — it is the daemons
+> mode of the Tweaks page, behind a segmented switch (`TweaksMode` in `TweaksView.swift`).
+> The catalog, the master switch, the Recommended set and the reset semantics are unchanged;
+> only the way in moved, because a phone's tab bar has five slots and these two share the
+> selection, the autosave and the Apply.
+>
 > **Amended 2026-09-27:** so has **PosterBoard** — wallpaper packs, video wallpapers and
 > the store resets; see `docs/posterboard-port.md`. Its row stays for the same reason, and
 > it is still reported by a preset import: the reference **itself** refuses to serialise

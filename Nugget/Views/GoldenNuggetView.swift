@@ -5,16 +5,18 @@ import Foundation
 /// The home page, laid out the way the reference's iOS home page lays it out
 /// (`src/gui/ios/home.py`): logo header carrying the device line and a refresh
 /// button → the connection status line → Apply Tweaks → the danger action → the
-/// centred process-status line.  What this app needs on top of that (pairing
-/// file, tunnel, diagnostics, log) sits below, because the reference keeps all of
-/// it on its own pages.
+/// centred process-status line.  What this app needs on top of that (the pairing
+/// record, the tunnel, the media store, the log) sits below, folded into as few
+/// rows as it can be: this is the page with the one button a run needs, and a
+/// second page's worth of controls under it is a second page.  Diagnostics and
+/// the log files live in Settings, where the evidence is collected anyway.
 ///
 /// There is no feature-card grid here.  The reference's home page opens its
-/// sections from cards, but this app has a sidebar, and the two were reaching the
-/// same five destinations by different routes — the cards now that the sidebar
-/// exists they are a second copy of a list the user is already looking at, and
-/// the copy that goes stale is the one on the page they are reading.  The
-/// sections are reachable from the sidebar and from nowhere else.
+/// sections from cards, but this app's two shells already list the same five
+/// destinations — the sidebar on a tablet, the tab bar and its More list on a
+/// phone — so cards would be a second copy of a list the user is already
+/// looking at, and the copy that goes stale is the one on the page they are
+/// reading.
 struct GoldenNuggetView: View {
     @ObservedObject private var hotload = HotLoadService.shared
     @ObservedObject private var community = CommunityTemplateStore.shared
@@ -32,6 +34,10 @@ struct GoldenNuggetView: View {
     /// Whether the sidebar is a column of its own or a stack behind the detail —
     /// see `navBarVisibility`.
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// Page-switching action from the shell. Used by the Media card: the Media
+    /// page is a tab of its own, so pushing it into this page's stack would show
+    /// a second copy while the tab bar still pointed at Home.
+    @Environment(\.openDestination) private var openDestination
     /// Launch auto-start bookkeeping for `reimportPairingFile()`, **owned by
     /// `RootView`**: `startMinimuxer`'s lock only rejects *concurrent* attempts,
     /// so these have to outlive the view that reads them even though what they
@@ -121,7 +127,12 @@ struct GoldenNuggetView: View {
     /// reason those two are apart: all three write to the device and none may
     /// report another's progress as its own.
     @State private var restoringMedia = false
-    @State private var tunnelExpanded = false
+    /// Whether the home page's one folded row — pairing and the tunnel — is open.
+    ///
+    /// It also drives the tunnel probe: the status line under the fields is the
+    /// only thing here that costs a network wait, so closed means no two-second
+    /// `poll()` every five seconds for a page nobody has opened.
+    @State private var connectionExpanded = false
     /// The tunnel status line's two halves, **cached** rather than computed in
     /// the body.
     ///
@@ -176,14 +187,10 @@ struct GoldenNuggetView: View {
             mediaCard
             if !status.isEmpty { processStatus }
             connectionSection
-            diagnosticsSection
             RunLogCard()
         }
         .listStyle(.insetGrouped)
         .navigationTitle("GoldenNugget")
-        // Compact widths only -- on a tablet the split view draws its own sidebar
-        // toggle, and a second button beside it is the duplicate-controls mess.
-        .goldenSidebarButton()
         .navigationBarTitleDisplayMode(.inline)
         // The home page carries its own logo header, so the platform bar would be
         // a second, empty one.  Hiding it *here* — not on the pushed page — keeps
@@ -205,8 +212,8 @@ struct GoldenNuggetView: View {
         // probe can wait two seconds for the peer, and two seconds on the main
         // thread is a frozen scroll.  `.task(id:)` cancels the loop when the
         // disclosure closes.
-        .task(id: tunnelExpanded) {
-            guard tunnelExpanded else { return }
+        .task(id: connectionExpanded) {
+            guard connectionExpanded else { return }
             while !Task.isCancelled {
                 await refreshTunnelStatus()
                 try? await Task.sleep(for: .seconds(5))
@@ -433,13 +440,12 @@ struct GoldenNuggetView: View {
     /// nothing to the device while reading as though it had.
     private var clearCard: some View {
         Section {
-            NativeNote("Puts whole pages back to stock on the device: the files those "
-                + "pages' tweaks are written to are overwritten with what a fresh device has. "
-                + "Choose the pages in the next screen.")
             NativeDangerButton(title: "Reset Tweaks",
                                disabled: running || resetting) {
                 showResetSheet = true
             }
+            NativeNote("Puts whole pages back to stock on the device. The next screen "
+                + "picks which ones and names the files it writes.")
         }
     }
 
@@ -481,11 +487,12 @@ struct GoldenNuggetView: View {
                                 disabled: !canRestoreMedia) {
                 restoreMedia()
             }
-            NativeNote("Writes every kept photo and video back to this device's Media "
-                + "folder, verifying each one. Setup starts the copy automatically and "
-                + "each launch adds new files; if the count above stays at zero, the "
-                + "tunnel may be down — the Media page can pull by hand.")
-            NavigationLink(value: AppDestination.media) {
+            NativeNote("Copied automatically at setup and on every launch; this writes "
+                + "every kept photo and video back to the device's Media folder.")
+            Button {
+                // Asks the shell: a tab on a phone, a push on a tablet.
+                openDestination(.media)
+            } label: {
                 Label("Media page", systemImage: "photo.on.rectangle")
             }
         }
@@ -596,35 +603,29 @@ struct GoldenNuggetView: View {
         }
     }
 
+    /// Pairing and the tunnel, folded into one row.
+    ///
+    /// The connection's *state* is already on the page twice — the header's
+    /// device line and `connectionLine`.  What is left here is the other half:
+    /// the things that fix a connection that is not there.  A session that works
+    /// never opens this, and as a section it was seven rows and two paragraphs
+    /// on the page whose job is one button.
     private var connectionSection: some View {
-        Section("Connection") {
-            if paired {
-                Button {
-                    resetPairing()
-                } label: {
-                    Label("Reset pairing file", systemImage: "arrow.counterclockwise")
+        Section {
+            DisclosureGroup(isExpanded: $connectionExpanded) {
+                VStack(alignment: .leading, spacing: 14) {
+                    pairingRows
+                    Divider()
+                    tunnelEditor
                 }
-            } else if wirelessPair.isRunning {
-                wirelessPairProgress
-            } else {
-                Button {
-                    showPairingImporter.toggle()
-                } label: {
-                    Label("Select Pairing File", systemImage: "doc.badge.plus")
-                }
-                // iOS 27 lets the device pair with itself: the service below is
-                // discovered by this same phone's RemotePairing daemon, so no
-                // computer is needed to produce a record.
-                Button {
-                    wirelessPair.start()
-                } label: {
-                    Label("Pair Wirelessly", systemImage: "wifi")
-                }
-                if case .failed(let message) = wirelessPair.phase {
-                    NativeSafetyNote(message)
-                }
+                .padding(.vertical, 6)
+            } label: {
+                // The row says what it can do, not what it is called: on a
+                // device with no record the action *is* the row, and a user
+                // reading "Connection" has no reason to guess that.
+                Label(paired ? "Pairing & tunnel" : "Pair the device",
+                      systemImage: paired ? "checkmark.seal" : "doc.badge.plus")
             }
-            tunnelDisclosure
         }
         .fileImporter(isPresented: $showPairingImporter,
                       allowedContentTypes: PairingRecord.types) { result in
@@ -633,6 +634,37 @@ struct GoldenNuggetView: View {
                 importPairingFile(from: url)
             case .failure(let error):
                 errorText = error.localizedDescription
+            }
+        }
+    }
+
+    /// The pairing rows, in the order the states occur.
+    @ViewBuilder
+    private var pairingRows: some View {
+        if paired {
+            Button {
+                resetPairing()
+            } label: {
+                Label("Reset pairing file", systemImage: "arrow.counterclockwise")
+            }
+        } else if wirelessPair.isRunning {
+            wirelessPairProgress
+        } else {
+            Button {
+                showPairingImporter.toggle()
+            } label: {
+                Label("Select Pairing File", systemImage: "doc.badge.plus")
+            }
+            // iOS 27 lets the device pair with itself: the service below is
+            // discovered by this same phone's RemotePairing daemon, so no
+            // computer is needed to produce a record.
+            Button {
+                wirelessPair.start()
+            } label: {
+                Label("Pair Wirelessly", systemImage: "wifi")
+            }
+            if case .failed(let message) = wirelessPair.phase {
+                NativeSafetyNote(message)
             }
         }
     }
@@ -673,110 +705,101 @@ struct GoldenNuggetView: View {
         }
     }
 
-    /// The tunnel addressing, folded away by default.
+    /// The tunnel addressing, inside the connection row rather than in a
+    /// disclosure of its own.
     ///
-    /// It is four fields and two paragraphs of explanation, and the reference's
-    /// home page carries nothing of the kind — this app's stand-in for the
-    /// device picker is the pairing file above it.  Open, it is the same editor
-    /// with the same validation; closed, it states the values in use, which is
-    /// the part a session that already works never needs to look at twice.
-    private var tunnelDisclosure: some View {
-        DisclosureGroup(isExpanded: $tunnelExpanded) {
-            VStack(alignment: .leading, spacing: 12) {
-                NativeNote("How this app finds the LocalDevVPN tunnel: it waits for the "
-                    + "tunnel IP on an interface, then probes the peer's lockdown port. "
-                    + "\(Tunnel.isCustomised ? "Custom values in use." : "Defaults in use.") "
-                    + "These steer this app only — the vendored library finds the peer from the "
-                    + "route table and always dials 62078.")
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Tunnel IP (this device)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextField("Tunnel IP (this device)", text: $tunnelIfaceIP)
-                        .textFieldStyle(.roundedBorder)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.numbersAndPunctuation)
-                    if !tunnelIfaceIPOK {
-                        NativeSafetyNote("Not an IPv4 address — \(Tunnel.defaultIfaceIP) is being probed instead.")
-                    }
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Peer IP (the VPN server)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextField("Peer IP (the VPN server)", text: $tunnelPeerIP)
-                        .textFieldStyle(.roundedBorder)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.numbersAndPunctuation)
-                    if !tunnelPeerIPOK {
-                        NativeSafetyNote("Not an IPv4 address — \(Tunnel.defaultPeerIP) is being probed instead.")
-                    }
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Lockdown port")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextField(String(Tunnel.defaultServicePort), text: $tunnelPort)
-                        .textFieldStyle(.roundedBorder)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        // `.numberPad` has no Return key, so on a phone this
-                        // keyboard could not be dismissed at all.
-                        .keyboardType(.numberPad)
-                        .nativeKeyboardDone()
-                    if !tunnelPortOK {
-                        NativeSafetyNote("Not a port in 1…65535 — \(Tunnel.defaultServicePort) is being probed instead.")
-                    }
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Tunnel IP prefix length")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextField(String(Tunnel.defaultPrefixLength), text: $tunnelPrefixLength)
-                        .textFieldStyle(.roundedBorder)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        // `.numberPad` has no Return key, so on a phone this
-                        // keyboard could not be dismissed at all.
-                        .keyboardType(.numberPad)
-                        .nativeKeyboardDone()
-                    if !tunnelPrefixOK {
-                        NativeSafetyNote("Not 0…32 — LocalDevVPN's tunnel-IP field takes a CIDR, and this is the part after the slash.")
-                    }
-                }
-                NativeNote("Copy into LocalDevVPN: tunnel IP \(Tunnel.ifaceIP)/\(Tunnel.ifacePrefixLength), peer \(Tunnel.peerIP), port \(Tunnel.servicePort).")
-                // Both values come from state — see `tunnelSummary`.  The probe
-                // is a 2 s `poll()` and must never run in a body.
-                Text("tunnel: \(tunnelSummary) · peer \(Tunnel.peerIP):\(Tunnel.servicePort) "
-                    + "reachable: \(peerReachable.map(String.init) ?? "…")")
+    /// Four fields and two paragraphs of explanation, and the reference's home
+    /// page carries nothing of the kind — this app's stand-in for the device
+    /// picker is the pairing record above it.  A disclosure inside a disclosure
+    /// is two taps to reach the second field, so it is a heading and a divider
+    /// here; the outer row already folded it away.
+    private var tunnelEditor: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Tunnel addresses")
+                .font(.headline)
+            NativeNote("How this app finds the LocalDevVPN tunnel: it waits for the "
+                + "tunnel IP on an interface, then probes the peer's lockdown port. "
+                + "\(Tunnel.isCustomised ? "Custom values in use." : "Defaults in use.") "
+                + "These steer this app only — the vendored library finds the peer from the "
+                + "route table and always dials 62078.")
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Tunnel IP (this device)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button {
-                    Tunnel.resetToDefaults()
-                    tunnelIfaceIP = Tunnel.defaultIfaceIP
-                    tunnelPeerIP = Tunnel.defaultPeerIP
-                    tunnelPort = String(Tunnel.defaultServicePort)
-                    tunnelPrefixLength = String(Tunnel.defaultPrefixLength)
-                    GoldenNuggetEngine.shared.log("tunnel addresses reset to defaults: \(Tunnel.requirements)")
-                    Task { await refreshTunnelStatus() }
-                } label: {
-                    Label("Reset tunnel addresses", systemImage: "arrow.counterclockwise")
+                TextField("Tunnel IP (this device)", text: $tunnelIfaceIP)
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.numbersAndPunctuation)
+                if !tunnelIfaceIPOK {
+                    NativeSafetyNote("Not an IPv4 address — \(Tunnel.defaultIfaceIP) is being probed instead.")
                 }
             }
-            .padding(.top, 8)
-        } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Tunnel settings")
-                    .font(.headline)
-                Text(Tunnel.requirements)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Peer IP (the VPN server)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                TextField("Peer IP (the VPN server)", text: $tunnelPeerIP)
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.numbersAndPunctuation)
+                if !tunnelPeerIPOK {
+                    NativeSafetyNote("Not an IPv4 address — \(Tunnel.defaultPeerIP) is being probed instead.")
+                }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Lockdown port")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField(String(Tunnel.defaultServicePort), text: $tunnelPort)
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    // `.numberPad` has no Return key, so on a phone this
+                    // keyboard could not be dismissed at all.
+                    .keyboardType(.numberPad)
+                    .nativeKeyboardDone()
+                if !tunnelPortOK {
+                    NativeSafetyNote("Not a port in 1…65535 — \(Tunnel.defaultServicePort) is being probed instead.")
+                }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Tunnel IP prefix length")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField(String(Tunnel.defaultPrefixLength), text: $tunnelPrefixLength)
+                    .textFieldStyle(.roundedBorder)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    // `.numberPad` has no Return key, so on a phone this
+                    // keyboard could not be dismissed at all.
+                    .keyboardType(.numberPad)
+                    .nativeKeyboardDone()
+                if !tunnelPrefixOK {
+                    NativeSafetyNote("Not 0…32 — LocalDevVPN's tunnel-IP field takes a CIDR, and this is the part after the slash.")
+                }
+            }
+            NativeNote("Copy into LocalDevVPN: tunnel IP \(Tunnel.ifaceIP)/\(Tunnel.ifacePrefixLength), peer \(Tunnel.peerIP), port \(Tunnel.servicePort).")
+            // Both values come from state — see `tunnelSummary`.  The probe
+            // is a 2 s `poll()` and must never run in a body.
+            Text("tunnel: \(tunnelSummary) · peer \(Tunnel.peerIP):\(Tunnel.servicePort) "
+                + "reachable: \(peerReachable.map(String.init) ?? "…")")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                Tunnel.resetToDefaults()
+                tunnelIfaceIP = Tunnel.defaultIfaceIP
+                tunnelPeerIP = Tunnel.defaultPeerIP
+                tunnelPort = String(Tunnel.defaultServicePort)
+                tunnelPrefixLength = String(Tunnel.defaultPrefixLength)
+                GoldenNuggetEngine.shared.log("tunnel addresses reset to defaults: \(Tunnel.requirements)")
+                Task { await refreshTunnelStatus() }
+            } label: {
+                Label("Reset tunnel addresses", systemImage: "arrow.counterclockwise")
             }
         }
-        .tint(.accentColor)
     }
 
     // A value is only "in use" when it survives the same validator `Tunnel`
@@ -786,54 +809,6 @@ struct GoldenNuggetView: View {
     private var tunnelPeerIPOK: Bool { Tunnel.isValidIPv4(tunnelPeerIP) != nil }
     private var tunnelPortOK: Bool { Tunnel.validPort(tunnelPort) != nil }
     private var tunnelPrefixOK: Bool { Tunnel.validPrefixLength(tunnelPrefixLength) != nil }
-
-    private var diagnosticsSection: some View {
-        Section("Diagnostics") {
-            Button {
-                Task {
-                    let block = await GoldenNuggetEngine.shared.diagnostics()
-                    RunLog.shared.append(block)
-                }
-            } label: {
-                Label("Dump Diagnostics Into Log", systemImage: "doc.text.magnifyingglass")
-            }
-            .disabled(running)
-            // Share sheets beat hand-selecting text: the diagnostics block and
-            // the full Rust log are files in Documents.  AirDrop / Save to
-            // Files gets them off the device intact.
-            shareRow(title: "Share diagnostics.txt",
-                     systemImage: "square.and.arrow.up",
-                     url: GoldenNuggetEngine.diagnosticsURL,
-                     available: hasDiagnostics)
-            shareRow(title: "Share minimuxer.log (\(GoldenNuggetEngine.rustLogSize() / 1024) KB)",
-                     systemImage: "doc.text.magnifyingglass",
-                     url: GoldenNuggetEngine.rustLogURL,
-                     available: GoldenNuggetEngine.rustLogSize() > 0)
-            // The app-side log is a separate file because it is a separate
-            // half of the evidence: the Rust log shows what the protocol did,
-            // this one shows what the host decided (filter keeps, commit
-            // accounting, staging leftovers).
-            shareRow(title: "Share goldennugget.log (\(GoldenNuggetEngine.appLogSize() / 1024) KB)",
-                     systemImage: "doc.plaintext",
-                     url: GoldenNuggetEngine.appLogURL,
-                     available: GoldenNuggetEngine.appLogSize() > 0)
-            NativeNote("The dump carries a keyword slice of the Rust log "
-                + "(mobilebackup2 protocol + jktcp flow verdict) scoped to this run, plus "
-                + "the app log tail (host-side decisions).")
-        }
-    }
-
-    /// One share action as a row.  Kept in one place so the three cannot drift
-    /// apart — the system dims an unavailable `ShareLink` on its own.
-    private func shareRow(title: String, systemImage: String, url: URL, available: Bool) -> some View {
-        ShareLink(item: url) {
-            HStack(spacing: 12) {
-                Label(title, systemImage: systemImage)
-                Spacer(minLength: 0)
-            }
-        }
-        .foregroundStyle(available ? Color.primary : Color.secondary)
-    }
 
     private var paired: Bool { pairingFileURL != nil }
 
@@ -863,29 +838,26 @@ struct GoldenNuggetView: View {
         return "Apply " + names.joined(separator: " & ")
     }
 
+    /// What the button will carry, in one line — and then only the branches that
+    /// change the decision.
+    ///
+    /// The paragraph-per-feature that used to live here described every selection
+    /// state whether or not it was selected ("nothing is on the PosterBoard
+    /// page, so no wallpapers ride along"), which is three lines of a page whose
+    /// content is one button.  The warnings stayed: a run that will refuse, or
+    /// that will drop part of the selection, is something to read *before* the
+    /// tap, not in the failure afterwards.
     private var applyNote: String {
-        var lines = ["Applies every enabled tweak to the device."
-            + " Reboot it when this is done — the injected preferences are read at boot."]
-        if posterBoardSelection.isActive {
-            lines.append("This run also delivers the PosterBoard page's selection "
-                + "(\(posterBoardSelection.describe)) — one backup, one restore, the same "
-                + "channel. That stage fetches the store's database from the device first, "
-                + "so it takes one extra exchange.")
-        } else {
-            lines.append("Nothing is selected on the PosterBoard page, so this run carries "
-                + "no wallpapers.")
-        }
+        var lines = ["One pass: every enabled tweak, plus the wallpapers and templates "
+            + "picked on their own pages. Reboot the device afterwards — the injected "
+            + "preferences are read at boot."]
         if posterBoardSelection.fullReset || !posterBoardSelection.resetModes.isEmpty {
             lines.append("⚠️ A PosterBoard reset is armed (\(posterBoardSelection.describe)). "
                 + "A reset run clears the store and installs no wallpapers, so with wallpapers "
                 + "selected as well Apply refuses until one of the two is turned off.")
         }
         if templateSelection.isActive {
-            if templateSelection.usesDomains {
-                lines.append("This run also delivers \(templateSelection.describe) from the "
-                    + "Templates page. A PosterBoard template rides along with the wallpapers; "
-                    + "any other one restores into the app container its `domain` names.")
-            } else {
+            if !templateSelection.usesDomains {
                 lines.append("The only template selected asks for sparserestore, which this app "
                     + "does not implement, so nothing is delivered from the Templates page and "
                     + "this run is not started for it.")
@@ -898,10 +870,6 @@ struct GoldenNuggetView: View {
             }
         }
         return lines.joined(separator: "\n\n")
-    }
-
-    private var hasDiagnostics: Bool {
-        FileManager.default.fileExists(atPath: GoldenNuggetEngine.diagnosticsURL.path)
     }
 
     // MARK: - Behaviour

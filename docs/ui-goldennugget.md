@@ -151,35 +151,58 @@ The four rules for a narrow window (the narrowest is computed from Slide Over 32
 the rule is the same as the reference's), the 720 cap of `GoldenPage` (it only centres when the window is wider than it, so it does nothing in a narrow window),
 the height of `GoldenLogView` (Slide Over is still full height).
 
-### Shell: `NavigationSplitView` (`Nugget/Views/AppShell.swift`)
+### Shell: sidebar on a tablet, tab bar on a phone (`Nugget/Views/AppShell.swift`)
 
-In a wide window it is the two columns "sidebar + detail"; in a narrow window the system collapses it to one column itself —
-**which is exactly why it was chosen**: this app runs in a window whose width is decided by the system, and `NavigationStack`
-only has the second form.
+`horizontalSizeClass` picks the shell, and each platform gets the idiom it is built around:
+
+- **Regular width (iPad):** `NavigationSplitView`. In a wide window it is the two columns "sidebar + detail"; the system
+  collapses it to one column on its own in a narrow window — **which is why it is still the tablet's shell**: this app
+  runs in a window whose width is decided by the system, and `NavigationStack` only has the second form.
+- **Compact width (iPhone):** `TabView` with five standard tabs — Home, Tweaks, Wallpapers, Media and **More**. The four
+  page tabs are the ones a session visits; More is a grouped list (Library / Personalize / Device / App) of everything
+  else. A tab bar holds five items, so the ninth page has to live one tap further or the bar stops being a bar.
 
 Three non-obvious constraints to check against when changing that file:
 
-1. **The home page is the bottom of the detail column's stack, not an item in the sidebar.** A split view
+1. **The home page is never pushed away.** On a tablet it is the bottom of the detail column's stack: a split view
    **destroys** the detail view when the selection changes, and the home page holds the run (Apply / progress / log)
-   and the launch bootstrap. So a sidebar selection pushes onto `path` (`path = [dest]`); the home page is
-   never removed, only covered; an empty `path` = home, and that is also the single source of truth for the
-   sidebar highlight (`path.last ?? .home`).
+   and the launch bootstrap. So a sidebar selection pushes onto `path` (`path = [dest]`); home is never removed, only
+   covered; an empty `path` = home, and that is also the single source of truth for the sidebar highlight
+   (`path.last ?? .home`). On a phone home is a tab root, and `TabView` keeps every tab's view alive. Each page tab
+   owns a `NavigationStack`; only More's path is bound, because the shell pushes into that one itself
+   (`.environment(\.openDestination)` — a page asks the shell to move, it does not push a second copy of a page that
+   already owns a tab).
 2. **`tweakSelection` and the two bootstrap flags (`didAutoStart` / `autoImportDisabled`) are hoisted to `RootView`.**
    The home page's `@State` dies together with the detail page when it is replaced: a user who selects 40 tweaks,
    taps Daemons and comes back finds everything empty. `didAutoStart` is the same story — it guards a
    process-level singleton (the lock in `startMinimuxer` only blocks concurrency), yet the flag dies with the view.
-3. **The home page's nav bar is hidden only at regular width.** The reference's home has no nav bar, but when
-   collapsed into one column **that bar is the only way back to the sidebar**, and hiding it locks the user on the
-   home page. So `navBarVisibility` forks on `horizontalSizeClass`: keep it in compact, hide it in regular.
+3. **The home page's nav bar is hidden only at regular width.** The reference's home has no nav bar, but in a narrow
+   window **that bar is the page's only title/back context**, and hiding it leaves a bare list under the tab bar. So
+   `navBarVisibility` forks on `horizontalSizeClass`: keep it in compact, hide it in regular.
 
-The sidebar uses the design system's own row metrics (`GoldenFont.rowTitle` / 20pt icon slot) rather than the platform
-row style, and `.scrollContentBackground(.hidden)` + `backgroundPrimary`, so that it and the page on the right are
-one and the same background colour. The 5 entries of the home card grid were changed to `NavigationLink(value:)`,
-sharing the one `navigationDestination` in `RootView` with the sidebar — otherwise a card could push a page that
-`path` does not know about and the sidebar would keep highlighting "GoldenNugget".
+The sidebar uses the platform's own row style, and the tab bar the platform's own `TabView`, so both follow the
+system's Liquid Glass treatment, the user's text size and the dark/light palette. Destination routing lives in one
+place (`page(for:)`), which both shells and every tab stack share, so a feature the HotLoad policy hides says so in
+place of its page instead of disappearing from a bar that cannot hide it.
 
 **Not done this round**: 44pt touch targets (that is a touch-precision problem, not a window-width problem; it was
 pulled out separately in the previous revert).
+
+### Pages: two halves of one job on one screen
+
+Two pages were sorted out once the shells stopped needing a menu row for each:
+
+- **Daemons is now the Tweaks page's second mode**, behind a segmented switch pinned above the list
+  (`TweaksMode` in `Nugget/Views/TweaksView.swift`, with `DaemonsView` embedded as the `.daemons` branch). They were
+  always one job — the same selection, the same autosave, the same preset import, and the same single Apply on the home
+  page — and upstream only splits them because a desktop has a sidebar to put them in. The switch is drawn only while
+  HotLoad leaves `Daemons` visible; a mode that can only say "Feature unavailable" is worse than no mode. `.daemons`
+  is gone from `AppDestination`, so neither the sidebar nor More carries a row for it.
+- **The home page is Apply first.** The note under Apply is one line plus the branches that actually change the
+  decision (an armed posterboard reset, an undeliverable template); Reset Tweaks is a button and a sentence; the media
+  card's paragraph is one line; pairing and the tunnel are a single closed disclosure whose label says what it can do
+  ("Pair the device" when there is no record); and the diagnostics dump plus its three share rows moved to Settings'
+  Logs section, where the files already were.
 
 ## 8. Phone (iPhone)
 
@@ -189,7 +212,7 @@ the layout and interaction, not the plist.
 
 | Item | On the phone | Handling |
 |---|---|---|
-| split shell | `NavigationSplitView` collapses to one column by itself on the phone | the initial `columnVisibility` forks on `userInterfaceIdiom`: `.detailOnly` on the phone (even collapsed into one column the sidebar is still reachable through the detail's back entry), `.automatic` on iPad (remembers the user's last choice). Forcing them side by side on the phone would only squeeze 393pt into 240 + 153 |
+| split shell | a phone cannot use the two-column split view, and a burger sheet is a menu nobody opens | the shell forks on `horizontalSizeClass`: **tab bar** on the phone — Home, Tweaks, Wallpapers, Media and a grouped **More** list — and `NavigationSplitView` with its sidebar on the iPad (where the two columns fit and the system collapses them itself in Slide Over) |
 | **the keyboard cannot be dismissed** | `.numberPad` / `.decimalPad` **have no Return key**, the keyboard covers half the screen and cannot be put away | added `GoldenKeyboardDone` (a Done above the keyboard, using UIKit's `resignFirstResponder`, no need to give every field a `@FocusState`), added only on the fields that use those two keyboards: the tunnel's Port / Prefix length; the tweak number editor uses `.numbersAndPunctuation`, which already has Return, so nothing is added |
 | narrowest 375 (SE) | content width 343; a 2-column card grid needs `2×200+12 = 412 > 343` ⇒ it naturally falls to 1 column | no change, `GoldenCardGrid`'s reflow rule computes it itself; the header title relies on that `minimumScaleFactor(0.6)` from §7 |
 | text fields inside alerts (Files' create/rename) | the alert brings its own Cancel, nothing gets stuck | no change |

@@ -74,9 +74,6 @@ struct SettingsView: View {
             developmentSection
         }
         .navigationTitle("Settings")
-        // Compact widths only -- on a tablet the split view draws its own sidebar
-        // toggle, and a second button beside it is the duplicate-controls mess.
-        .goldenSidebarButton()
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(isPresented: $showSetupGuide) {
             NavigationStack {
@@ -197,8 +194,32 @@ struct SettingsView: View {
 
     // MARK: - Logs
 
+    /// The evidence files and the dump built from them.
+    ///
+    /// The diagnostics rows moved here from the home page's Diagnostics section:
+    /// this is where the log files already are, and the home page's job is
+    /// Apply.  `diagnostics.txt` sits between them because it is the summary the
+    /// two raw logs feed.
     private var logsSection: some View {
         Section("Logs") {
+            Button {
+                Task {
+                    let block = await GoldenNuggetEngine.shared.diagnostics()
+                    RunLog.shared.append(block)
+                    refreshLogs()
+                }
+            } label: {
+                Label("Dump diagnostics into log", systemImage: "doc.text.magnifyingglass")
+            }
+            // A dump reads the device's own logs, so it cannot run while a run
+            // owns the device — the log button would just fail busy.
+            .disabled(InFlightCall.shared.isRunActive)
+
+            shareRow(title: "diagnostics.txt",
+                     size: nil,
+                     systemImage: "square.and.arrow.up",
+                     url: GoldenNuggetEngine.diagnosticsURL,
+                     available: hasDiagnostics)
             // The two halves of a report's evidence: this one is what the host
             // decided, the other is what the protocol did.
             shareRow(title: "goldennugget.log",
@@ -214,18 +235,22 @@ struct SettingsView: View {
             if !logs.hasRust, !logs.rustStatus.isEmpty {
                 NativeNote(logs.rustStatus)
             }
-            NativeNote(logs.hasApp
-                ? "A report wants both files: the app log says what was decided, "
-                  + "minimuxer.log says what the device answered."
-                : "No app log yet — it is written from the first run in this session.")
+            NativeNote("A report wants all three: diagnostics.txt carries the keyword "
+                + "slice of the Rust log (mobilebackup2 protocol + jktcp flow verdict) for "
+                + "the last run plus the app log's tail, the app log says what was decided, "
+                + "and minimuxer.log says what the device answered.")
         }
     }
 
-    private func shareRow(title: String, size: UInt64, systemImage: String,
+    private var hasDiagnostics: Bool {
+        FileManager.default.fileExists(atPath: GoldenNuggetEngine.diagnosticsURL.path)
+    }
+
+    private func shareRow(title: String, size: UInt64?, systemImage: String,
                           url: URL, available: Bool) -> some View {
         ShareLink(item: url) {
             HStack(spacing: 12) {
-                Label("\(title) (\(size) KB)", systemImage: systemImage)
+                Label(size.map { "\(title) (\($0) KB)" } ?? title, systemImage: systemImage)
                 Spacer(minLength: 0)
             }
         }

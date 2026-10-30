@@ -64,9 +64,6 @@ struct MediaView: View {
         // everything else, so this page gets the same bar as the rest — title
         // included, which it never had.
         .navigationTitle("Media")
-        // Compact widths only -- on a tablet the split view draws its own sidebar
-        // toggle, and a second button beside it is the duplicate-controls mess.
-        .goldenSidebarButton()
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog(
             "Copy media and remove eligible originals?",

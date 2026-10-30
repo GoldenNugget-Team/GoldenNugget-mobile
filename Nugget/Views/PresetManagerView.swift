@@ -59,8 +59,6 @@ struct PresetManagerView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Presets")
         .navigationBarTitleDisplayMode(.inline)
-        // Compact widths only -- the split view draws its own sidebar toggle.
-        .goldenSidebarButton()
         .task {
             await deviceMonitor.refresh()
             refresh()
