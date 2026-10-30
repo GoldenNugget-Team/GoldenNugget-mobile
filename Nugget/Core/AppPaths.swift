@@ -15,6 +15,15 @@ enum AppPaths {
     /// `enableRustFileLogging()`.
     static let rustLog = URL.documents.appendingPathComponent("minimuxer.log")
 
+    /// `<Documents>/minimuxer.log.1` — the previous generation of the Rust sink.
+    ///
+    /// The sink rotates itself on a byte cap (`ffi/src/logging.rs`), because a
+    /// DEBUG file sink is otherwise unbounded: one two-hour backup wrote 18.7 GB
+    /// into `minimuxer.log`, on the same volume the device measures before it
+    /// agrees to upload anything. This name only exists so the boot-time
+    /// hygiene pass can drop a stale generation too.
+    static let rustLogArchive = URL.documents.appendingPathComponent("minimuxer.log.1")
+
     /// `<Documents>/diagnostics.txt` — the last dumped diagnostics block, so it
     /// can be shared as a FILE instead of hand-selecting text in the log list.
     static let diagnostics = URL.documents.appendingPathComponent("diagnostics.txt")

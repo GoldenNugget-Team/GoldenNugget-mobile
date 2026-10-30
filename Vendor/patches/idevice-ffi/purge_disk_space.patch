@@ -1,0 +1,87 @@
+diff --git a/idevice/src/services/mobilebackup2.rs b/idevice/src/services/mobilebackup2.rs
+index adc422a..e807c43 100644
+--- a/idevice/src/services/mobilebackup2.rs
++++ b/idevice/src/services/mobilebackup2.rs
+@@ -1284,6 +1284,10 @@ impl MobileBackup2Client {
+         delegate: &dyn BackupDelegate,
+     ) -> Result<Option<Dictionary>, IdeviceError> {
+         let mut tracker = ProgressTracker::default();
++        // The last answer given to `DLMessageGetFreeDiskSpace`, kept so a
++        // following `DLMessagePurgeDiskSpace` can report the byte threshold the
++        // device is actually comparing against instead of a raw purge request.
++        let mut reported_free_space: Option<u64> = None;
+         loop {
+             let (tag, value) = self.receive_dl_message().await?;
+ 
+@@ -1319,6 +1323,7 @@ impl MobileBackup2Client {
+                 }
+                 "DLMessageGetFreeDiskSpace" => {
+                     let freespace = delegate.get_free_disk_space(host_dir);
++                    reported_free_space = Some(freespace);
+                     self.send_status_response(
+                         0,
+                         None,
+@@ -1326,6 +1331,63 @@ impl MobileBackup2Client {
+                     )
+                     .await?;
+                 }
++                // The device's free-space check, second half.
++                //
++                // `BackupAgent2` compares the size of everything it *plans* to
++                // upload (plus 128 MiB of headroom) against the answer above and,
++                // when the plan does not fit, asks the host to free some of it —
++                // Apple's DeviceLink hands `amount` to CacheDelete. The answer is
++                // a status response either way; a host that cannot purge says so
++                // and the device decides.
++                //
++                // Falling through to the `other` arm answered "Operation not
++                // supported" instead, which is not a purge failure the device
++                // understands: it dropped the session, and the host saw a clean
++                // backup with zero files offered and no reason anywhere. Mirror
++                // Apple's purge-failed path (status -1, "failed to purge", zero
++                // bytes reclaimed) and let the device answer with
++                // `MBErrorDomain/105`, which the Swift side now reports.
++                "DLMessagePurgeDiskSpace" => {
++                    let (amount, urgency) = match &value {
++                        plist::Value::Array(arr) => (
++                            arr.get(1)
++                                .and_then(|v| v.as_unsigned_integer())
++                                .unwrap_or(0),
++                            arr.get(2)
++                                .and_then(|v| v.as_unsigned_integer())
++                                .unwrap_or(0),
++                        ),
++                        _ => (0, 0),
++                    };
++                    // `amount` is `(required - reported) + 2 GiB`, so the real
++                    // threshold is recoverable; under 2 GiB the model does not
++                    // hold and the raw request is all there is to report.
++                    let required = reported_free_space
++                        .filter(|_| amount >= 0x8000_0000)
++                        .map(|reported| amount + reported - 0x8000_0000);
++                    match (required, reported_free_space) {
++                        (Some(required), Some(reported)) => warn!(
++                            "DeviceLink purge: the device needs more than {required} byte(s) free \
++                             at {} to back up its plan; this host reported {reported} \
++                             ({} more needed) and has no purge backend — answering \"failed to \
++                             purge\", the device will decide",
++                            host_dir.display(),
++                            required.saturating_sub(reported),
++                        ),
++                        _ => warn!(
++                            "DeviceLink purge: the device asked the host to free {amount} byte(s) \
++                             (urgency {urgency}) at {}; no purge backend — answering \"failed to \
++                             purge\", the device will decide",
++                            host_dir.display(),
++                        ),
++                    }
++                    self.send_status_response(
++                        -1,
++                        Some("DLPurgeDiskSpace failed to purge"),
++                        Some(plist::Value::Integer(0.into())),
++                    )
++                    .await?;
++                }
+                 "DLContentsOfDirectory" => {
+                     let listing = Self::list_directory_contents(&value, host_dir, delegate).await;
+                     self.send_status_response(0, None, Some(listing)).await?;

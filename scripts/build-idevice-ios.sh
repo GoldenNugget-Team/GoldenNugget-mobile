@@ -163,7 +163,7 @@ PY
 # The shipped idevice.h is newer than any tag we can pin, and two of its
 # additions are ABI-relevant in ways a symbol diff cannot see. Both are kept as
 # git patches so a fresh clone of the tag reproduces them exactly.
-for P in factory_info should_preserve local_tunnel redact_pairing; do
+for P in factory_info should_preserve local_tunnel redact_pairing log_rotation purge_disk_space; do
   PATCH="$REPO/Vendor/patches/idevice-ffi/$P.patch"
   echo "==> applying idevice-ffi/$P.patch"
   if git -C "$SRC" apply --reverse --check "$PATCH" 2>/dev/null; then

@@ -147,6 +147,28 @@ enum RustLog {
 
     // MARK: - Excerpts
 
+    /// A window of the log, not the whole file.
+    ///
+    /// Every reader below looks at the tail of one run — a keyword-filtered
+    /// excerpt, the last N lines, or the final handshake line — while the file is
+    /// a live DEBUG sink that can be enormous. Reading it whole was slow when it
+    /// was healthy and impossible when it was not: an 18.7 GB `minimuxer.log` is
+    /// why this returned "no readable minimuxer.log" on a run that had a file.
+    ///
+    /// - Parameter offset: byte offset to start from (the run mark, usually).
+    /// - Parameter limit: bytes kept from the *end* of that range, so the part
+    ///   nearest the failure is always the part that is read.
+    private static func readWindow(from offset: UInt64?, limit: Int) -> (start: UInt64, data: Data)? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let size = try? handle.seekToEnd() else { return nil }
+        var start = min(offset ?? 0, size)
+        if size - start > UInt64(limit) { start = size - UInt64(limit) }
+        guard (try? handle.seek(toOffset: start)) != nil,
+              let data = try? handle.read(upToCount: Int(size - start)) else { return nil }
+        return (start, data)
+    }
+
     /// Keyword-filtered slice of the Rust log — the evidence the app log cannot
     /// provide on its own.
     ///
@@ -162,15 +184,12 @@ enum RustLog {
         since: UInt64? = nil,
         keywords: [String] = RustLog.verdictKeywords
     ) -> String {
-        let offset = since ?? mark
-        // Read the whole file then drop the prefix: FileHandle's read-to-end API
-        // was renamed in the iOS 27 SDK, and this log is a few hundred KB.
-        guard let whole = try? Data(contentsOf: url) else {
+        guard let window = readWindow(from: since ?? mark, limit: 24 << 20) else {
             return "  (no readable minimuxer.log at \(url.path))"
         }
-        let from = Int(min(offset ?? 0, UInt64(whole.count)))
-        let data = whole.dropFirst(from)
-        guard let text = String(data: data, encoding: .utf8) else {
+        let requested = since ?? mark
+        let from = Int(window.start)
+        guard let text = String(data: window.data, encoding: .utf8) else {
             return "  (minimuxer.log unreadable from byte \(from))"
         }
 
@@ -182,7 +201,7 @@ enum RustLog {
         }
 
         var out = "  rust log excerpt"
-        if offset != nil { out += " after byte \(from)" }
+        if let requested { out += " after byte \(max(Int(requested), from))" }
         out += ": \(lines.count) new lines, \(hits.count) match protocol/flow keywords"
         out += "\n" + messageHistogram(lines)
         // The DL census says whether the *protocol* moved; this says whether the
@@ -242,12 +261,11 @@ enum RustLog {
     /// - Parameter since: byte offset to start from (a `markStart()` snapshot
     ///   confines it to the current run).  nil = whole file.
     static func tail(_ count: Int = 30, since: UInt64? = nil) -> String {
-        guard let whole = try? Data(contentsOf: url) else {
+        guard let window = readWindow(from: since, limit: 1 << 20) else {
             return "(no minimuxer.log at \(url.path))"
         }
-        let from = Int(min(since ?? 0, UInt64(whole.count)))
-        guard let text = String(data: whole.dropFirst(from), encoding: .utf8) else {
-            return "(minimuxer.log unreadable from byte \(from))"
+        guard let text = String(data: window.data, encoding: .utf8) else {
+            return "(minimuxer.log unreadable from byte \(window.start))"
         }
         return text.split(separator: "\n").suffix(count).joined(separator: "\n")
     }
@@ -272,10 +290,8 @@ enum RustLog {
     ///
     /// - Parameter offset: byte offset to read from; nil = the current run mark.
     static func deviceSilentAtHandshake(since offset: UInt64? = nil) -> Bool {
-        let from = offset ?? mark
-        guard let whole = try? Data(contentsOf: url) else { return false }
-        let start = Int(min(from ?? 0, UInt64(whole.count)))
-        guard let text = String(data: whole.dropFirst(start), encoding: .utf8) else { return false }
+        guard let window = readWindow(from: offset ?? mark, limit: 512 << 10),
+              let text = String(data: window.data, encoding: .utf8) else { return false }
         guard let lastStart = text.range(of: "Starting DeviceLink version exchange",
                                          options: .backwards) else {
             return false

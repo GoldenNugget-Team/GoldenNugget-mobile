@@ -10,6 +10,8 @@ The prebuilt archive is a binary; these are the deltas that make it reproducible
 | `idevice-ffi/idevice_to_stream.rs` | `ffi/src/lib.rs` | Restores `_idevice_to_stream`, which v0.1.68 does not have. |
 | `idevice-ffi/factory_info.patch` | `ffi/src/mobilebackup2.rs`, `idevice/src/services/mobilebackup2.rs`, `tools/src/mobilebackup2.rs` | Restores the `factory_info` parameter of `mobilebackup2_backup`. Without it the app crashes the instant a backup starts. |
 | `idevice-ffi/should_preserve.patch` | same two `mobilebackup2.rs` files | Restores the pre-store filter. Without it a *protective* backup writes every photo and video to flash. |
+| `idevice-ffi/log_rotation.patch` | `ffi/src/logging.rs` | Caps the DEBUG file sink at 64 MB per generation. Without it one two-hour backup wrote 18.7 GB into `minimuxer.log`, on the same volume the device's own backup space check measures. |
+| `idevice-ffi/purge_disk_space.patch` | `idevice/src/services/mobilebackup2.rs` | Answers `DLMessagePurgeDiskSpace` the way Apple's DeviceLink does (status -1, "failed to purge") instead of "Operation not supported", and logs the byte threshold the device is comparing against. |
 
 ## idevice-ffi
 
@@ -143,6 +145,51 @@ at Debug for transport diagnostics without including those credentials.
 Rebuild/install IDevice first, then AirliftFFI with `--install` so deduplication
 runs against the updated IDevice archive. Verify the linked results with
 `python3 scripts/check-pairing-log-privacy.py --archives`.
+
+## The log sink that ate the backup volume
+
+`idevice-ffi/log_rotation.patch` bounds the DEBUG file sink. It is the app's most
+useful diagnostic and it lives in the app's container, i.e. on **the same APFS
+volume the device's own data occupies** — so its size is not private to the app.
+
+A two-hour protective backup wrote **18.7 GB** into `Documents/minimuxer.log`.
+`BackupAgent2` then compared its planned upload against the free space the host
+reported for the backup root, found ~19 GB less than it needed, asked the host to
+purge, and refused with `MBErrorDomain/105`. Every backup after that offered zero
+files, and the app blamed its keep-filter. Because the file could no longer be
+read into memory, `PairingLogPrivacy` also failed on every launch and left the
+Rust sink off, so no Rust evidence existed to contradict that guess.
+
+`RotatingFile` rotates at 64 MB, keeping one generation as `minimuxer.log.1`;
+total weight is at most 128 MB. Swift deletes either file at boot only if it is
+over 128 MB (`PairingLogPrivacy`), so a normal pair survives a relaunch — and a
+runaway file from an older build is still cleared before the logger starts.
+
+At the rate that produced the 18.7 GB file (≈2.6 MB/s of DEBUG) the ring holds
+about the last minute of traffic. That is the intended trade: the tail is where
+a run dies, and the host-side decisions live in `goldennugget.log`, which rotates
+at 2 MB on its own.
+
+## The purge request that was answered "not supported"
+
+`idevice-ffi/purge_disk_space.patch` handles `DLMessagePurgeDiskSpace`. This is
+the second half of the device's free-space check: after
+`DLMessageGetFreeDiskSpace` the device compares its whole **planned** upload
+(plus 128 MiB) against that answer and, when it does not fit, asks the host to
+free `(required - reported) + 2 GiB`.
+
+Apple's DeviceLink hands that to CacheDelete. A host with no purge backend still
+has to *answer*: status -1, `DLPurgeDiskSpace failed to purge`, zero bytes
+reclaimed — then the device reports 105 in its final `DLMessageProcessMessage`.
+Our loop had no arm for it, so it fell through to `other` and answered
+"Operation not supported". The device dropped the session instead, the host saw a
+clean backup with zero files offered, and nothing said why.
+
+The arm also logs `required` (recovered as `amount + reported - 2 GiB`), which is
+the one number that explains a zero-offer run. The Swift side now also throws on
+the device's own `ErrorCode` (`IdeviceGateway.backupRefusal`) instead of
+discarding the response dictionary, so 105 arrives as a free-space message rather
+than as an empty backup.
 
 ## Rebuilding
 

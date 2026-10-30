@@ -3398,9 +3398,52 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI {
                 dict = (self.plistNodeToDictionary(response) ?? [:])
                 self.safeFreePlist(response)
             }
+            // The device states a refusal exactly once, in this dictionary:
+            // `ErrorCode`/`ErrorDescription` is what BackupAgent2 puts in the
+            // final `DLMessageProcessMessage` when it declines to back up. The
+            // Rust layer hands it back as an ordinary success, and callers only
+            // counted files — so "not enough disk space" (MBErrorDomain/105)
+            // arrived as "0 of 0 offered, the container was never named" and the
+            // app blamed its own keep-filter, factory info and filter for a
+            // failure that is entirely about free space on the backup volume.
+            if let refusal = Self.backupRefusal(dict, backupRoot: backupRoot) {
+                delegateLog?("device refused the backup: \(refusal)")
+                throw IdeviceGatewayError(.serviceError, reason: "The device refused the backup: "
+                    + refusal)
+            }
             verboseLog("[IdeviceGateway] syncBackupBackup() mobilebackup2_backup completed")
             return dict
         }
+    }
+
+    /// The device's own reason for refusing a `Backup`, or `nil` when it accepted.
+    ///
+    /// `ErrorCode` is absent or 0 on success, which is also how
+    /// pymobiledevice3 reads this dictionary (`dl_loop`: falsy → success,
+    /// `MB_ERROR_INSUFFICIENT_DISK_SPACE` → its own error).
+    ///
+    /// `MBErrorDomain/105` gets a sentence of its own because it is the one
+    /// device-side refusal whose cause is on this side of the wire and whose
+    /// symptom is indistinguishable from an empty backup: `BackupAgent2` compares
+    /// its planned upload size against the free space this host reported
+    /// (`DLMessageGetFreeDiskSpace`), asks for a purge (`DLMessagePurgeDiskSpace`)
+    /// and then refuses. No container, factory-info entry or keep-filter is at
+    /// fault, so the message must not read like one.
+    static func backupRefusal(_ response: [String: Any], backupRoot: String) -> String? {
+        let code = (response["ErrorCode"] as? NSNumber)?.intValue ?? 0
+        guard code != 0 else { return nil }
+        let description = (response["ErrorDescription"] as? String)
+            ?? (response["Error"] as? String)
+            ?? "the device gave no description"
+        if code == 105 {
+            return "MBErrorDomain/105 — not enough free space for the backup it planned. "
+                + "The backup root \(backupRoot) is on the same volume as the device's own data, "
+                + "and the device needs its whole planned upload plus 128 MiB free before it will "
+                + "start (it asks the host to purge, then refuses when nothing was reclaimed). "
+                + "Free space in this app's container — the Rust log sink, an abandoned AFC media "
+                + "pull, or an old backup root — and try again. Device text: \(description)"
+        }
+        return "MBErrorDomain/\(code) — \(description)"
     }
 }
 

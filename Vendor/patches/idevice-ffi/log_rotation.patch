@@ -1,0 +1,105 @@
+diff --git a/ffi/src/logging.rs b/ffi/src/logging.rs
+index 15b372c..f99f405 100644
+--- a/ffi/src/logging.rs
++++ b/ffi/src/logging.rs
+@@ -3,6 +3,8 @@
+ use std::{
+     ffi::{CStr, c_char},
+     fs::File,
++    io::{self, Write},
++    path::{Path, PathBuf},
+     sync::Once,
+ };
+ 
+@@ -11,6 +13,82 @@ use tracing_appender::non_blocking;
+ use tracing_subscriber::{EnvFilter, Layer};
+ use tracing_subscriber::{Registry, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+ 
++/// The file sink rotates at this size instead of growing.
++///
++/// A DEBUG sink is unbounded otherwise, and on an iOS device the file lives in
++/// the app's own container — the same APFS volume the *device's* data is on.
++/// One two-hour protective backup wrote 18.7 GB into `minimuxer.log`; the
++/// mobilebackup2 client then asked the host for free space, got an answer 19 GB
++/// smaller than it needed, and refused every backup afterwards with zero files
++/// offered (MBErrorDomain/105). The log that was meant to explain that failure
++/// was the failure.
++///
++/// The ceiling is per generation. The finished generation is kept as
++/// `<path>.1`, so the recent evidence survives a rotation, and total log weight
++/// on the volume is at most `2 * FILE_LOG_CAP_BYTES`.
++const FILE_LOG_CAP_BYTES: u64 = 64 * 1024 * 1024;
++
++/// A `Write` sink that rotates on a byte cap.
++///
++/// `File::create` truncates once per process, which is not a bound: a session
++/// that backs up for two hours keeps writing for two hours.
++struct RotatingFile {
++    path: PathBuf,
++    file: File,
++    written: u64,
++}
++
++impl RotatingFile {
++    fn open(path: &Path) -> io::Result<Self> {
++        let file = File::create(path)?;
++        Ok(Self {
++            path: path.to_path_buf(),
++            file,
++            written: 0,
++        })
++    }
++
++    fn archive_path(&self) -> PathBuf {
++        let name = self
++            .path
++            .file_name()
++            .map(|n| n.to_string_lossy().into_owned())
++            .unwrap_or_else(|| "minimuxer.log".to_string());
++        self.path.with_file_name(format!("{name}.1"))
++    }
++
++    fn rotate(&mut self) -> io::Result<()> {
++        let archive = self.archive_path();
++        // A fixed archive name, not a numbered chain: one generation is the
++        // point, and an unbounded chain would reintroduce the problem.
++        let _ = std::fs::remove_file(&archive);
++        let _ = std::fs::rename(&self.path, &archive);
++        self.file = File::create(&self.path)?;
++        self.written = 0;
++        let marker = format!(
++            "--- minimuxer.log rotated at {FILE_LOG_CAP_BYTES} bytes; the previous generation is {} ---\n",
++            archive.display()
++        );
++        let _ = self.file.write_all(marker.as_bytes());
++        Ok(())
++    }
++}
++
++impl Write for RotatingFile {
++    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
++        if self.written > 0 && self.written + buf.len() as u64 > FILE_LOG_CAP_BYTES {
++            self.rotate()?;
++        }
++        let written = self.file.write(buf)?;
++        self.written += written as u64;
++        Ok(written)
++    }
++
++    fn flush(&mut self) -> io::Result<()> {
++        self.file.flush()
++    }
++}
++
+ #[repr(C)]
+ pub enum IdeviceLoggerError {
+     Success = 0,
+@@ -107,7 +185,7 @@ pub unsafe extern "C" fn idevice_init_logger(
+                 }
+             };
+ 
+-            match File::create(path) {
++            match RotatingFile::open(std::path::Path::new(path)) {
+                 Ok(f) => {
+                     let (non_blocking, guard) = non_blocking(f);
+                     file_guard = Some(guard);
