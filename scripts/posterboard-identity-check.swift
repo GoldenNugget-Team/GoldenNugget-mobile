@@ -142,6 +142,9 @@ enum PosterBoardStore {
     static func createEmptyDatabase(at url: URL) throws {}
     static func stitch(database: URL, items: [PosterBoardConfigItem],
                        workingDirectory: URL) throws -> URL { database }
+    /// The apply logs this; the harness has no SQLite, so a fixed string is
+    /// enough to keep the code under test compiling.
+    static func summary(_ url: URL) -> String { "0 poster(s)" }
 }
 
 enum PosterBoardVideo {

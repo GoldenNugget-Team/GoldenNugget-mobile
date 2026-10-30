@@ -108,7 +108,7 @@ enum PosterBoardStore {
     static func isEncrypted(_ url: URL) -> Bool {
         let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
         guard let size = attributes?[.size] as? Int, size >= 100 else { return false }
-        guard let db = open(url.path) else { return false }
+        guard let db = openReadOnly(url.path) else { return false }
         defer { sqlite3_close(db) }
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
@@ -124,6 +124,30 @@ enum PosterBoardStore {
         defer { sqlite3_close(db) }
         let tables = tableNames(db)
         return tables.isEmpty ? "no tables" : tables.sorted().joined(separator: ", ")
+    }
+
+    /// What a store actually carries, in one line.
+    ///
+    /// The row counts are the only evidence either half of a fetch leaves about
+    /// whether the device handed over a live store or an empty one: a store
+    /// whose schema is intact and whose `poster` table holds nothing validates
+    /// exactly like a full one, so shipping it back would erase every wallpaper
+    /// on the device with nothing in the log to say why. Logged once on the
+    /// fetched store and once on the staged copy, so "the device gave us
+    /// nothing" and "the stitch lost the rows" cannot be mistaken for each other.
+    static func summary(_ url: URL) -> String {
+        guard let db = open(url.path) else { return "unreadable" }
+        defer { sqlite3_close(db) }
+        func count(_ table: String) -> String {
+            guard let rows = try? scalarInt(db, "SELECT COUNT(*) FROM \(table)") else { return "?" }
+            return String(rows)
+        }
+        var parts = ["\(count("poster")) poster(s)",
+                     "\(count("posterRoleMembership")) membership row(s)"]
+        if tableExists(db, "posterAttributes") {
+            parts.append("\(count("posterAttributes")) attribute row(s)")
+        }
+        return parts.joined(separator: ", ")
     }
 
     // MARK: - The empty database
@@ -160,6 +184,10 @@ enum PosterBoardStore {
             throw GoldenNuggetError("Could not create the empty PosterBoard database schema: "
                 + String(cString: sqlite3_errmsg(db)))
         }
+        // Same shipping requirement as a stitched store: the reset delivers this
+        // file too, and PosterBoard's read-only open cannot switch a
+        // rollback-journal database to WAL (see `declareWAL`).
+        try declareWAL(db, describing: "empty PosterBoard database")
         guard validate(url) else {
             throw GoldenNuggetError("The empty PosterBoard database failed validation. Reset was stopped before writing to the device.")
         }
@@ -181,10 +209,10 @@ enum PosterBoardStore {
                 + "payload injected into an encrypted store cannot be decrypted by the "
                 + "restore agent (MBErrorDomain/205).")
         }
-        guard validate(database) || validate(database, strict: false) else {
+        if let complaint = diagnose(database, strict: false) {
             throw GoldenNuggetError(
-                "The PosterBoard database is not usable — it does not carry the store's "
-                + "tables (\(describeTables(database))). It may be a truncated or interrupted "
+                "The PosterBoard database is not usable — \(complaint) (tables: "
+                + "\(describeTables(database))). It may be a truncated or interrupted "
                 + "fetch; fetch it again.")
         }
 
@@ -221,7 +249,43 @@ enum PosterBoardStore {
             _ = exec(db, "ROLLBACK")
             throw error
         }
+        // The rows above were written through a `-wal`, and the payload the
+        // apply ships is this one file — so it has to be in the shape the
+        // device's own store is in (see `declareWAL`).
+        try declareWAL(db, describing: "staged PosterBoard database")
         return staged
+    }
+
+    /// Leaves the database declaring WAL with every committed page in the main
+    /// file — the only shape the restore may ship.
+    ///
+    /// PosterBoard opens its store read-only (`opening database … w/ flags 1`)
+    /// and immediately runs `PRAGMA journal_mode=WAL`. On a database that
+    /// already says WAL that is a no-op; on a rollback-journal database it is a
+    /// *write*, and a read-only connection answers "attempt to write a
+    /// readonly database". The store then logs "data store never ever
+    /// initialized; skipping migration" and rebuilds itself from the gallery:
+    /// every poster gets a new identity and every custom wallpaper — the ones
+    /// whose content lives only in the store — is gone. That is the wipe this
+    /// feature kept producing, and it was one line of SQL.
+    ///
+    /// The file stays self-contained: the checkpoint moves every frame into the
+    /// main file and truncates the `-wal`, so the zero-byte `-wal`/`-shm`
+    /// companions the restore ships alongside it are exactly what the device's
+    /// own store has.
+    private static func declareWAL(_ db: OpaquePointer, describing what: String) throws {
+        guard exec(db, "PRAGMA journal_mode=WAL"),
+              try scalarText(db, "PRAGMA journal_mode")?.lowercased() == "wal" else {
+            throw GoldenNuggetError("The \(what) would not switch to WAL mode ("
+                + String(cString: sqlite3_errmsg(db)) + "). PosterBoard opens its store "
+                + "read-only and asks for WAL, and a rollback-journal database makes that "
+                + "fail — it then rebuilds the store and drops every wallpaper.")
+        }
+        guard exec(db, "PRAGMA wal_checkpoint(TRUNCATE)") else {
+            throw GoldenNuggetError("Could not checkpoint the \(what) — shipping it would "
+                + "leave rows behind in a file the restore does not carry: "
+                + String(cString: sqlite3_errmsg(db)))
+        }
     }
 
     /// The inserts themselves.  Every write updates first and only inserts when
@@ -332,7 +396,40 @@ enum PosterBoardStore {
         case integer(Int)
     }
 
+    /// A read handle to a database, whether or not its journal sidecars exist.
+    ///
+    /// Read-only first, because that is what every reader below does. A
+    /// WAL-mode database *without* a `-wal`/`-shm` pair beside it cannot be read
+    /// that way, though: SQLite needs the shared-memory file to take a read
+    /// mark and will not create one for a reader, so the first statement fails
+    /// with SQLITE_CANTOPEN. The handle is also lazy — `sqlite3_open_v2`
+    /// returns SQLITE_OK before it touches the file — so that failure only
+    /// surfaces on the first statement, never at open. That is exactly the
+    /// shape of a store we have just prepared for delivery: `fold` checkpoints
+    /// every page into the main file and leaves the sidecars as zero-byte
+    /// companions the restore carries separately. Probe, and retry read-write
+    /// so SQLite can create whatever it needs.
     private static func open(_ path: String) -> OpaquePointer? {
+        for flags in [SQLITE_OPEN_READONLY, SQLITE_OPEN_READWRITE] {
+            var db: OpaquePointer?
+            guard sqlite3_open_v2(path, &db, flags, nil) == SQLITE_OK, let db else {
+                sqlite3_close(db)
+                continue
+            }
+            var statement: OpaquePointer?
+            let status = sqlite3_prepare_v2(db, "SELECT 1 FROM sqlite_master LIMIT 1",
+                                           -1, &statement, nil)
+            sqlite3_finalize(statement)
+            if status == SQLITE_OK { return db }
+            sqlite3_close(db)
+        }
+        return nil
+    }
+
+    /// A read-only handle *without* the probe above, for `isEncrypted`: telling
+    /// an encrypted payload from a WAL-mode one means reading the failure, and
+    /// `open` reports both as "will not open".
+    private static func openReadOnly(_ path: String) -> OpaquePointer? {
         var db: OpaquePointer?
         guard sqlite3_open_v2(path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
             sqlite3_close(db)
@@ -379,6 +476,22 @@ enum PosterBoardStore {
         guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
         if sqlite3_column_type(statement, 0) == SQLITE_NULL { return nil }
         return Int(sqlite3_column_int64(statement, 0))
+    }
+
+    /// One text column of one row, `nil` when the row or the value is absent.
+    private static func scalarText(_ db: OpaquePointer, _ sql: String,
+                                   _ bindings: [Binding] = []) throws -> String? {
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw GoldenNuggetError("PosterBoard query failed: \(sql) — "
+                + String(cString: sqlite3_errmsg(db)))
+        }
+        bind(statement, bindings)
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+        if sqlite3_column_type(statement, 0) == SQLITE_NULL { return nil }
+        guard let text = sqlite3_column_text(statement, 0) else { return nil }
+        return String(cString: text)
     }
 
     private static func run(_ db: OpaquePointer, _ sql: String,

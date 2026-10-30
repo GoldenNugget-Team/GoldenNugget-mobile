@@ -101,7 +101,22 @@ enum PosterBoardBackup {
         //    metadata files, which must never be drained or the backup is
         //    un-restorable.
         let counter = Counter()
-        try await Minimuxer.shared().backupBackup(
+        // The fetch is the one long call that used to run *unobserved*: the
+        // protective pull and the restore each sit inside a `StallGuard`, this
+        // one did not, so pressing Stop during "Fetch database from device" (or
+        // during an apply's fetch stage) did nothing at all — the flag was set
+        // and nobody was polling it. It also means the phase now has a
+        // heartbeat: an upload that goes quiet is reported with the device's
+        // liveness instead of looking like a slow one.
+        try await StallGuard.run(
+            label: "PosterBoard fetch",
+            idleSeconds: 120,
+            idle: { counter.lastActivityAt },
+            wire: { WireCensus.totals() },
+            probe: { await Diagnostics.deviceLivenessProbe() },
+            handshakeSilent: { RustLog.deviceSilentAtHandshake() }
+        ) {
+            try await Minimuxer.shared().backupBackup(
             backupRoot: backupRoot.path(percentEncoded: false),
             sourceIdentifier: udid,
             applications: [PosterBoard.bundleID: entry],
@@ -141,7 +156,8 @@ enum PosterBoardBackup {
                 onProgress?(overall)
             },
             delegateLog: { line in AppLog.write(line) }
-        )
+            )
+        }
         log("PosterBoard: backup done — \(counter.summary)")
         // Logged on every run, not only on failure: the first few offers are the
         // only record of which string this device's stream carries the path in.
@@ -152,6 +168,23 @@ enum PosterBoardBackup {
         // reader, with a message about a table. The device's own names are the evidence,
         // and they are right here.
         guard counter.posterBoardKept > 0 else {
+            // `0 of 0` and `0 of N` are different failures wearing one message.
+            // Nothing offered means the device refused before it named a single
+            // payload — no filter, factory-info entry or container name is
+            // involved — and the most common cause is the free-space refusal
+            // (MBErrorDomain/105): the device compares its whole *planned* upload
+            // against the free space the host reports for the backup volume and
+            // refuses to start when that volume cannot hold it, even though this
+            // fetch keeps a few hundred MB. That number is the one fact that
+            // separates the two, so it belongs in the error.
+            let nothingOffered = counter.total == 0
+                ? " The device offered NOTHING at all (0 of 0), so the filter never saw a name: "
+                    + "this is the device refusing the session, not rejecting payloads. Host free "
+                    + "space on the backup volume: \(ProtectiveBackup.freeSpaceDescription()) — a "
+                    + "planned upload larger than that is refused with MBErrorDomain/105 after "
+                    + "DLMessagePurgeDiskSpace, and free space in this app's own container is the "
+                    + "fix."
+                : ""
             throw GoldenNuggetError(
                 "The device uploaded nothing for \(PosterBoard.bundleID): \(counter.kept) of "
                 + "\(counter.total) offered file(s) went through the keep-filter and not one of "
@@ -163,7 +196,7 @@ enum PosterBoardBackup {
                 + "Manifest.plist, Status.plist, Manifest.db and its -shm/-wal — means the "
                 + "filter matched nothing the device streamed, not that the device sent "
                 + "nothing: check whether the names being matched are the device's or the "
-                + "host's.)")
+                + "host's.)" + nothingOffered)
         }
 
         // 4. Pull it out, merge the WAL, and hand back the version it was found
@@ -197,8 +230,21 @@ enum PosterBoardBackup {
         log("PosterBoard: database ready — \(extracted.locatedBy), structure version "
             + "\(extracted.structureVersion), "
             + ByteCountFormatter.string(fromByteCount: fileSize(consolidated), countStyle: .file))
+        // The device's own row counts, before anything is added. A store that
+        // arrives empty is what an apply would then write back, so the number
+        // belongs in the log even when it is 0 — that is the line that separates
+        // "the fetch produced nothing" from "the stitch dropped it".
+        log("PosterBoard: the fetched store carries \(PosterBoardStore.summary(consolidated))")
         if preserveExisting && ios27 {
-            _ = try PosterBoardSnapshot.records(in: deviceDir)
+            let records = try PosterBoardSnapshot.records(in: deviceDir)
+            // What the snapshot actually describes: the number that decides how
+            // much of the live container an import *could* touch. Non-zero is not
+            // a promise of completeness — the device only offers what it decides
+            // to upload — so the counts belong in the log next to the merge line.
+            log("PosterBoard: snapshot carries "
+                + "\(records.filter { $0.flags == 1 }.count) file record(s), "
+                + "\(records.filter { $0.flags == 2 }.count) directory record(s), "
+                + "\(records.filter { $0.flags == 4 }.count) symlink(s)")
             let baseline = destination.deletingLastPathComponent()
                 .appendingPathComponent("Recovery/" + udid + "/Baseline", isDirectory: true)
             try PosterBoardSnapshot.retainBaseline(from: deviceDir, at: baseline)
@@ -240,8 +286,10 @@ enum PosterBoardBackup {
     /// Produce a standalone SQLite snapshot even when no WAL was uploaded.
     /// A main file can still carry WAL journal mode without a companion. Opening
     /// that copy read-only can require sidecar creation/recovery and fail before
-    /// sqlite_master is readable. Work on a writable private copy, then publish
-    /// a DELETE-mode snapshot with no dependency on sidecars from an earlier fetch.
+    /// sqlite_master is readable. Work on a writable private copy, then publish a
+    /// self-contained snapshot — one whose every page is in the main file but
+    /// which still *declares* WAL mode (see `fold` for why that mode is the
+    /// shipping requirement, not an accident).
     private static func consolidate(main: URL,
                                     wal: URL?,
                                     destination: URL,
@@ -276,7 +324,7 @@ enum PosterBoardBackup {
         }
         try fm.moveItem(at: snapshot, to: destination)
         log("PosterBoard: prepared standalone store snapshot ("
-            + "\(fileSize(destination)) bytes, journal_mode=DELETE)")
+            + "\(fileSize(destination)) bytes, journal_mode=WAL)")
         return destination
     }
 
@@ -314,11 +362,39 @@ enum PosterBoardBackup {
         }
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
-        guard sqlite3_prepare_v2(merged, "PRAGMA journal_mode=DELETE", -1, &statement, nil) == SQLITE_OK,
+        // THE SNAPSHOT MUST DECLARE WAL, NOT DELETE.
+        //
+        // PosterBoard opens its store read-only first (`opening database …
+        // w/ flags 1`, i.e. SQLITE_OPEN_READONLY) and immediately runs
+        // `PRAGMA journal_mode=WAL`. On a database that already says WAL that
+        // pragma is a no-op and succeeds. On a DELETE-mode database it is a
+        // *write*, and a read-only connection answers
+        //
+        //   PFSQLiteErrorDomain Code=8 "attempt to write a readonly database"
+        //
+        // after which the store logs "data store never ever initialized;
+        // skipping migration" and rebuilds itself from the gallery: every
+        // installed poster gets a new identity and everything whose content
+        // lives only in the store — every custom wallpaper — is gone. That is
+        // the wipe this feature kept producing, and it was one line of SQL.
+        //
+        // The file still has to be self-contained: a checkpoint moves every
+        // frame into the main file and truncates the `-wal` to zero, so the
+        // single file we ship carries the whole database. The 0-byte
+        // `-wal`/`-shm` companions the apply ships alongside it are then
+        // exactly the state the device's own store is in.
+        guard sqlite3_prepare_v2(merged, "PRAGMA journal_mode=WAL", -1, &statement, nil) == SQLITE_OK,
               sqlite3_step(statement) == SQLITE_ROW,
               let mode = sqlite3_column_text(statement, 0),
-              String(cString: mode).lowercased() == "delete" else {
-            throw failure("normalizing journal mode", merged)
+              String(cString: mode).lowercased() == "wal" else {
+            throw failure("setting WAL journal mode", merged)
+        }
+        sqlite3_finalize(statement)
+        statement = nil
+        guard sqlite3_prepare_v2(merged, "PRAGMA wal_checkpoint(TRUNCATE)", -1, &statement, nil) == SQLITE_OK,
+              sqlite3_step(statement) == SQLITE_ROW,
+              sqlite3_column_int(statement, 0) == 0 else {
+            throw failure("checkpointing the snapshot", merged)
         }
     }
 
@@ -342,10 +418,12 @@ private final class Counter: @unchecked Sendable {
     private var _lastStep = -1
     private var _posterBoardOffers: [String] = []
     private var _files: [String: String] = [:]
+    private var _lastActivity = Date()
 
     func note(deviceName: String, fileName: String, keep: Bool, isStore: Bool, relativePath: String?) {
         lock.lock()
         defer { lock.unlock() }
+        _lastActivity = Date()
         if let relativePath { _files[relativePath] = fileName }
         _total += 1
         if keep { _kept += 1 }
@@ -383,6 +461,11 @@ private final class Counter: @unchecked Sendable {
     }
 
     var files: [String: String] { lock.lock(); defer { lock.unlock() }; return _files }
+
+    /// When the last device offer arrived. The fetch's `StallGuard` clock, so a
+    /// device that goes quiet mid-upload is reported instead of looking idle by
+    /// accident.
+    var lastActivityAt: Date { lock.lock(); defer { lock.unlock() }; return _lastActivity }
 
     var total: Int { lock.lock(); defer { lock.unlock() }; return _total }
     var kept: Int { lock.lock(); defer { lock.unlock() }; return _kept }

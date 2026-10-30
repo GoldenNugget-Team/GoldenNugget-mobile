@@ -63,12 +63,12 @@
             deviceVersion: "27.0.1", workingDirectory: root.appendingPathComponent("backup-delta"), log: { _ in })
         precondition(!delta.contains { $0.relativePath == TweakPayload.manifestPath(oldPath) },
                      "native snapshot files must not be re-encoded as new tweak files")
-        let galleryAsset = delta.first { $0.relativePath.contains("/Extensions/com.apple.Posters.CollectionsPosterApp/descriptors/") && $0.relativePath.hasSuffix("image.bin") }!
+        precondition(!delta.contains { $0.relativePath.contains("/descriptors/") },
+                     "an installed wallpaper is delivered once, as a configuration; the gallery-descriptor duplicate is a second identity the store has to reconcile")
         let configurationAsset = delta.first { $0.relativePath.contains("/configurations/") && $0.relativePath.hasSuffix("image.bin") }!
-        let galleryBytes = try galleryAsset.bytes()
         let configurationBytes = try configurationAsset.bytes()
-        precondition(galleryBytes == configurationBytes, "gallery and lock screen carry the same wallpaper assets")
-        precondition(!delta.contains { $0.relativePath.contains("/descriptors/") && $0.relativePath.hasSuffix("com.apple.posterkit.role.identifier") }, "gallery descriptor is not a lock screen role")
+        precondition(configurationBytes == Data("wallpaper bytes".utf8),
+                     "the configuration carries the wallpaper's own assets")
         PosterBoardPreferences.autoRefresh = false
         let noRefresh = try await PosterBoard.compile(selection: PosterBoardSelection(), templates: [template],
             structureVersion: 61, database: source, preservedPayloads: preserved, deviceVersion: "27.0.1",
@@ -83,19 +83,21 @@
             let dvd = try await PosterBoard.compile(selection: dvdSelection, structureVersion: 61,
                 database: source, preservedPayloads: preserved, includeSnapshotFiles: false,
                 deviceVersion: "27.0.1", workingDirectory: root.appendingPathComponent("dvd-work"), log: { _ in })
-            let gallery = dvd.filter { $0.relativePath.contains("/Extensions/com.apple.Posters.CollectionsPosterApp/descriptors/") }
             let configs = dvd.filter { $0.relativePath.contains("/Extensions/" + PosterBoard.collectionsExtension + "/configurations/") }
-            precondition(!gallery.isEmpty && !configs.isEmpty, "DVD must publish gallery and installed configuration")
-            for item in configs where !item.relativePath.hasSuffix("com.apple.posterkit.role.identifier") {
-                let suffix = item.relativePath.components(separatedBy: "/configurations/").last!
-                let counterpart = gallery.first { $0.relativePath.hasSuffix("/descriptors/" + suffix) }!
-                let left = try item.bytes()
-                let right = try counterpart.bytes()
-                precondition(left == right, "DVD gallery assets must exactly match its configuration")
-            }
+            precondition(!configs.isEmpty, "DVD must publish an installed configuration")
+            // One identity per wallpaper. A second copy under
+            // `CollectionsPosterApp/descriptors/` (or the provider's own
+            // `descriptors/`) is the gallery channel, not an installed poster;
+            // the device's store holds no such directory on iOS 27, and a
+            // duplicate the store cannot reconcile is what made it rebuild the
+            // whole database — every wallpaper gone.
+            precondition(!dvd.contains { $0.relativePath.contains("/descriptors/") },
+                         "DVD must be delivered once, as a configuration")
+            precondition(configs.contains { $0.relativePath.hasSuffix("/providerInfo.plist") },
+                         "the configuration carries the provider metadata the store reads")
             let database = dvd.first { $0.relativePath.hasSuffix(PosterBoard.databaseFileName) }!.source!
             precondition(rowCount(database) == 2 && rowCount(source) == 1, "DVD registration retains existing wallpaper")
-            print("PASS: actual DVD Screensaver publishes both targets, with matching assets and preserved database rows")
+            print("PASS: actual DVD Screensaver publishes one configuration, with preserved database rows")
         }
         print("16 PosterBoard template backup checks passed")
     }

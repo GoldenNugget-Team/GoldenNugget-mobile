@@ -137,13 +137,21 @@ record into a boolean.
   does the fold (the reference's `src.backup(merged)`), and the `-shm` is deliberately
   **not** copied — a stale shared-memory file desyncs against the WAL and is a classic
   "database disk image is malformed". Every fetch now goes through a writable scratch
-  copy and produces a validated `journal_mode=DELETE` snapshot, even without a WAL
+  copy and produces a validated **WAL-declared** snapshot, even without a WAL
   companion: the main file can still carry WAL mode, and the old copy-only path could
-  fail at `sqlite_master` with "unable to open database file". Old cache sidecars are
+  fail at `sqlite_master` with "unable to open database file". The snapshot stays
+  self-contained — every page is checkpointed into the main file, so the `-wal` the
+  restore carries is a zero-byte companion, exactly like the device's own store. The
+  mode itself is not cosmetic: PosterBoard opens its store read-only and immediately
+  runs `PRAGMA journal_mode=WAL`, which is a *write* on a DELETE-mode database, fails
+  with `PFSQLiteErrorDomain 8 "attempt to write a readonly database"`, and makes the
+  store rebuild itself from the gallery — every custom wallpaper gone. Shipping
+  DELETE mode was the wipe this feature kept producing. Old cache sidecars are
   removed before publishing the snapshot. Unlike the reference, a failed merge stops
   the apply and preserves the previous cache instead of falling back to a main file
   that may omit committed rows. `scripts/check-posterboard-backup.py` covers this
-  failure, WAL-only rows, and stitching a new wallpaper into the restore payload.
+  failure, WAL-only rows, the declared mode, and stitching a new wallpaper into the
+  restore payload.
 - **The structure version is read out of the path** (`PRBPosterExtensionDataStore/<v>/`),
   falling back to 61 only when the path does not name the store directory — the reference's
   own fallback. The wrong version lands the injected database in a directory the device

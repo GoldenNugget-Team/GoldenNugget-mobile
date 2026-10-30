@@ -227,10 +227,21 @@ enum BackupInjector {
         let preservedDirectories: Set<String>
         let preservedFileMetadata: [String: Data]
         if let posterBoardSnapshot {
-            let snapshot = try PosterBoardSnapshot.merge(from: posterBoardSnapshot, into: deviceDir)
+            // Only the run's own delta is imported out of the snapshot. The rest
+            // of the container stays exactly as the device holds it: those files
+            // are already there, so re-importing them would only hand the restore
+            // agent the live store's whole tree to recreate. The native records
+            // still come along as donors — that is what keeps a same-path
+            // replacement (the database, the refresh preferences) stamped with
+            // the device's own metadata.
+            let delivering = Set(tweakPayloads.map { $0.domain + "/" + $0.relativePath })
+            let snapshot = try PosterBoardSnapshot.merge(from: posterBoardSnapshot, into: deviceDir,
+                                                        delivering: delivering)
             preservedDirectories = snapshot.directories
             preservedFileMetadata = snapshot.fileMetadata
-            AppLog.write("PosterBoard: native manifest restored, \(preservedDirectories.count) directory records preserved")
+            AppLog.write("PosterBoard: native manifest restored — \(preservedDirectories.count) "
+                + "directory record(s), \(snapshot.delivered) snapshot file(s) carried; the "
+                + "container's other files are left as the device has them")
         } else { preservedDirectories = []; preservedFileMetadata = [:] }
 
         let tweakStage = StageTimer("inject tweaks")

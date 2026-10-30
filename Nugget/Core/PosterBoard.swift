@@ -388,27 +388,21 @@ extension PosterBoard {
 
         // 5. Walk what is on disk into payloads, staging one config item per
         //    added descriptor on the way.
+        //
+        //    A wallpaper is delivered **once**, under
+        //    `Extensions/<provider>/configurations/<uuid>`, which is the only
+        //    shape the device's own store contains and the only one the
+        //    reference writes. An earlier revision also published a second copy
+        //    of every file under `Extensions/com.apple.Posters.CollectionsPosterApp/
+        //    descriptors/` "so it shows in Add Wallpaper". That is a gallery
+        //    *descriptor* channel, not an installed poster: on iOS 27.0.1 the
+        //    store has no `descriptors` directory at all, the bundle directory
+        //    does not exist, and a duplicated identity under an unknown provider
+        //    is one more thing the store has to reconcile on boot — with a
+        //    rebuild, i.e. every wallpaper gone, as the outcome when it cannot.
         var builder = PosterBoardBuilder(structureVersion: version, log: log)
         try builder.walk(currentPath: workingDirectory, restorePath: "", isAdding: false)
         payloads.append(contentsOf: builder.payloads)
-        // Configurations register an installed Lock Screen; descriptors populate
-        // Add Wallpaper / Collections. Publish both, using the current gallery
-        // provider mapping shared with the desktop/AirLift descriptor path.
-        for payload in builder.payloads {
-            guard payload.relativePath.contains("/configurations/"),
-                  !payload.relativePath.hasSuffix("/com.apple.posterkit.role.identifier") else { continue }
-            var galleryPath = payload.relativePath.replacingOccurrences(of: "/configurations/", with: "/descriptors/")
-            if (compareVersion(deviceVersion, "26.4") ?? -1) >= 0 {
-                galleryPath = galleryPath.replacingOccurrences(of: "/Extensions/" + collectionsExtension + "/",
-                    with: "/Extensions/com.apple.Posters.CollectionsPosterApp/")
-            }
-            if let source = payload.source {
-                payloads.append(TweakPayload(domain: domain, relativePath: galleryPath, source: source))
-            } else {
-                payloads.append(TweakPayload(domain: domain, relativePath: galleryPath, contents: payload.contents))
-            }
-        }
-
 
         // 6. The database.  A wallpaper that is not in it does not exist.
         //
@@ -430,6 +424,7 @@ extension PosterBoard {
             let staged = try PosterBoardStore.stitch(database: database,
                                                      items: stagedItems,
                                                      workingDirectory: workingDirectory)
+            log("PosterBoard: the staged store carries \(PosterBoardStore.summary(staged))")
             payloads.append(TweakPayload(domain: domain,
                                          relativePath: storePath(version) + "/" + databaseFileName,
                                          source: staged))

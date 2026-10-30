@@ -51,12 +51,28 @@ struct ManifestStore {
 }
 let source = URL(fileURLWithPath: CommandLine.arguments[1])
 let target = URL(fileURLWithPath: CommandLine.arguments[2])
+let mode = CommandLine.arguments.count > 3 ? CommandLine.arguments[3] : "full"
+let dbPath = "Library/Application Support/PRBPosterExtensionDataStore/61/" + PosterBoard.databaseFileName
+let addedPath = "Library/Application Support/PRBPosterExtensionDataStore/61/Extensions/test-provider/descriptors/NEW/asset.bin"
+if mode == "delta" {
+    // What an apply does: import only the run's own delta. Every other file the
+    // snapshot holds keeps its native record but is neither copied nor given a
+    // row, so the restore never rewrites the container the device already has.
+    // (The same-path database patch needs a real donor archive, so that half is
+    // exercised by the `patch` mode against a captured container.)
+    let narrowed = try PosterBoardSnapshot.merge(from: source, into: target,
+        delivering: [PosterBoard.domain + "/" + dbPath, PosterBoard.domain + "/" + addedPath])
+    _ = try TweakInjector.inject(into: target, payloads: [
+        TweakPayload(domain: PosterBoard.domain, relativePath: addedPath, contents: Data("new wallpaper".utf8)),
+    ], preservedDirectories: narrowed.directories, preservedFileMetadata: narrowed.fileMetadata)
+    print("RESTRICTED \(narrowed.directories.count) \(narrowed.delivered)")
+    exit(0)
+}
 let baseline = target.deletingLastPathComponent().appendingPathComponent(target.lastPathComponent + "-baseline")
 try PosterBoardSnapshot.retainBaseline(from: source, at: baseline)
 let snapshot = try PosterBoardSnapshot.merge(from: source, into: target)
-let addedPath = "Library/Application Support/PRBPosterExtensionDataStore/61/Extensions/test-provider/descriptors/NEW/asset.bin"
 _ = try TweakInjector.inject(into: target, payloads: [TweakPayload(domain: PosterBoard.domain, relativePath: addedPath, contents: Data("new wallpaper".utf8))], preservedDirectories: snapshot.directories, preservedFileMetadata: snapshot.fileMetadata)
-if CommandLine.arguments.count > 3 && CommandLine.arguments[3] == "patch" {
+if mode == "patch" {
     let database = try PosterBoardSnapshot.records(in: source).first { PosterBoardSnapshot.storeVersion(relativePath: $0.path) != nil }!
     _ = try TweakInjector.inject(into: target, payloads: [TweakPayload(domain: PosterBoard.domain, relativePath: database.path, contents: Data("new db".utf8))], preservedDirectories: snapshot.directories, preservedFileMetadata: snapshot.fileMetadata)
 }
@@ -127,6 +143,48 @@ def run_and_verify(binary, source, target, patch=False):
     print(f'PASS: {len(original)} native records and all file bytes survive delta injection')
 
 
+def run_and_verify_delta(binary, source, target):
+    """The apply path: the delta is imported, the rest of the container is not."""
+    original = rows(source)
+    target.mkdir()
+    with sqlite3.connect(target / 'Manifest.db') as conn:
+        conn.execute(SCHEMA)
+        add(conn, target, 'Library/unrelated.bin', 1, b'keep', 'HomeDomain')
+    result = subprocess.run([str(binary), str(source), str(target), 'delta'],
+                            capture_output=True, text=True)
+    assert result.returncode == 0, f'delta run failed ({result.returncode}): {result.stderr}'
+    with sqlite3.connect(target / 'Manifest.db') as conn:
+        current = {row[2]: row for row in rows(target)}
+        # A directory record is an instruction to place that directory, not a
+        # harmless annotation, so only the delivered files' own ancestors come
+        # along — with the device's metadata, so the delta's parents stay native
+        # instead of synthesised. Everything else the container holds is left
+        # exactly as the device has it, contents included.
+        tail = 'Library/Application Support/PRBPosterExtensionDataStore/61'
+        for path in ['', 'Library', 'Library/Application Support',
+                     f'{tail}', f'{tail}/Extensions', f'{tail}/Extensions/test-provider',
+                     f'{tail}/Extensions/test-provider/descriptors',
+                     f'{tail}/Extensions/test-provider/descriptors/NEW']:
+            row = next((r for r in original if r[2] == path), None)
+            assert row is None or current.get(path) == row, f'native ancestor record lost: {path}'
+        assert f'{tail}/Extensions/empty-provider/descriptors' not in current, \
+            'a directory the delta does not need was placed on the device'
+        assert 'Library/current-link' not in current, 'a symlink the delta does not need was restored'
+        # The two delivered paths have rows; everything else the container holds
+        # keeps its absence, because the device still has those files.
+        assert DB_PATH in current, 'the database delta was not imported'
+        assert current[DB_PATH] == next(row for row in original if row[2] == DB_PATH), \
+            'the imported database row lost its native metadata'
+        assert any(path.endswith('/NEW/asset.bin') for path in current), 'the new descriptor has no row'
+        assert 'Library/existing.bin' not in current, 'an unchanged container file was re-imported'
+        ident = file_id('Library/existing.bin')
+        assert not (target / ident[:2] / ident).exists(), 'an unchanged payload was copied into the restore'
+        assert (target / file_id(DB_PATH)[:2] / file_id(DB_PATH)).read_bytes() == b'snapshot database'
+        assert conn.execute("SELECT count(*) FROM Files WHERE domain='HomeDomain'").fetchone()[0] == 1
+    print(f'PASS: only the delta and its own ancestors are delivered '
+          f'({result.stdout.strip()})')
+
+
 with tempfile.TemporaryDirectory(prefix='pb-restore-') as work:
     work = Path(work)
     main = work / 'main.swift'
@@ -151,6 +209,7 @@ with tempfile.TemporaryDirectory(prefix='pb-restore-') as work:
         add(conn, source, 'Library/current-link', 4)
         add(conn, source, 'secret.bin', 1, b'foreign app', 'AppDomain-foreign')
     run_and_verify(binary, source, work / 'target')
+    run_and_verify_delta(binary, source, work / 'delta-target')
     # Device manifests can retain WAL mode without an accompanying WAL/SHM.
     # Exercise opening that uploaded shape, not only our DELETE-mode fixture.
     with sqlite3.connect(source / 'Manifest.db') as conn:

@@ -155,21 +155,72 @@ extension PosterBoardSnapshot {
         try fm.moveItem(at: staging, to: destination)
     }
 
-    /// Import the complete native domain after Protective pruning, before adding
-    /// the new wallpaper delta. Never reconstruct existing MBFile metadata.
+    /// Import the native domain's records the delta needs after Protective
+    /// pruning, before adding the new wallpaper delta. Never reconstruct
+    /// existing MBFile metadata.
     struct RestoredSnapshot {
+        /// The directory rows the restore actually carries, keyed
+        /// `domain/relativePath`; `TweakInjector` skips synthesising those.
         let directories: Set<String>
+        /// Native file rows, keyed the same way, used as metadata donors when a
+        /// delivered file replaces one at the same path.
         let fileMetadata: [String: Data]
+        /// Regular files the restore actually carries. Under `delivering` this is
+        /// the delta only, not the whole fetched container.
+        let delivered: Int
     }
 
-    static func merge(from sourceDir: URL, into targetDir: URL) throws -> RestoredSnapshot {
+    /// Import the snapshot's records into the restore backup.
+    ///
+    /// - Parameter delivering: when set, only the regular files whose
+    ///   `domain/relativePath` key is in it are copied and given rows. Every
+    ///   other file the snapshot holds is left alone, and so is every directory
+    ///   the delta does not need — a directory record is not free either. The
+    ///   restore agent treats a directory row as an instruction to *place* that
+    ///   directory, so a record for a directory full of files the manifest does
+    ///   not carry is how the store lost its wallpaper configurations: the
+    ///   device recreated the parent and the contents that were only ever there
+    ///   stayed behind (see `docs/posterboard-rewrite-2026-10-21.md`). Only the
+    ///   ancestors of the delivered files are imported, which is what keeps the
+    ///   delta's own parents native instead of synthesised.
+    ///
+    ///   The apply passes the run's delta here, because rewriting the rest of
+    ///   the container is what this app must not do. Those files are already on
+    ///   the device, byte for byte; a restore that re-imports them buys nothing
+    ///   and hands the restore agent the whole live store's tree to recreate.
+    ///   The reference restores the delta and nothing else, and this is that
+    ///   same stick.
+    ///
+    ///   `nil` imports everything, which is what `retainBaseline` needs: the
+    ///   recovery copy has to be complete to be worth keeping.
+    static func merge(from sourceDir: URL, into targetDir: URL,
+                      delivering: Set<String>? = nil) throws -> RestoredSnapshot {
         let rows = try records(in: sourceDir) // validate ALL payloads before mutation
         let fm = FileManager.default
+        let domainPrefix = PosterBoard.domain + "/"
+        // The directory rows this import is allowed to place: the domain root
+        // and every ancestor of a delivered file, no more. `nil` means "the
+        // whole tree", which is what the recovery baseline is for.
+        var neededDirectories: Set<String>?
+        if let delivering {
+            var needed: Set<String> = [""]
+            for key in delivering where key.hasPrefix(domainPrefix) {
+                var accumulated = ""
+                for component in key.dropFirst(domainPrefix.count).split(separator: "/").dropLast() {
+                    accumulated = accumulated.isEmpty ? String(component) : "\(accumulated)/\(component)"
+                    needed.insert(accumulated)
+                }
+            }
+            neededDirectories = needed
+        }
+        var delivered = 0
         for row in rows {
             guard let source = row.source else { continue }
+            if let delivering, !delivering.contains(domainPrefix + row.path) { continue }
             let target = targetDir.appendingPathComponent("\(row.fileID.prefix(2))/\(row.fileID)")
             try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
             try Data(contentsOf: source, options: .mappedIfSafe).write(to: target, options: .atomic)
+            delivered += 1
         }
         var db: OpaquePointer?
         guard sqlite3_open(targetDir.appendingPathComponent("Manifest.db").path, &db) == SQLITE_OK, let db else {
@@ -188,7 +239,19 @@ extension PosterBoardSnapshot {
         }
         defer { sqlite3_finalize(stmt) }
         let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+        var importedDirectories: Set<String> = []
         for row in rows {
+            // A file row without a payload is MBErrorDomain/205 at restore time,
+            // so a file this import deliberately leaves alone must not get a row
+            // either. Directories and symlinks have no payload by definition,
+            // but placing one is itself a write the device acts on — see the
+            // `delivering` note above — so a directory the delta does not need
+            // is left out too.
+            if row.flags != 1, let neededDirectories,
+               !neededDirectories.contains(row.path) { continue }
+            if row.flags == 1, let delivering,
+               !delivering.contains(domainPrefix + row.path) { continue }
+            if row.flags == 2 { importedDirectories.insert(PosterBoard.domain + "/" + row.path) }
             sqlite3_reset(stmt)
             sqlite3_clear_bindings(stmt)
             sqlite3_bind_text(stmt, 1, row.fileID, -1, transient)
@@ -205,8 +268,9 @@ extension PosterBoardSnapshot {
         }
         committed = true
         return RestoredSnapshot(
-            directories: Set(rows.filter { $0.flags == 2 }.map { PosterBoard.domain + "/" + $0.path }),
+            directories: importedDirectories,
             fileMetadata: Dictionary(uniqueKeysWithValues: rows.filter { $0.flags == 1 }
-                .map { (PosterBoard.domain + "/" + $0.path, $0.blob) }))
+                .map { (PosterBoard.domain + "/" + $0.path, $0.blob) }),
+            delivered: delivered)
     }
 }
