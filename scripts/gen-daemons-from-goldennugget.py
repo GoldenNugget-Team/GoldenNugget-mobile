@@ -20,7 +20,9 @@ Two facts the reference is careful about and this file has to carry:
     "broke whole apps on iOS 26.5".
   * Switch rows are read from the desktop GUI. Interface groups without a
     row remain available through presets/recommended selection and are emitted
-    with `showsSwitch: false`.
+    with `showsSwitch: false`. Rows in the GUI's third table (the "Risky"
+    3-tuples with a warning line) ride the Disable section and carry the
+    warning as `information`.
 
 Usage:
     scripts/gen-daemons-from-goldennugget.py [--goldennugget <path>]
@@ -37,9 +39,14 @@ REPO = Path(__file__).resolve().parent.parent
 OUTPUT = REPO / "Nugget/Core/TweakCatalogDaemons.swift"
 
 # Filled from the desktop GUI's literal row tables by load_reference().
-MAIN: list[tuple[str, str]] = []
-ANALYTICS: list[tuple[str, str]] = []
+MAIN: list[tuple[str, str, str | None]] = []
+ANALYTICS: list[tuple[str, str, str | None]] = []
+RISKY: list[tuple[str, str, str | None]] = []
 RECOMMENDED: list[str] = []
+# Rows in RISKY carry a warning line (the 3rd tuple element); keyed by daemon
+# name and re-emitted as `information`. Empty when the desktop has no Risky
+# rows.
+INFORMATION: dict[str, str] = {}
 
 # `TweakID.ClearScreenTimeAgentPlist` is a NullifyFileTweak: it does not write
 # the ScreenTime plist, it writes a 0-byte file over it. The port's registry
@@ -59,32 +66,55 @@ def swift_string(value: str) -> str:
 
 
 def load_reference(root: Path):
-    global MAIN, ANALYTICS, RECOMMENDED, SECTIONS
+    global MAIN, ANALYTICS, RISKY, RECOMMENDED, SECTIONS, INFORMATION
     # Read literal row data without importing Qt or constructing the desktop UI.
+    # Three tables: two 2-tuples (`title, daemon`) for the main Disable and
+    # Analytics rows, one 3-tuple (`title, daemon, information`) for the Risky
+    # rows the reference shows with a warning line. Titles arrive either as
+    # `QCoreApplication.translate(...)` calls or plain `self.tr`-able strings.
     tree = ast.parse((root / "src/gui/ios/daemons.py").read_text())
     tables = []
+
+    def parsed_title(node) -> str | None:
+        # Rows bind either `QCoreApplication.translate("Nugget", 'Title')`
+        # (or `self.tr('Title')`): the string payload is the last positional
+        # string constant, never the translate context.
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        if isinstance(node, ast.Call):
+            candidates = [a.value for a in node.args
+                          if isinstance(a, ast.Constant) and isinstance(a.value, str)]
+            candidates += [kw.value.value for kw in node.keywords
+                           if kw.arg == "text" and isinstance(kw.value, ast.Constant)
+                           and isinstance(kw.value.value, str)]
+            if candidates:
+                return candidates[-1]
+        return None
+
     for node in ast.walk(tree):
-        if not isinstance(node, ast.For) or not isinstance(node.iter, ast.List):
+        if not isinstance(node, ast.For) or not isinstance(node.iter, (ast.List, ast.Tuple)):
             continue
-        rows = []
+        rows: list[tuple[str, str, str | None]] = []
         for item in node.iter.elts:
-            if not isinstance(item, ast.Tuple) or len(item.elts) != 2:
+            if not isinstance(item, ast.Tuple) or len(item.elts) not in (2, 3):
                 break
-            title, daemon = item.elts
-            if not (isinstance(title, ast.Call) and len(title.args) == 2
-                    and isinstance(title.args[1], ast.Constant) and isinstance(title.args[1].value, str)
+            title, daemon, *rest = item.elts
+            if not (parsed_title(title) is not None
                     and isinstance(daemon, ast.Attribute) and isinstance(daemon.value, ast.Name)
                     and daemon.value.id == "Daemon"):
                 break
-            rows.append((daemon.attr, title.args[1].value))
+            information = (rest[0].value if rest and isinstance(rest[0], ast.Constant)
+                           and isinstance(rest[0].value, str) else None)
+            rows.append((daemon.attr, parsed_title(title), information))
         else:
             if rows:
                 tables.append((node.lineno, rows))
     tables.sort()
-    if len(tables) != 2:
-        raise ValueError("Expected two desktop daemon switch tables; update the generator")
-    MAIN, ANALYTICS = (table[1] for table in tables)
+    if len(tables) != 3:
+        raise ValueError("Expected three desktop daemon switch tables; update the generator")
+    MAIN, ANALYTICS, RISKY = (table[1] for table in tables)
     SECTIONS = {"main": MAIN, "analytics": ANALYTICS}
+    INFORMATION = {name: info for name, _, info in RISKY if info}
     sys.path.insert(0, str(root))
     from src.tweaks.daemons_tweak import (  # noqa: E402
         DANGEROUS_KEYS,
@@ -133,6 +163,10 @@ def emit(Daemon, INTERFACE_DAEMONS, INTERFACE_KEYS, DANGEROUS_KEYS) -> list[str]
     w("    let section: DaemonSection")
     w("    let isRecommended: Bool")
     w("    let showsSwitch: Bool")
+    w("    /// The reference's row warning line (its `Risky tweaks` rows): the")
+    w("    /// sentence the desktop shows under the title, e.g. what breaking")
+    w("    /// thermal monitoring or ATWAKEUP costs. nil everywhere else.")
+    w("    let information: String?")
     w("}")
     w("")
     w("/// The two groups of switches on the Daemons page, in the reference's order.")
@@ -144,11 +178,17 @@ def emit(Daemon, INTERFACE_DAEMONS, INTERFACE_KEYS, DANGEROUS_KEYS) -> list[str]
     w("")
     w("enum DaemonGroups {")
 
-    # The table, ordered the way the page shows it.
+    # The table, ordered the way the page shows it. The two Risky rows
+    # (3-tuples with the warning line) ride the Disable section after the main
+    # rows: the desktop page surfaces them under a "Risky tweaks" heading,
+    # which this two-section page has no room for -- a disable-type action
+    # either way.
     w("    static let all: [DaemonGroup] = [")
     for section_name, members in SECTIONS.items():
         case = "disable" if section_name == "main" else "analytics"
-        for name, title in members:
+        if section_name == "main":
+            members = members + RISKY
+        for name, title, information in members:
             labels = Daemon[name].value
             w("        DaemonGroup(")
             w(f"            name: {swift_string(name)},")
@@ -156,13 +196,18 @@ def emit(Daemon, INTERFACE_DAEMONS, INTERFACE_KEYS, DANGEROUS_KEYS) -> list[str]
             w(f"            labels: [{', '.join(swift_string(x) for x in labels)}],")
             w(f"            section: .{case},")
             w(f"            isRecommended: {str(name in RECOMMENDED).lower()},")
-            w(f"            showsSwitch: true")
+            w("            showsSwitch: true,")
+            info = INFORMATION.get(name)
+            w("            information: "
+              + (swift_string(info) if info is not None else "nil"))
             w("        ),")
     # Groups without a switch, appended so `all` stays complete for the
     # compiler and the Recommended set. They carry an empty section on purpose:
     # nothing renders them individually.
     for name in sorted(interface):
-        if any(name == n for n, _ in MAIN) or any(name == n for n, _ in ANALYTICS):
+        if (any(name == n for n, _, _ in MAIN)
+                or any(name == n for n, _, _ in ANALYTICS)
+                or any(name == n for n, _, _ in RISKY)):
             continue
         labels = Daemon[name].value
         w("        DaemonGroup(")
@@ -171,7 +216,8 @@ def emit(Daemon, INTERFACE_DAEMONS, INTERFACE_KEYS, DANGEROUS_KEYS) -> list[str]
         w(f"            labels: [{', '.join(swift_string(x) for x in labels)}],")
         w("            section: .analytics,")
         w(f"            isRecommended: {str(name in RECOMMENDED).lower()},")
-        w("            showsSwitch: false")
+        w("            showsSwitch: false,")
+        w("            information: nil")
         w("        ),")
     w("    ]")
     w("")
@@ -240,7 +286,7 @@ def emit(Daemon, INTERFACE_DAEMONS, INTERFACE_KEYS, DANGEROUS_KEYS) -> list[str]
     w("            iphoneOnly: false,")
     w("            ipadOnly: false,")
     w("            disabled: false,")
-    w("            detail: \"Disables \\(group.labels.count) launchd \"")
+    w("            detail: group.information ?? \"Disables \\(group.labels.count) launchd \"")
     w("                + \"\\(group.labels.count == 1 ? \"daemon\" : \"daemons\"): \"")
     w("                + group.labels.joined(separator: \", \") + \".\",")
     w("            multiValues: Dictionary(")

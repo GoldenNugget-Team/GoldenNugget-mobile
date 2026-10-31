@@ -4,39 +4,26 @@ import UIKit
 /// The one-time setup guide: put a loopback VPN tunnel up, put a pairing record
 /// in place, then let the user in.
 ///
-/// Two prerequisites, in this order, because they are a chain. The app reaches the
-/// device through a loopback tunnel (`Tunnel`), so with no tunnel there is
-/// nothing for a pairing record to connect over — and with no pairing record
-/// there is no device to reach, which is why the home page's `startMinimuxer()`
-/// waits for the tunnel before it hands anything to minimuxer. Guiding the steps
-/// in the order they unblock each other is the difference between a guide and a
-/// list.
+/// A four-slide `TabView` (art in `FirstRunArt.swift`): Welcome with live step
+/// cards, Tunnel with the values for LocalDevVPN, Pairing — the desktop app's
+/// Mobile Helper first, then import / iOS 27 self-pairing as fallbacks — and
+/// Finish. Order follows the dependency chain: the app reaches the device
+/// through the tunnel, so no tunnel → nothing for a pairing record to connect
+/// over → no device for minimuxer.
 ///
-/// **Every check is one the app can actually make**, and neither step guesses:
-///
-///   * the VPN step is judged by the interface and the peer probe `Tunnel` itself
-///     probes with — a real tunnel carrying a real lockdown port, not a guess
-///     made from a bundle ID the app cannot read;
-///   * the pairing step is judged by a record at `AppPaths.pairingFile` that
-///     passes the same `PairingRecord` rule the restore path applies.
-///
-/// There is no "install" button, and that is deliberate rather than unfinished.
-/// The app has no installer to call: `installation_proxy` lives in the vendored
-/// `IdeviceGateway` and is not bridged into this target, and the profile route
-/// this app would otherwise use is not available either — `SkipSetup` documents
-/// the same wall for `MobileConfigService`. A button that promises to install an
-/// app it cannot install is worse than an honest set of instructions, so the step
-/// says what to install and what to type into it.
+/// Both checks are ones the app can actually make: the VPN step is judged by
+/// the interface and peer probe `Tunnel` performs, the pairing step by a
+/// record at `AppPaths.pairingFile` passing the same `PairingRecord` rule the
+/// restore path applies. There is deliberately no "install" button — this
+/// target cannot install (`installation_proxy` is not bridged in), so the
+/// tunnel slide says what to install and what to type into it instead.
 struct FirstRunView: View {
-    /// Present when the guide is a page pushed from Settings rather than the
-    /// app's own gate. Only then is there a way out that is not "finish", and
-    /// only then does the finish button have somewhere to return to.
+    /// Non-nil when the guide is pushed from Settings rather than the gate:
+    /// only then can the user leave without finishing setup.
     var onClose: (() -> Void)?
 
     @ObservedObject private var firstRun = FirstRunSettings.shared
-    /// Shared because the advertisement outlives this page: the user leaves for
-    /// Settings → Developer Mode to confirm it, and a `NavigationSplitView`
-    /// replaces the detail on every selection.
+    /// Shared: the advertisement outlives this page (Settings → Developer Mode).
     @ObservedObject private var wirelessPair = WirelessPairing.shared
     @Environment(\.scenePhase) private var scenePhase
 
@@ -46,14 +33,14 @@ struct FirstRunView: View {
     @State private var pairingReady = PairingRecord.onDisk() != nil
     @State private var showPairingImporter = false
     @State private var errorText: String?
+    /// The slide number, swiped by the user or animated to by a step-card tap.
+    @State private var page = 0
+    /// The last slide's index; `Finish` and `Skip` live below it.
+    private let lastPage = 3
 
-    /// The tunnel step, as the app can actually observe it.
-    ///
-    /// `.peerUnreachable` is deliberately **not** a failure state: the interface
-    /// is up, so the VPN is on and something else — LocalDevVPN's own service —
-    /// has yet to answer on the peer port. `Tunnel.waitForTunnel` waits for
-    /// exactly this, and reporting it as an error would tell a user whose tunnel
-    /// is working that it is not.
+    /// The tunnel step, as the app can actually observe it. `.peerUnreachable`
+    /// is not a failure: the interface is up, the peer service is just not
+    /// answering yet — `Tunnel.waitForTunnel` waits on exactly this.
     private enum TunnelStep: Equatable {
         /// Not probed yet, or the last probe was interrupted.
         case unchecked
@@ -64,6 +51,7 @@ struct FirstRunView: View {
         /// The tunnel is carrying lockdown traffic — `startMinimuxer` will go on.
         case ready
 
+        /// The long verdict, carrying the values it judged — for the log.
         var text: String {
             switch self {
             case .unchecked: return "Not checked yet"
@@ -73,17 +61,31 @@ struct FirstRunView: View {
             }
         }
 
+        /// The short verdict a status pill can carry.
+        var shortText: String {
+            switch self {
+            case .unchecked: return "Not checked yet"
+            case .interfaceMissing: return "Tunnel not connected"
+            case .peerUnreachable: return "Waiting for the tunnel's other end"
+            case .ready: return "Tunnel is up"
+            }
+        }
+
         var isReady: Bool { self == .ready }
     }
 
     var body: some View {
-        List {
-            introSection
-            tunnelSection
-            pairingSection
-            finishSection
+        VStack(spacing: 0) {
+            TabView(selection: $page) {
+                welcomeSlide.tag(0)
+                tunnelSlide.tag(1)
+                pairingSlide.tag(2)
+                finishSlide.tag(3)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            footer
         }
-        .listStyle(.insetGrouped)
+        .background(FirstRunBackground())
         .navigationTitle("Set Up")
         .navigationBarTitleDisplayMode(.inline)
         // No menu button: there is no sidebar behind this page in either state.
@@ -143,159 +145,323 @@ struct FirstRunView: View {
         }
     }
 
-    // MARK: - Sections
+    // MARK: - Footer
 
-    private var introSection: some View {
-        Section {
-            HStack(spacing: 16) {
-                NativeLogo(size: 64)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Set up GoldenNugget")
-                        .font(.title3.bold())
-                    Text("Two things before the app can reach this device.")
+    /// The chrome under the slides: back, the dots, the forward action — and
+    /// on the last slide the two ways out. `Finish` lives here so it can never
+    /// be scrolled away.
+    private var footer: some View {
+        VStack(spacing: 12) {
+            HStack {
+                if page == 0 {
+                    // The first slide's leading edge carries the exit instead of
+                    // a back button there is nothing to go back to.
+                    Button("Skip setup for now") { skip() }
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Button {
+                        withAnimation(.snappy) { page -= 1 }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.body.weight(.semibold))
+                            .frame(width: 44, height: 44)
+                            .background(.quaternary, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Previous slide")
                 }
-                Spacer(minLength: 0)
+                Spacer()
+                HStack(spacing: 6) {
+                    ForEach(0...lastPage, id: \.self) { index in pageDot(index) }
+                }
+                Spacer()
+                if page < lastPage {
+                    Button {
+                        withAnimation(.snappy) { page += 1 }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(page == 0 ? "Get started" : "Continue")
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.body.weight(.semibold))
+                        .padding(.horizontal, 16)
+                        .frame(height: 44)
+                        .background(.quaternary, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    // Width-balances the back button so the dots stay centred on
+                    // the last slide too.
+                    Color.clear
+                        .frame(width: 44, height: 44)
+                        .accessibilityHidden(true)
+                }
             }
-            .padding(.vertical, 4)
-            NativeNote("If the tunnel was connected after the app had already started, "
-                + "close and reopen GoldenNugget once — it decides whether to start its own "
-                + "emulated tunnel at launch, and that decision is made once.")
+            if page == lastPage {
+                NativePrimaryButton(title: "Finish setup", systemImage: "checkmark", disabled: !canFinish) {
+                    finish()
+                }
+                Button("Skip setup for now") { skip() }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                NativeNote("Skipping is not a dead end: this guide is in Settings afterwards.")
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+    }
+
+    /// One of the four dots; the live one stretches into a capsule.
+    private func pageDot(_ index: Int) -> some View {
+        Capsule()
+            .fill(index == page ? Color.accentColor : Color(.tertiaryLabel))
+            .frame(width: index == page ? 20 : 7, height: 7)
+            .animation(.spring(duration: 0.25), value: page)
+            .accessibilityLabel("Slide \(index + 1) of \(lastPage + 1)")
+            .accessibilityHidden(index != page)
+    }
+
+    // MARK: - Slides
+
+    /// Slide 0: what the app does, plus the two steps as live cards that jump
+    /// to their slide — the same probes as below, one name per state.
+    private var welcomeSlide: some View {
+        SlideLayout(
+            art: { FirstRunWelcomeArt(active: page == 0) },
+            title: "GoldenNugget",
+            subtitle: "Restyle this iPhone's SpringBoard, status bar and daemons. Two steps stand in front of it.")
+        {
+            VStack(alignment: .leading, spacing: 12) {
+                stepCard(number: 1, title: "Tunnel", done: tunnel.isReady,
+                         working: tunnel == .peerUnreachable, status: tunnel.shortText,
+                         destination: 1)
+                stepCard(number: 2, title: "Pairing", done: pairingReady,
+                         working: wirelessPair.isRunning,
+                         status: pairingReady ? "Pairing record in place" : "No pairing record yet",
+                         destination: 2)
+                NativeNote("The PC version does step 2 for you — plug this iPhone in over USB and open GoldenNugget's “Mobile Helper”.")
+                NativeNote("If the tunnel was connected after the app started, close and reopen GoldenNugget once.")
+            }
         }
     }
 
-    /// Step 1: the tunnel, with the values to type into LocalDevVPN.
-    ///
-    /// The configuration line is the same `Tunnel.requirements` string the home
-    /// page's diagnostics and its tunnel-failure alert print, so the guide and
-    /// the diagnostics cannot disagree about what a working tunnel looks like —
-    /// including when the user has overridden the addressing.
-    private var tunnelSection: some View {
-        Section("1 · LocalDevVPN tunnel") {
-            stepStatus(done: tunnel.isReady, text: tunnel.text)
-            Text(Tunnel.requirements)
-                .font(.footnote.monospaced())
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-            Button {
-                UIPasteboard.general.string = Tunnel.requirements
-            } label: {
-                Label("Copy these values", systemImage: "doc.on.doc")
-            }
-            Button {
-                Task { await probe() }
-            } label: {
-                Label("Check again", systemImage: "arrow.clockwise")
-            }
-            NativeNote("Install LocalDevVPN (or any equivalent tunnel app) on this iPhone, "
-                + "then switch it on and enter the values above: the tunnel IP is this "
-                + "device's own address in the tunnel, and the peer is the other end. "
-                + "Leave the tunnel on — GoldenNugget needs it for every connection, and "
-                + "this app cannot install a VPN app or a configuration profile itself.")
-            if tunnel == .interfaceMissing {
-                NativeNote("No interface carries \(Tunnel.ifaceIP). The most common cause "
-                    + "is the VPN app being connected to the wrong network, or its tunnel "
-                    + "IP left at its own default.")
-            }
-            if Tunnel.isCustomised {
-                NativeSafetyNote("Custom tunnel values are in use (see Tunnel settings on "
-                    + "the home page). These must match the ones in LocalDevVPN.")
+    /// Slide 1: the tunnel. `Tunnel.requirements` is the same string the home
+    /// page's diagnostics print, so the two cannot disagree.
+    private var tunnelSlide: some View {
+        SlideLayout(
+            art: { FirstRunTunnelArt(ready: tunnel.isReady, active: page == 1) },
+            title: "1 · Tunnel",
+            subtitle: "Install LocalDevVPN (or any tunnel app), enter the values below, and leave it on — every connection needs it.")
+        {
+            VStack(alignment: .leading, spacing: 12) {
+                statusPill(done: tunnel.isReady, working: tunnel == .peerUnreachable,
+                           text: tunnel.shortText)
+                Text(Tunnel.requirements)
+                    .font(.footnote.monospaced())
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(Color(.secondarySystemBackground),
+                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                HStack(spacing: 10) {
+                    Button {
+                        UIPasteboard.general.string = Tunnel.requirements
+                    } label: {
+                        Text("Copy these values")
+                    }
+                    .buttonStyle(.bordered)
+                    Button {
+                        Task { await probe() }
+                    } label: {
+                        Label("Check again", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.bordered)
+                }
+                if tunnel == .interfaceMissing {
+                    NativeNote("No interface carries \(Tunnel.ifaceIP) — the VPN app may be "
+                        + "on the wrong network, or its tunnel IP left at default.")
+                }
+                if Tunnel.isCustomised {
+                    NativeSafetyNote("Custom tunnel values are in use (Tunnel settings on the "
+                        + "home page) — they must match LocalDevVPN.")
+                }
             }
         }
     }
 
-    /// Step 2: a pairing record, from the PC or from the phone itself.
-    private var pairingSection: some View {
-        Section("2 · Pairing") {
-            stepStatus(done: pairingReady,
-                       text: pairingReady
-                        ? "A pairing record is in place"
-                        : "No pairing record yet")
-            if wirelessPair.isRunning {
-                wirelessPairProgress
-            } else {
-                Button {
-                    showPairingImporter = true
-                } label: {
-                    Label("Import pairing file", systemImage: "doc.badge.plus")
-                }
-                Button {
-                    wirelessPair.start()
-                } label: {
-                    Label("Pair without a computer", systemImage: "wifi")
+    /// Slide 2: a pairing record — the desktop app's Mobile Helper first, then
+    /// the two fallbacks (import; iOS 27 self-pairing).
+    private var pairingSlide: some View {
+        SlideLayout(
+            art: { FirstRunPairArt(linked: pairingReady, active: page == 2) },
+            title: "2 · Pairing",
+            subtitle: "The PC version's Mobile Helper is the easiest route. The two cards below are fallbacks.")
+        {
+            VStack(alignment: .leading, spacing: 12) {
+                statusPill(done: pairingReady, working: wirelessPair.isRunning,
+                           text: pairingReady ? "Pairing record in place" : "No pairing record yet")
+                if wirelessPair.isRunning {
+                    wirelessCard
+                } else {
+                    helperCard
+                    actionCard(icon: "doc.badge.plus", title: "Import pairing file",
+                               subtitle: "Made on a computer — AirDrop, Files, iCloud Drive") {
+                        showPairingImporter = true
+                    }
+                    actionCard(icon: "wifi", title: "Pair without a computer",
+                               subtitle: "iOS 27+ — on iOS 26, use a file from a computer") {
+                        wirelessPair.start()
+                    }
+                    NativeNote("No helper? Pair on a computer (idevicepair, Sideloadly — "
+                        + "tap Trust when the phone asks), send the .mobiledevicepairing file "
+                        + "here, and import it above. The helper's “Save Pairing File to "
+                        + "Disk” works the same way.")
                 }
             }
-            NativeNote("To pair with a computer: connect this iPhone over USB, tap Trust when "
-                + "it asks, and run the computer's pairing tool against it — for example "
-                + "idevicepair from libimobiledevice, or Sideloadly. The tool writes a "
-                + ".mobiledevicepairing file; send that file to this phone (AirDrop, or save it "
-                + "in iCloud Drive) and import it above.")
-            NativeNote("Or pair without a computer: iOS 27 lets the phone pair with itself, "
-                + "which is what the second button does. That record is this app's own — a "
-                + "computer still needs its own record, imported the first way.")
         }
     }
 
-    private var finishSection: some View {
-        Section {
-            NativeNote(canFinish
-                ? "Both are ready. Finishing connects to the device and opens the home page; "
-                    + "the record here is the one it reads."
-                : "The tunnel and the pairing record are both required. Finish stays greyed "
-                    + "out until both are ready — a home page that cannot connect is the "
-                    + "state this guide exists to prevent.")
-            NativePrimaryButton(title: "Finish setup", systemImage: "checkmark", disabled: !canFinish) {
-                firstRun.complete(reason: "tunnel and pairing record both ready")
-                // Start the photo/video copy here, while the tunnel is known to
-                // be up and the user is still on a screen that explains it. The
-                // order matters: the record is already complete, so a pull that
-                // outlives this page is not tied to it. The engine waits for
-                // minimuxer before it touches AFC, which is why this call can
-                // happen before the home page's `.task` starts it.
-                GoldenNuggetEngine.shared.startAutomaticMediaPull(
-                    reason: "setup finished", force: true)
-                onClose?()
+    /// The desktop app's route, as an informative card — the work happens in
+    /// another app on another machine, so it must not read as a button. Its
+    /// file lands exactly where `PairingRecord.adoptFromDisk` reads it, and
+    /// the slide's check turns green on its own after that.
+    private var helperCard: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "desktopcomputer")
+                .font(.title3)
+                .foregroundStyle(.tint)
+                .frame(width: 34)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("The PC version does this for you")
+                    .font(.headline)
+                Text("Connect this iPhone over USB and tap Trust, then open "
+                    + "GoldenNugget on the computer — iOS → “GoldenNugget Mobile "
+                    + "Helper”. It installs the app and sends the pairing file itself.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                NativeNote("Send the file while the app is closed, then reopen it.")
             }
-            Button("Skip setup for now") {
-                firstRun.complete(reason: "skipped by the user")
-                onClose?()
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(Color(.secondarySystemBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// Slide 3: both verdicts and the buttons out; the confetti follows
+    /// `canFinish`, never promising a finish the button refuses.
+    private var finishSlide: some View {
+        SlideLayout(
+            art: { FirstRunFinishArt(ready: canFinish, active: page == lastPage) },
+            title: "All set",
+            subtitle: "Finishing connects to the device and opens the home page.")
+        {
+            VStack(alignment: .leading, spacing: 12) {
+                stepCard(number: 1, title: "Tunnel", done: tunnel.isReady,
+                         working: tunnel == .peerUnreachable, status: tunnel.shortText,
+                         destination: 1)
+                stepCard(number: 2, title: "Pairing", done: pairingReady,
+                         working: wirelessPair.isRunning,
+                         status: pairingReady ? "Pairing record in place" : "No pairing record yet",
+                         destination: 2)
+                NativeNote("Finish also starts copying this device's photos and videos in the "
+                    + "background — “Restore media” on the home page puts it back after a reset.")
+                if !canFinish {
+                    NativeNote("Finish stays greyed out until both steps are ready.")
+                }
             }
-            .foregroundStyle(.secondary)
-            NativeNote("Skipping is not a dead end: this guide is in Settings afterwards.")
-            NativeNote("Finishing also starts copying this device's photos and videos into "
-                + "the app's container. It runs in the background — you can keep using the "
-                + "app — and the copy is what the “Restore media” button on the home page "
-                + "puts back after a reset. Videos take a while the first time; later "
-                + "launches only collect new files.")
         }
     }
 
     // MARK: - Pieces
 
-    /// One step's verdict: a tick, a spinner-free cross, and the sentence saying
-    /// which of the two it is. The wording is the step's whole value here — an
-    /// icon alone would leave a user who cannot see the screen colour with no way
-    /// to tell which of the two checks failed.
-    private func stepStatus(done: Bool, text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: done ? "checkmark.circle.fill" : "circle.dashed")
-                .foregroundStyle(done ? Color.green : Color.secondary)
-                .accessibilityHidden(true)
-            Text(text)
-                .font(.subheadline)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+    /// A step card (welcome/finish slides): number, name, short verdict, and a
+    /// tap that jumps to the step's slide.
+    private func stepCard(number: Int, title: String, done: Bool, working: Bool,
+                          status: String, destination: Int) -> some View {
+        Button {
+            withAnimation(.snappy) { page = destination }
+        } label: {
+            HStack(spacing: 12) {
+                Text("\(number)")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(done ? Color.green : Color.accentColor)
+                    .frame(width: 30, height: 30)
+                    .background(.quaternary, in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(status)
+                        .font(.footnote)
+                        .foregroundStyle(done ? Color.green : working ? Color.orange : Color.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(12)
+            .background(Color(.secondarySystemBackground),
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens this step's slide")
     }
 
-    /// The in-flight wireless pairing. Drawn in place of the two acquire buttons,
-    /// because the advertisement blocks until the device connects — this row's
-    /// jobs are to say the host is up, show a PIN if the device asks for one, and
-    /// offer a way out so a pairing that never connects does not look frozen.
-    private var wirelessPairProgress: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    /// A pairing-slide action as a full-width card (two halves truncate at
+    /// large Dynamic Type sizes).
+    private func actionCard(icon: String, title: String, subtitle: String,
+                            action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(.tint)
+                    .frame(width: 34)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(12)
+            .background(Color(.secondarySystemBackground),
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// A step's verdict as a pill: done (green), working (orange), not yet.
+    private func statusPill(done: Bool, working: Bool = false, text: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: done ? "checkmark.circle.fill" : working ? "ellipsis.circle.fill" : "circle.dashed")
+                .foregroundStyle(done ? Color.green : working ? Color.orange : Color.secondary)
+                .accessibilityHidden(true)
+            Text(text)
+                .font(.subheadline.weight(.medium))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.quinary, in: Capsule())
+    }
+
+    /// The in-flight wireless pairing: host status, PIN if asked, cancel.
+    private var wirelessCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 ProgressView()
                 Text(wirelessPair.serviceName
@@ -308,13 +474,12 @@ struct FirstRunView: View {
                 Text("PIN: \(pin)")
                     .font(.title3.monospaced().weight(.semibold))
                     .textSelection(.enabled)
-                NativeNote("Confirm this PIN in Settings → Privacy & Security → Developer "
-                    + "Mode → “Pair with \(WirelessPairing.displayName)” to finish pairing.")
+                NativeNote("Confirm it in Settings → Privacy & Security → Developer "
+                    + "Mode → “Pair with \(WirelessPairing.displayName)”.")
             } else {
-                NativeNote("Leave this screen open, then open Settings → Privacy & Security → "
-                    + "Developer Mode on this iPhone and tap “Pair with "
-                    + "\(WirelessPairing.displayName)”. iOS 27 connects the phone to the "
-                    + "advertised service itself — no computer is involved.")
+                NativeNote("Leave this open, then above on this iPhone: Settings → Privacy "
+                    + "& Security → Developer Mode → “Pair with "
+                    + "\(WirelessPairing.displayName)”.")
             }
             Button(role: .destructive) {
                 wirelessPair.cancel()
@@ -322,11 +487,35 @@ struct FirstRunView: View {
                 Label("Cancel pairing", systemImage: "xmark.circle")
             }
         }
+        .padding(12)
+        .background(Color(.secondarySystemBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var canFinish: Bool { tunnel.isReady && pairingReady }
 
     // MARK: - Actions
+
+    /// Leave the guide with both steps satisfied, and start the copy.
+    private func finish() {
+        firstRun.complete(reason: "tunnel and pairing record both ready")
+        // Start the photo/video copy here, while the tunnel is known to
+        // be up and the user is still on a screen that explains it. The
+        // order matters: the record is already complete, so a pull that
+        // outlives this page is not tied to it. The engine waits for
+        // minimuxer before it touches AFC, which is why this call can
+        // happen before the home page's `.task` starts it.
+        GoldenNuggetEngine.shared.startAutomaticMediaPull(
+            reason: "setup finished", force: true)
+        onClose?()
+    }
+
+    /// Leave the guide without the setup; the gate's log tells the two ways out
+    /// apart, and everything here stays reachable from Settings.
+    private func skip() {
+        firstRun.complete(reason: "skipped by the user")
+        onClose?()
+    }
 
     /// Fill the tunnel step's state, off the main actor.
     ///
@@ -388,5 +577,58 @@ struct FirstRunView: View {
             GoldenNuggetEngine.shared.log("setup guide: wireless pairing record rejected — "
                 + "\(error.localizedDescription)")
         }
+    }
+}
+
+// MARK: - Slide scaffolding
+
+/// One slide's frame: illustration, title, subtitle, then the content — which
+/// scrolls when Dynamic Type or a small phone leaves it no room, while the
+/// illustration keeps its space and stays the slide's face.
+private struct SlideLayout<Art: View, Content: View>: View {
+    @ViewBuilder var art: () -> Art
+    var title: LocalizedStringKey
+    var subtitle: LocalizedStringKey
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            art()
+                .padding(.top, 16)
+            VStack(spacing: 8) {
+                Text(title)
+                    .font(.largeTitle.weight(.bold))
+                Text(subtitle)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 24)
+            .padding(.top, 4)
+            .padding(.bottom, 20)
+            ScrollView(.vertical) {
+                content()
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
+/// The slides' backdrop: the system background with one quiet accent wash from
+/// the top, behind every slide. Semantic colours only — the wash fades to
+/// nothing rather than to a fixed colour, so dark mode needs no second version.
+private struct FirstRunBackground: View {
+    var body: some View {
+        ZStack {
+            Color(.systemBackground)
+            LinearGradient(colors: [Color.accentColor.opacity(0.10), .clear],
+                           startPoint: .top,
+                           endPoint: UnitPoint(x: 0.5, y: 0.6))
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
     }
 }

@@ -28,6 +28,10 @@ struct DaemonGroup: Sendable {
     let section: DaemonSection
     let isRecommended: Bool
     let showsSwitch: Bool
+    /// The reference's row warning line (its `Risky tweaks` rows): the
+    /// sentence the desktop shows under the title, e.g. what breaking
+    /// thermal monitoring or ATWAKEUP costs. nil everywhere else.
+    let information: String?
 }
 
 /// The two groups of switches on the Daemons page, in the reference's order.
@@ -41,11 +45,12 @@ enum DaemonGroups {
     static let all: [DaemonGroup] = [
         DaemonGroup(
             name: "OTA",
-            title: "Disable OTA Updates",
+            title: "Disable OTA Update Services",
             labels: ["com.apple.mobile.softwareupdated", "com.apple.OTATaskingAgent", "com.apple.softwareupdateservicesd", "com.apple.mobile.NRDUpdated"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "UsageTrackingAgent",
@@ -53,7 +58,8 @@ enum DaemonGroups {
             labels: ["com.apple.UsageTrackingAgent"],
             section: .disable,
             isRecommended: true,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "GameCenter",
@@ -61,7 +67,8 @@ enum DaemonGroups {
             labels: ["com.apple.gamed"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "Tips",
@@ -69,7 +76,8 @@ enum DaemonGroups {
             labels: ["com.apple.tipsd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "VPN",
@@ -77,7 +85,8 @@ enum DaemonGroups {
             labels: ["com.apple.racoon"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "ChineseLAN",
@@ -85,7 +94,8 @@ enum DaemonGroups {
             labels: ["com.apple.wapic", "com.apple.wifi.wapic"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "HealthKit",
@@ -93,7 +103,8 @@ enum DaemonGroups {
             labels: ["com.apple.healthd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "AirPrint",
@@ -101,7 +112,8 @@ enum DaemonGroups {
             labels: ["com.apple.printd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "AssistiveTouch",
@@ -109,7 +121,8 @@ enum DaemonGroups {
             labels: ["com.apple.assistivetouchd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "iCloud",
@@ -117,7 +130,8 @@ enum DaemonGroups {
             labels: ["com.apple.itunescloudd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "InternetTethering",
@@ -125,7 +139,8 @@ enum DaemonGroups {
             labels: ["com.apple.MobileInternetSharing"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "PassBook",
@@ -133,7 +148,8 @@ enum DaemonGroups {
             labels: ["com.apple.passd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "Spotlight",
@@ -141,7 +157,8 @@ enum DaemonGroups {
             labels: ["com.apple.searchd", "com.apple.corespotlightservice", "com.apple.spotlightknowledged", "com.apple.spotlightknowledged.updater", "com.apple.spotlight.IndexAgent"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "VoiceControl",
@@ -149,7 +166,8 @@ enum DaemonGroups {
             labels: ["com.apple.assistant_service", "com.apple.assistantd", "com.apple.voiced"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "AppleAds",
@@ -157,7 +175,8 @@ enum DaemonGroups {
             labels: ["com.apple.promotedcontentd", "com.apple.adprivacyd", "com.apple.adservicesd"],
             section: .disable,
             isRecommended: true,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "News",
@@ -165,7 +184,8 @@ enum DaemonGroups {
             labels: ["com.apple.newsd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "FamilySharing",
@@ -173,7 +193,8 @@ enum DaemonGroups {
             labels: ["com.apple.familycircled", "com.apple.familynotificationd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "VideoSubscriptions",
@@ -181,7 +202,8 @@ enum DaemonGroups {
             labels: ["com.apple.videosubscriptionsd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "WebBookmarks",
@@ -189,7 +211,8 @@ enum DaemonGroups {
             labels: ["com.apple.webbookmarksd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "WifiLogging",
@@ -197,7 +220,8 @@ enum DaemonGroups {
             labels: ["com.apple.wifilogd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "Maps",
@@ -205,7 +229,8 @@ enum DaemonGroups {
             labels: ["com.apple.geod"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "SafariSuggestions",
@@ -213,7 +238,8 @@ enum DaemonGroups {
             labels: ["com.apple.parsecd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "Reminders",
@@ -221,7 +247,8 @@ enum DaemonGroups {
             labels: ["com.apple.reminderd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "AirPlay",
@@ -229,7 +256,8 @@ enum DaemonGroups {
             labels: ["com.apple.airplay"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "GameKitService",
@@ -237,7 +265,8 @@ enum DaemonGroups {
             labels: ["com.apple.gamekitservice"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "Sidecar",
@@ -245,7 +274,8 @@ enum DaemonGroups {
             labels: ["com.apple.sidecarcore"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "SpeechRecognition",
@@ -253,7 +283,8 @@ enum DaemonGroups {
             labels: ["com.apple.speechrecognition"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "MockLocation",
@@ -261,7 +292,8 @@ enum DaemonGroups {
             labels: ["com.apple.mocksynclocationd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "Feedback",
@@ -269,7 +301,8 @@ enum DaemonGroups {
             labels: ["com.apple.feedbackd"],
             section: .disable,
             isRecommended: true,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "SettingsStats",
@@ -277,7 +310,8 @@ enum DaemonGroups {
             labels: ["com.apple.settings-statsd"],
             section: .disable,
             isRecommended: true,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "Shazam",
@@ -285,7 +319,8 @@ enum DaemonGroups {
             labels: ["com.apple.shazamd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "FollowUp",
@@ -293,7 +328,8 @@ enum DaemonGroups {
             labels: ["com.apple.followupd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "Location",
@@ -301,7 +337,26 @@ enum DaemonGroups {
             labels: ["com.apple.locationd"],
             section: .disable,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
+        ),
+        DaemonGroup(
+            name: "thermalmonitord",
+            title: "Disable Temperature Monitoring",
+            labels: ["com.apple.thermalmonitord"],
+            section: .disable,
+            isRecommended: false,
+            showsSwitch: true,
+            information: "Disrupts temperature monitoring; can cause instability."
+        ),
+        DaemonGroup(
+            name: "ATWAKEUP",
+            title: "Disable ATWAKEUP Helper",
+            labels: ["com.apple.atc.atwakeup"],
+            section: .disable,
+            isRecommended: false,
+            showsSwitch: true,
+            information: "Reported to cause repeated interface restarts with AirPods when disabled."
         ),
         DaemonGroup(
             name: "Diagnostics",
@@ -309,7 +364,8 @@ enum DaemonGroups {
             labels: ["com.apple.diagnosticd", "com.apple.diagnosticextensionsd", "com.apple.diagnosticservicesd", "com.apple.diagnosticspushd", "com.apple.symptomsd-diag", "com.apple.sysdiagnose", "com.apple.sysdiagnose.darwinos", "com.apple.sysdiagnose_helper"],
             section: .analytics,
             isRecommended: true,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "CrashReports",
@@ -317,7 +373,8 @@ enum DaemonGroups {
             labels: ["com.apple.ReportCrash", "com.apple.ReportCrash.Jetsam", "com.apple.ReportMemoryException", "com.apple.OTACrashCopier", "com.apple.aslmanager", "com.apple.coresymbolicationd", "com.apple.crash_mover", "com.apple.crashreportcopymobile", "com.apple.DumpBasebandCrash", "com.apple.DumpPanic", "com.apple.logd", "com.apple.logd.admin", "com.apple.logd.events", "com.apple.logd.watchdog", "com.apple.logd_helper", "com.apple.logd_reporter", "com.apple.logd_reporter.report_statistics", "com.apple.system.logger", "com.apple.hangreporter", "com.apple.hangtracerd", "com.apple.spindump", "com.apple.tailspind", "com.apple.syslogd", "com.apple.signpost.signpost_reporter", "com.apple.pluginkit.pkreporter", "com.apple.ProxiedCrashCopier", "com.apple.ProxiedCrashCopier.ProxyingDevice", "com.apple.ReportSystemMemory"],
             section: .analytics,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "WifiAnalytics",
@@ -325,7 +382,8 @@ enum DaemonGroups {
             labels: ["com.apple.wifianalyticsd"],
             section: .analytics,
             isRecommended: true,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "AnalyticsHelper",
@@ -333,7 +391,8 @@ enum DaemonGroups {
             labels: ["com.apple.analyticsd", "com.apple.analyticsd.admin", "com.apple.analyticsd.events"],
             section: .analytics,
             isRecommended: true,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "AudioAnalytics",
@@ -341,7 +400,8 @@ enum DaemonGroups {
             labels: ["com.apple.audioanalyticsd"],
             section: .analytics,
             isRecommended: true,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "EcosystemAnalytics",
@@ -349,7 +409,8 @@ enum DaemonGroups {
             labels: ["com.apple.ecosystemanalyticsd"],
             section: .analytics,
             isRecommended: true,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "CallAnalytics",
@@ -357,7 +418,8 @@ enum DaemonGroups {
             labels: ["com.apple.rtcreportingd"],
             section: .analytics,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "CoreDuet",
@@ -365,7 +427,8 @@ enum DaemonGroups {
             labels: ["com.apple.coreduetd"],
             section: .analytics,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "Insight",
@@ -373,7 +436,8 @@ enum DaemonGroups {
             labels: ["com.apple.insightd"],
             section: .analytics,
             isRecommended: true,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "Metrics",
@@ -381,7 +445,8 @@ enum DaemonGroups {
             labels: ["com.apple.metricsd"],
             section: .analytics,
             isRecommended: true,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "MediaExperience",
@@ -389,7 +454,8 @@ enum DaemonGroups {
             labels: ["com.apple.mediaremoted"],
             section: .analytics,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "Symptomsd",
@@ -397,7 +463,8 @@ enum DaemonGroups {
             labels: ["com.apple.symptomsd", "com.apple.symptomsd-app"],
             section: .analytics,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "StatisticalDiagnostic",
@@ -405,7 +472,8 @@ enum DaemonGroups {
             labels: ["com.apple.StatisticalDiagnosticService"],
             section: .analytics,
             isRecommended: true,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "WirelessDiagnostics",
@@ -413,7 +481,8 @@ enum DaemonGroups {
             labels: ["com.apple.wirelessdiagnostics"],
             section: .analytics,
             isRecommended: true,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "DuetHeuristic",
@@ -421,7 +490,8 @@ enum DaemonGroups {
             labels: ["com.apple.DuetHeuristic-BM", "com.apple.DuetHeuristic-BM.Baseband"],
             section: .analytics,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "DuetExpert",
@@ -429,7 +499,8 @@ enum DaemonGroups {
             labels: ["com.apple.duetexpertd"],
             section: .analytics,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "Triald",
@@ -437,7 +508,8 @@ enum DaemonGroups {
             labels: ["com.apple.triald"],
             section: .analytics,
             isRecommended: false,
-            showsSwitch: true
+            showsSwitch: true,
+            information: nil
         ),
         DaemonGroup(
             name: "Sociald",
@@ -445,23 +517,8 @@ enum DaemonGroups {
             labels: ["com.apple.sociald"],
             section: .analytics,
             isRecommended: false,
-            showsSwitch: true
-        ),
-        DaemonGroup(
-            name: "ATWAKEUP",
-            title: "ATWAKEUP",
-            labels: ["com.apple.atc.atwakeup"],
-            section: .analytics,
-            isRecommended: false,
-            showsSwitch: false
-        ),
-        DaemonGroup(
-            name: "thermalmonitord",
-            title: "thermalmonitord",
-            labels: ["com.apple.thermalmonitord"],
-            section: .analytics,
-            isRecommended: false,
-            showsSwitch: false
+            showsSwitch: true,
+            information: nil
         ),
     ]
 
@@ -630,7 +687,7 @@ extension TweakCatalog {
             iphoneOnly: false,
             ipadOnly: false,
             disabled: false,
-            detail: "Disables \(group.labels.count) launchd "
+            detail: group.information ?? "Disables \(group.labels.count) launchd "
                 + "\(group.labels.count == 1 ? "daemon" : "daemons"): "
                 + group.labels.joined(separator: ", ") + ".",
             multiValues: Dictionary(
