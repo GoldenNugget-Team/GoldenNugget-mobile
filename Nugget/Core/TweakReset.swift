@@ -28,10 +28,10 @@ enum ResetPage: String, CaseIterable, Identifiable, Sendable {
     /// is the string the reference's checkbox carries.
     var title: String {
         switch self {
-        case .statusBar: return "Status Bar"
-        case .springboard: return "Springboard"
-        case .internalOptions: return "Internal"
-        case .daemons: return "Daemons"
+        case .statusBar: return String(localized: "Status Bar")
+        case .springboard: return String(localized: "Springboard")
+        case .internalOptions: return String(localized: "Internal")
+        case .daemons: return String(localized: "Daemons")
         }
     }
 

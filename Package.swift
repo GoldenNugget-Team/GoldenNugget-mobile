@@ -51,6 +51,12 @@ let package = Package(
                 "scripts",
                 ".github",
                 "Vendor",
+                // Build products are not sources or resources.  They have to be
+                // named: SwiftPM treats everything under the target path that is
+                // neither a source nor excluded as a resource, and a build tree
+                // holds copies of the app's `.lproj` directories — two of them,
+                // which SwiftPM rejects as duplicate resources.
+                "build",
             ],
             // One entry, not a hand-maintained list.  The list that used to live
             // here had already drifted — it was missing Nugget/Core/InFlightCall

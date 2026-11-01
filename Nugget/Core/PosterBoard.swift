@@ -97,11 +97,11 @@ enum PosterBoardResetMode: String, CaseIterable, Identifiable, Hashable {
     var detail: String {
         switch self {
         case .collections:
-            return "Clears the Collections and MercuryPoster descriptor folders."
+            return String(localized: "Clears the Collections and MercuryPoster descriptor folders.")
         case .suggestedPhotos:
-            return "Clears the Photos poster provider's descriptor folder."
+            return String(localized: "Clears the Photos poster provider's descriptor folder.")
         case .galleryCache:
-            return "Clears the gallery cache."
+            return String(localized: "Clears the gallery cache.")
         }
     }
 

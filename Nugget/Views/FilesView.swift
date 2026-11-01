@@ -93,9 +93,11 @@ struct FilesView: View {
                 ContentUnavailableView {
                     Label("Folder is Empty", systemImage: "folder")
                 } description: {
-                    Text(path.isEmpty
-                         ? "The device's AFC service published nothing here."
-                         : "\(path[path.count - 1]) has nothing in it.")
+                    if path.isEmpty {
+                        Text("The device's AFC service published nothing here.")
+                    } else {
+                        Text("\(path[path.count - 1]) has nothing in it.")
+                    }
                 } actions: {
                     Button("New Folder") { newFolderName = ""; showNewFolder = true }
                         .buttonStyle(.borderedProminent)
@@ -124,9 +126,7 @@ struct FilesView: View {
             // The write cap, where a reader of the listing will find it rather
             // than where a failed upload finds them. It is the one limit on this
             // page that is not the device's, so it is stated as this app's.
-            Text("Uploads are capped at \(AfcFileExplorer.format(AfcFileExplorer.pushSizeLimit)) "
-                 + "— an AFC write is a single call with no streaming form, so a larger file "
-                 + "is refused rather than truncated.")
+            Text("Uploads are capped at \(AfcFileExplorer.format(AfcFileExplorer.pushSizeLimit)) — an AFC write is a single call with no streaming form, so a larger file is refused rather than truncated.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .listRowBackground(Color.clear)
@@ -203,7 +203,7 @@ struct FilesView: View {
             Button("Cancel", role: .cancel) { renaming = nil; renameText = "" }
         }
         .confirmationDialog(
-            deleting.map { "Delete \($0.name)?" } ?? "Delete?",
+            LocalizedStringKey(deleting.map { String(localized: "Delete \($0.name)?") } ?? String(localized: "Delete?")),
             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
             titleVisibility: .visible
         ) {
@@ -211,10 +211,11 @@ struct FilesView: View {
             Button("Cancel", role: .cancel) { deleting = nil }
         } message: {
             if let deleting {
-                Text(deleting.isDirectory
-                     ? "A folder. Nothing goes through a trash here — this is the device's own delete."
-                     : "\(AfcFileExplorer.format(deleting.size)) on the device, removed with no trash "
-                        + "and no undo.")
+                if deleting.isDirectory {
+                    Text("A folder. Nothing goes through a trash here — this is the device's own delete.")
+                } else {
+                    Text("\(AfcFileExplorer.format(deleting.size)) on the device, removed with no trash and no undo.")
+                }
             }
         }
     }
@@ -294,6 +295,7 @@ struct FilesView: View {
             if !path.isEmpty {
                 Button(action: goUp) {
                     Image(systemName: "chevron.left")
+                        .flipsForRightToLeftLayoutDirection(true)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.tint)
                 }
@@ -323,7 +325,7 @@ struct FilesView: View {
                     // empty breadcrumb otherwise does not.
                     Image(systemName: "internaldrive")
                         .foregroundStyle(.secondary)
-                    Text("afc://")
+                    Text(verbatim: "afc://")
                         .font(.body)
                         .fontWeight(.medium)
                 }
@@ -332,6 +334,7 @@ struct FilesView: View {
                         // A chevron, which is what makes a stack of tappable
                         // words read as a path rather than as a sentence.
                         Image(systemName: "chevron.right")
+                            .flipsForRightToLeftLayoutDirection(true)
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.tertiary)
                     }
@@ -410,6 +413,7 @@ struct FilesView: View {
 
                 if entry.isDirectory {
                     Image(systemName: "chevron.right")
+                        .flipsForRightToLeftLayoutDirection(true)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
@@ -462,8 +466,8 @@ struct FilesView: View {
     /// they are trying to tell two similarly named files apart — and the
     /// modification date was being read off the entry and thrown away.
     private func subtitle(for entry: AfcFsEntry) -> String {
-        if let link = entry.linkTarget { return "Symlink → \(link)" }
-        guard !entry.isDirectory else { return "Folder" }
+        if let link = entry.linkTarget { return String(localized: "Symlink → \(link)") }
+        guard !entry.isDirectory else { return String(localized: "Folder") }
         let size = AfcFileExplorer.format(entry.size)
         guard let modified = entry.modified else { return size }
         return "\(size) · \(Self.dateText(modified))"
@@ -487,8 +491,8 @@ struct FilesView: View {
             return f
         }()
         return { date in
-            if calendar.isDateInToday(date) { return "Today, \(time.string(from: date))" }
-            if calendar.isDateInYesterday(date) { return "Yesterday, \(time.string(from: date))" }
+            if calendar.isDateInToday(date) { return String(localized: "Today, \(time.string(from: date))") }
+            if calendar.isDateInYesterday(date) { return String(localized: "Yesterday, \(time.string(from: date))") }
             return day.string(from: date)
         }
     }()

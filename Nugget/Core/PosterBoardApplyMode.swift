@@ -27,8 +27,8 @@ enum PosterBoardApplyMode: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .backup: return "Protective backup"
-        case .airlift: return "AirLift (AirTraffic)"
+        case .backup: return String(localized: "Protective backup")
+        case .airlift: return String(localized: "AirLift (AirTraffic)")
         }
     }
 

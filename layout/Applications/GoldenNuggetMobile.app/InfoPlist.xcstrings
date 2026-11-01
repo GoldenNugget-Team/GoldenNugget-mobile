@@ -1,0 +1,30 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Why the app publishes a pairing service on the local network. Shown in Settings > Privacy > Local Network.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GoldenNugget publishes an iOS 27 wireless pairing service on the local network so this iPhone can pair with itself and generate its own pairing file without a computer."
+          }
+        }
+      }
+    },
+    "UTTypeDescription" : {
+      "comment" : "The human-readable name of the .mobiledevicepairing document type.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mobile Device Pairing File"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -54,10 +54,10 @@ enum PosterBoardPosterType: String, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
-        case .collections: return "Collections"
-        case .suggestedPhotos: return "Suggested Photos"
-        case .mercury: return "Mercury"
-        case .container: return "App Container"
+        case .collections: return String(localized: "Collections")
+        case .suggestedPhotos: return String(localized: "Suggested Photos")
+        case .mercury: return String(localized: "Mercury")
+        case .container: return String(localized: "App Container")
         }
     }
 
@@ -297,19 +297,19 @@ struct LegacyConvertPrompt: Identifiable {
 
     /// The dialog's `setText`: "<b>pack</b> uses the legacy A, B format."
     var title: String {
-        "\(pack.name) uses the legacy \(families.joined(separator: ", ")) format."
+        String(localized: "\(pack.name) uses the legacy \(families.joined(separator: ", ")) format.")
     }
 
     /// The dialog's `setInformativeText`, verbatim.
-    static let message = "iOS 27 only applies the depth effect to wallpapers in the modern "
-        + "format, so a legacy wallpaper is rewritten on import. Pick “Install as is” to push "
-        + "the original files untouched instead."
+    static var message: String {
+        String(localized: "iOS 27 only applies the depth effect to wallpapers in the modern format, so a legacy wallpaper is rewritten on import. Pick “Install as is” to push the original files untouched instead.")
+    }
 
     /// `Convert (may break the wallpaper)` — the reference's accepted-role button,
     /// and its default.
-    static let convertTitle = "Convert (may break the wallpaper)"
+    static var convertTitle: String { String(localized: "Convert (may break the wallpaper)") }
     /// `Install as is` — the reference's rejected-role button.
-    static let asIsTitle = "Install as is"
+    static var asIsTitle: String { String(localized: "Install as is") }
 }
 
 /// The imported packs, as files in this app's container.

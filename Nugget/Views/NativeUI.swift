@@ -25,7 +25,12 @@ struct NativeNote: View {
     init(_ text: String) { self.text = text }
 
     var body: some View {
-        Text(text)
+        // `LocalizedStringKey` rather than `Text(text)`: a `String` parameter is
+        // the verbatim initializer, so every note in the app would ship in
+        // English regardless of the catalog.  The literal call sites are found
+        // by scripts/extract-localizations.py, which keeps Localizable.xcstrings
+        // complete even though this initializer hides the key from the compiler.
+        Text(LocalizedStringKey(text))
             .font(.footnote)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -38,7 +43,7 @@ struct NativeSafetyNote: View {
     init(_ text: String) { self.text = text }
 
     var body: some View {
-        Text(text)
+        Text(LocalizedStringKey(text))
             .font(.footnote)
             .foregroundStyle(.red)
             .fixedSize(horizontal: false, vertical: true)
@@ -65,7 +70,7 @@ struct NativePrimaryButton: View {
                 } else if let systemImage {
                     Image(systemName: systemImage)
                 }
-                Text(title).font(.headline)
+                Text(LocalizedStringKey(title)).font(.headline)
             }
             .frame(maxWidth: .infinity)
         }
@@ -86,7 +91,7 @@ struct NativeDangerButton: View {
         Button(role: .destructive, action: action) {
             HStack(spacing: 8) {
                 if let systemImage { Image(systemName: systemImage) }
-                Text(title).font(.headline)
+                Text(LocalizedStringKey(title)).font(.headline)
             }
             .frame(maxWidth: .infinity)
         }
@@ -113,9 +118,10 @@ struct NativeCollapsibleHeader: View {
             withAnimation(.easeInOut(duration: 0.2)) { collapsed.toggle() }
         } label: {
             HStack(spacing: 6) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                 Spacer(minLength: 0)
                 Image(systemName: collapsed ? "chevron.right" : "chevron.down")
+                    .flipsForRightToLeftLayoutDirection(true)
                     .font(.caption.weight(.semibold))
             }
             .foregroundStyle(.secondary)

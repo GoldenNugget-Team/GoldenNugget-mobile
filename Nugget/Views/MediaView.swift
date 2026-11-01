@@ -72,18 +72,13 @@ struct MediaView: View {
             Button("Copy and remove originals", role: .destructive) { Task { await doPull() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("\(bytes(survey?.bytes ?? 0)) will be copied into this app's container. Files larger than 64 MiB will also stay on the device. "
-                + "Free space there: \(bytes(free)). Once removed, the copy in the "
-                + "container is the only one -- and the container is deleted if the "
-                + "app is.")
+            Text("\(bytes(survey?.bytes ?? 0)) will be copied into this app's container. Files larger than 64 MiB will also stay on the device. Free space there: \(bytes(free)). Once removed, the copy in the container is the only one -- and the container is deleted if the app is.")
         }
     }
 
     private var mediaSection: some View {
         Section("AFC media") {
-            NativeNote("Copies \(AfcMediaBackup.trees.joined(separator: " and ")) "
-                + "from the device's Media root over AFC into this app's container. "
-                + "Needs no photo-library permission.")
+            NativeNote(String(localized: "Copies \(AfcMediaBackup.trees.joined(separator: " and ")) from the device's Media root over AFC into this app's container. Needs no photo-library permission."))
             surveyRows
             deleteSwitch
             Button {
@@ -114,8 +109,7 @@ struct MediaView: View {
                 Label("Empty the local store", systemImage: "trash")
             }
             .disabled(busy || !hasStoredFiles)
-            NativeSafetyNote("Emptying the store is only safe once the originals are "
-                + "back on the device and verified there.")
+            NativeSafetyNote("Emptying the store is only safe once the originals are back on the device and verified there.")
         }
     }
 
@@ -123,8 +117,8 @@ struct MediaView: View {
     private var surveyRows: some View {
         if let survey {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(survey.files.count) file(s), \(bytes(survey.bytes))"
-                    + (survey.skippedSymlinks > 0 ? ", \(survey.skippedSymlinks) symlink(s) skipped" : ""))
+                (Text("\(survey.files.count) file(s), \(bytes(survey.bytes))")
+                    + (survey.skippedSymlinks > 0 ? Text(", \(survey.skippedSymlinks) symlink(s) skipped") : Text(verbatim: "")))
                     .font(.body)
                 NativeNote("Free in the container: \(bytes(free)).")
             }

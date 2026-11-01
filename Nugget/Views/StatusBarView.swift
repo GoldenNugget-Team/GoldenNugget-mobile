@@ -122,10 +122,7 @@ struct StatusBarView: View {
     /// else, and stated once rather than repeated on every row that disappears.
     private var archiveNote: some View {
         Section {
-            NativeNote("iOS 27 replaced the status bar override file, so only the carrier "
-                + "entry can be changed here: its name, its service badge, signal bars and network type. "
-                + "The badge and the bars apply to the carrier name, so set one first. Signal bars are omitted unless explicitly set. Network type is a fixed visual badge and does not change the connection. Set a carrier name for each SIM; without a network selection its badge is hidden. The other "
-                + "options need iOS 26 or lower.")
+            NativeNote("iOS 27 replaced the status bar override file, so only the carrier entry can be changed here: its name, its service badge, signal bars and network type. The badge and the bars apply to the carrier name, so set one first. Signal bars are omitted unless explicitly set. Network type is a fixed visual badge and does not change the connection. Set a carrier name for each SIM; without a network selection its badge is hidden. The other options need iOS 26 or lower.")
         }
     }
 
@@ -211,7 +208,7 @@ struct StatusBarView: View {
     /// app has no way to reach (TTY, student status, liquid detection on a device
     /// without it). Offering them would be offering 32 switches that can only
     /// ever write a value nothing reads.
-    private static let itemRows: [(StatusBarItem, String)] = [
+    private static let itemRows: [(StatusBarItem, LocalizedStringKey)] = [
         (.quietMode, "Disable Focus Mode icon"),
         (.airplaneMode, "Disable Airplane Mode icon"),
         (.cellularService, "Disable Cellular Service icon"),
@@ -249,8 +246,7 @@ struct StatusBarView: View {
     private var extrasSection: some View {
         Section("Extras") {
             toggleRow("Silly Mode (every item on)", isOn: $selection.sillyMode) { edited() }
-            NativeNote("Silly Mode forces every status-bar item on, over anything set "
-                + "above it. Turning it off restores exactly what you had.")
+            NativeNote("Silly Mode forces every status-bar item on, over anything set above it. Turning it off restores exactly what you had.")
         }
     }
 
@@ -269,10 +265,8 @@ struct StatusBarView: View {
             Text(selection.enabled ? "Ready to apply" : "Not applying")
                 .font(.headline)
             NativeNote(selection.enabled
-                ? "\(selection.overrides.activeCount) override(s) → "
-                    + "\(mechanism == .archive ? "the iOS 27 archive" : "the classic struct"), "
-                    + "written on the next Apply."
-                : "Nothing is written on Apply until this is on.")
+                ? String(localized: "\(selection.overrides.activeCount) override(s) → \(mechanism == .archive ? String(localized: "the iOS 27 archive") : String(localized: "the classic struct")), written on the next Apply.")
+                : String(localized: "Nothing is written on Apply until this is on."))
         }
     }
 
@@ -280,7 +274,7 @@ struct StatusBarView: View {
 
     /// A switch row: title on the left, control on the right, the reference's
     /// card metrics around them.
-    private func toggleRow(_ title: String, isOn: Binding<Bool>,
+    private func toggleRow(_ title: LocalizedStringKey, isOn: Binding<Bool>,
                            onChange: @escaping () -> Void = {}) -> some View {
         Toggle(title, isOn: Binding(
             get: { isOn.wrappedValue },
@@ -297,7 +291,7 @@ struct StatusBarView: View {
     /// switching off and on again does not lose what was typed — the reference
     /// keeps the value on the setter for the same reason and only drops the flag.
     @ViewBuilder
-    private func textFieldRow(_ key: StatusBarOverrides.FieldKey, _ title: String,
+    private func textFieldRow(_ key: StatusBarOverrides.FieldKey, _ title: LocalizedStringKey,
                               survivesArchive: Bool) -> some View {
         let field = selection.overrides.field(for: key)
         if mechanism == .archive && !survivesArchive {
@@ -312,7 +306,7 @@ struct StatusBarView: View {
         }
     }
 
-    private func networkRow(_ key: StatusBarOverrides.FieldKey, _ title: String) -> some View {
+    private func networkRow(_ key: StatusBarOverrides.FieldKey, _ title: LocalizedStringKey) -> some View {
         let names: [Int: String] = [0: "—", 4: "3G", 5: "4G", 7: "4G (7)", 8: "LTE", 9: "LTE (9)",
                                   10: "5G", 11: "5G+", 12: "5G Ultra / UWB", 13: "5G UC"]
         let current = selection.overrides.field(for: key).value
@@ -336,7 +330,7 @@ struct StatusBarView: View {
     /// stepper's range, so the value cannot be set to something the field cannot
     /// hold.
     @ViewBuilder
-    private func levelRow(_ key: StatusBarOverrides.FieldKey, _ title: String,
+    private func levelRow(_ key: StatusBarOverrides.FieldKey, _ title: LocalizedStringKey,
                           range: ClosedRange<Int>, survivesArchive: Bool) -> some View {
         let field = selection.overrides.field(for: key)
         if mechanism == .archive && !survivesArchive {
@@ -354,8 +348,13 @@ struct StatusBarView: View {
                     HStack {
                         Text(title)
                         Spacer()
-                        Text(field.set ? "\(field.value)" : "Default")
-                            .foregroundStyle(.secondary)
+                        if field.set {
+                            Text(verbatim: "\(field.value)")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Default")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Stepper(value: levelBinding(for: key), in: range) {

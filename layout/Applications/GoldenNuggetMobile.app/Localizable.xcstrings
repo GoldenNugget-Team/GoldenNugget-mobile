@@ -1,0 +1,1769 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@  •  %@  •  %@  •  iOS %@  •  %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@  •  %2$@  •  %3$@  •  iOS %4$@  •  %5$@"
+          }
+        }
+      }
+    },
+    "%@ (%lld/%lld)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ (%2$lld/%3$lld)"
+          }
+        }
+      }
+    },
+    "%@ (%llu KB)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ (%2$llu KB)"
+          }
+        }
+      }
+    },
+    "%@ has nothing in it." : {
+
+    },
+    "%@ on the device, removed with no trash and no undo." : {
+
+    },
+    "%@ uses the legacy %@ format." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ uses the legacy %2$@ format."
+          }
+        }
+      }
+    },
+    "%@ will be copied into this app's container. Files larger than 64 MiB will also stay on the device. Free space there: %@. Once removed, the copy in the container is the only one -- and the container is deleted if the app is." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ will be copied into this app's container. Files larger than 64 MiB will also stay on the device. Free space there: %2$@. Once removed, the copy in the container is the only one -- and the container is deleted if the app is."
+          }
+        }
+      }
+    },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@ — %lld file(s), %lld key(s) found." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ — %2$lld file(s), %3$lld key(s) found."
+          }
+        }
+      }
+    },
+    "%lld file(s), %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld file(s), %2$@"
+          }
+        }
+      }
+    },
+    "%lld files" : {
+
+    },
+    "%lld of %lld applicable tweak(s) enabled. Incompatible and un-ported tweaks are hidden, the same way the reference hides them." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld applicable tweak(s) enabled. Incompatible and un-ported tweaks are hidden, the same way the reference hides them."
+          }
+        }
+      }
+    },
+    "%lld of %lld daemon group(s) on. The groups upstream marks interface-visible but gives no switch are in the Recommended set only." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld daemon group(s) on. The groups upstream marks interface-visible but gives no switch are in the Recommended set only."
+          }
+        }
+      }
+    },
+    "%lld operations found" : {
+
+    },
+    "%lld override(s) → %@, written on the next Apply." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld override(s) → %2$@, written on the next Apply."
+          }
+        }
+      }
+    },
+    "%lld photo(s) and video(s) — %@ kept in the app" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld photo(s) and video(s) — %2$@ kept in the app"
+          }
+        }
+      }
+    },
+    "(empty = clear)" : {
+
+    },
+    ", %lld symlink(s) skipped" : {
+
+    },
+    "1 file" : {
+
+    },
+    "1 · Tunnel" : {
+
+    },
+    "1. SysSharedContainerDomain-systemgroup.com.apple.configurationprofiles/Library/ConfigurationProfiles/CloudConfigurationDetails.plist, %lld setup panes marked skipped;" : {
+
+    },
+    "2 · Pairing" : {
+
+    },
+    "2. ManagedPreferencesDomain/mobile/com.apple.purplebuddy.plist, setup marked done." : {
+
+    },
+    "A folder. Nothing goes through a trash here — this is the device's own delete." : {
+
+    },
+    "A video that carries a rotation transform is decoded in its stored orientation, which is what the reference's decoder does; such a clip may appear rotated on the Lock Screen." : {
+
+    },
+    "A wallpaper exists in two places at once — its descriptor files, and three rows in the store's own sqlite. The rows carry the device's provider registrations and the metadata the picker sorts by, so they cannot be invented: the apply fetches the store from the device first and adds rows to a copy of it." : {
+
+    },
+    "AAR handling" : {
+
+    },
+    "AFC media" : {
+
+    },
+    "About" : {
+
+    },
+    "Add" : {
+
+    },
+    "Additional daemons" : {
+
+    },
+    "Advertising “%@” — waiting for this iPhone to connect…" : {
+
+    },
+    "AirLift" : {
+
+    },
+    "AirLift (AirTraffic)" : {
+
+    },
+    "AirLift needs a pairing record and none is stored. Import one on the home page." : {
+
+    },
+    "AirPlay" : {
+
+    },
+    "Airplane Mode" : {
+
+    },
+    "Alarm" : {
+
+    },
+    "All" : {
+
+    },
+    "All languages" : {
+
+    },
+    "All operations" : {
+
+    },
+    "All results" : {
+
+    },
+    "All set" : {
+
+    },
+    "Allowed: %@. Applies the same file to every path the template lists." : {
+
+    },
+    "App Container" : {
+
+    },
+    "App bundle id" : {
+
+    },
+    "Applied" : {
+
+    },
+    "Applies to: %@." : {
+
+    },
+    "Apply" : {
+
+    },
+    "Apply %@" : {
+
+    },
+    "Apply theme" : {
+
+    },
+    "Apply via AirLift" : {
+
+    },
+    "Applying…" : {
+
+    },
+    "Arabic" : {
+
+    },
+    "Archive handling" : {
+
+    },
+    "Assign Card Skin" : {
+
+    },
+    "Assistant" : {
+
+    },
+    "Automatic refresh" : {
+
+    },
+    "Automatic refresh is on (upstream's default): each apply also writes PBF_RESET_FILE_PROTECTIONS, which is what makes PosterBoard re-read the store at boot. Turn it off to leave the device's preferences alone." : {
+
+    },
+    "Battery" : {
+
+    },
+    "Battery Detail" : {
+
+    },
+    "Battery Detail Text" : {
+
+    },
+    "Battery Icon Capacity" : {
+
+    },
+    "Before you continue" : {
+
+    },
+    "Bluetooth" : {
+
+    },
+    "Bold only" : {
+
+    },
+    "Breadcrumb Text" : {
+
+    },
+    "Bundle id" : {
+
+    },
+    "C protocol core" : {
+
+    },
+    "Calculation mode" : {
+
+    },
+    "Camera" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Cancel pairing" : {
+
+    },
+    "CarPlay" : {
+
+    },
+    "Card #%lld" : {
+
+    },
+    "Carrier Name" : {
+
+    },
+    "Catalog" : {
+
+    },
+    "Catalogs are cached for %lld minutes; the reload button throws the cache away and asks again. Previews are cached until iOS reclaims them." : {
+
+    },
+    "Category" : {
+
+    },
+    "Cellular Service" : {
+
+    },
+    "Cellular Signal Bars" : {
+
+    },
+    "Cellular Signal Strength" : {
+
+    },
+    "Cellular signal bars: %lld" : {
+
+    },
+    "Check again" : {
+
+    },
+    "Check for updates" : {
+
+    },
+    "Checking…" : {
+
+    },
+    "Chinese" : {
+
+    },
+    "Choose cellular signal bars" : {
+
+    },
+    "Choose freeze frame (.heic)" : {
+
+    },
+    "Choose video" : {
+
+    },
+    "Clear" : {
+
+    },
+    "Clear All Cards" : {
+
+    },
+    "Clear History" : {
+
+    },
+    "Clear all tweaks" : {
+
+    },
+    "Clear search" : {
+
+    },
+    "Clear the video choice" : {
+
+    },
+    "Clears the Collections and MercuryPoster descriptor folders." : {
+
+    },
+    "Clears the Photos poster provider's descriptor folder." : {
+
+    },
+    "Clears the gallery cache." : {
+
+    },
+    "Close" : {
+
+    },
+    "Co-developer" : {
+
+    },
+    "Collections" : {
+
+    },
+    "Community Catalog" : {
+
+    },
+    "Community Presets" : {
+
+    },
+    "Community Templates" : {
+
+    },
+    "Community repository and submissions" : {
+
+    },
+    "Community template switches" : {
+
+    },
+    "Compatible with this iOS" : {
+
+    },
+    "Confirm it in Settings → Privacy & Security → Developer Mode → “Pair with %@”." : {
+
+    },
+    "Confirm this PIN in Settings → Privacy & Security → Developer Mode → “Pair with %@” to finish pairing." : {
+
+    },
+    "Conflicts" : {
+
+    },
+    "Connect this iPhone over USB and tap Trust, then open GoldenNugget on the computer — iOS → “GoldenNugget Mobile Helper”. It installs the app and sends the pairing file itself." : {
+
+    },
+    "Continue" : {
+
+    },
+    "Continue Anyway" : {
+
+    },
+    "Continue anyway" : {
+
+    },
+    "Conversion is off, so legacy packs are pushed with their original files." : {
+
+    },
+    "Convert (may break the wallpaper)" : {
+
+    },
+    "Convert legacy wallpapers to the modern format" : {
+
+    },
+    "Copies %@ from the device's Media root over AFC into this app's container. Needs no photo-library permission." : {
+
+    },
+    "Copy and remove originals" : {
+
+    },
+    "Copy into LocalDevVPN: tunnel IP %@/%lld, peer %@, port %u." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Copy into LocalDevVPN: tunnel IP %1$@/%2$lld, peer %3$@, port %4$u."
+          }
+        }
+      }
+    },
+    "Copy media and remove eligible originals?" : {
+
+    },
+    "Copy these values" : {
+
+    },
+    "Cover the clock" : {
+
+    },
+    "Create" : {
+
+    },
+    "Create a template with Batter Builder" : {
+
+    },
+    "Credits" : {
+
+    },
+    "Custom values in use." : {
+
+    },
+    "Daemons" : {
+
+    },
+    "Daemons are sensitive to the iOS version and device type, and applying incompatible ones can bootloop your device. Proceed with caution." : {
+
+    },
+    "Data Network Type" : {
+
+    },
+    "Date" : {
+
+    },
+    "Date Text" : {
+
+    },
+    "Declared as a float, so the slider works in thousandths." : {
+
+    },
+    "Default" : {
+
+    },
+    "Defaults in use." : {
+
+    },
+    "Delete" : {
+
+    },
+    "Delete %@?" : {
+
+    },
+    "Delete Preset" : {
+
+    },
+    "Delete originals after copy" : {
+
+    },
+    "Delete preset \"%@\"?" : {
+
+    },
+    "Delete?" : {
+
+    },
+    "Deletes: %@." : {
+
+    },
+    "Description (optional)" : {
+
+    },
+    "Description: %@" : {
+
+    },
+    "Deselect All" : {
+
+    },
+    "Desktop app · this is a port of it" : {
+
+    },
+    "Development" : {
+
+    },
+    "Development mode" : {
+
+    },
+    "Device: %@ • iOS %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Device: %1$@ • iOS %2$@"
+          }
+        }
+      }
+    },
+    "Disable AirPlay icon" : {
+
+    },
+    "Disable Airplane Mode icon" : {
+
+    },
+    "Disable Alarm icon" : {
+
+    },
+    "Disable Battery icon" : {
+
+    },
+    "Disable Bluetooth icon" : {
+
+    },
+    "Disable CarPlay icon" : {
+
+    },
+    "Disable Cellular Service icon" : {
+
+    },
+    "Disable Focus Mode icon" : {
+
+    },
+    "Disable Liquid Detection Warning icon" : {
+
+    },
+    "Disable Location icon" : {
+
+    },
+    "Disable Rotation Lock icon" : {
+
+    },
+    "Disable VPN icon" : {
+
+    },
+    "Disable Voice Control icon" : {
+
+    },
+    "Disable Wi-Fi icon" : {
+
+    },
+    "Discrete" : {
+
+    },
+    "Done" : {
+
+    },
+    "Download IPA" : {
+
+    },
+    "Download Wallpapers" : {
+
+    },
+    "Downloading…" : {
+
+    },
+    "Dump diagnostics into log" : {
+
+    },
+    "Empty the local store" : {
+
+    },
+    "Enable Daemon Modifications" : {
+
+    },
+    "Enable Status Bar Modifications" : {
+
+    },
+    "Enable incompatible tweaks" : {
+
+    },
+    "English" : {
+
+    },
+    "Error" : {
+
+    },
+    "Estimated time" : {
+
+    },
+    "Estimated working space: keep at least %.1f GB free for the backup and restore." : {
+
+    },
+    "Every choice you do not pick is deleted before the files are delivered." : {
+
+    },
+    "Export" : {
+
+    },
+    "Extra 1" : {
+
+    },
+    "Extras" : {
+
+    },
+    "Failed" : {
+
+    },
+    "Favorite %@" : {
+
+    },
+    "Favorites only" : {
+
+    },
+    "Feature unavailable" : {
+
+    },
+    "Fetch database from device" : {
+
+    },
+    "Fetched database: %@" : {
+
+    },
+    "Files" : {
+
+    },
+    "Files changed" : {
+
+    },
+    "Files to write" : {
+
+    },
+    "Finishing connects to the device and opens the home page." : {
+
+    },
+    "Fixed network badge" : {
+
+    },
+    "Flash" : {
+
+    },
+    "Flash Log (%lld lines)" : {
+
+    },
+    "Flashing…" : {
+
+    },
+    "Folder" : {
+
+    },
+    "Folder is Empty" : {
+
+    },
+    "Force Partial Restore" : {
+
+    },
+    "French" : {
+
+    },
+    "Full reset — wipe everything and start empty" : {
+
+    },
+    "Full reset: the store's Extensions, GalleryCache and Backups directories are zeroed and replaced with an empty database. Every wallpaper on the device is gone, and the database fetched before this point is stale — the next apply fetches a fresh one." : {
+
+    },
+    "GN1.…" : {
+
+    },
+    "German" : {
+
+    },
+    "Get started" : {
+
+    },
+    "GoldenNugget" : {
+
+    },
+    "GoldenNugget Mobile %@ is available" : {
+
+    },
+    "GoldenNugget developer" : {
+
+    },
+    "GoldenNugget is unavailable" : {
+
+    },
+    "Hebrew" : {
+
+    },
+    "Home" : {
+
+    },
+    "HotLoad" : {
+
+    },
+    "HotLoad forces %lld daemon label(s) disabled, even when daemon modifications are off." : {
+
+    },
+    "HotLoad safety rules" : {
+
+    },
+    "HotLoad warning" : {
+
+    },
+    "HotLoad: %lld/%lld labels forced disabled. " : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "HotLoad: %1$lld/%2$lld labels forced disabled. "
+          }
+        }
+      }
+    },
+    "How this app finds the LocalDevVPN tunnel: it waits for the tunnel IP on an interface, then probes the peer's lockdown port. %@ These steer this app only — the vendored library finds the peer from the route table and always dials 62078." : {
+
+    },
+    "How to apply" : {
+
+    },
+    "Import" : {
+
+    },
+    "Import .batter or portable preset" : {
+
+    },
+    "Import .batter template" : {
+
+    },
+    "Import .tendies pack" : {
+
+    },
+    "Import Preset…" : {
+
+    },
+    "Import Share Code" : {
+
+    },
+    "Import a .passthm" : {
+
+    },
+    "Import another" : {
+
+    },
+    "Import autosave.json" : {
+
+    },
+    "Import failed" : {
+
+    },
+    "Import pairing file" : {
+
+    },
+    "Import result" : {
+
+    },
+    "Imported (%lld)" : {
+
+    },
+    "Include in Apply" : {
+
+    },
+    "Install LocalDevVPN (or any tunnel app), enter the values below, and leave it on — every connection needs it." : {
+
+    },
+    "Install as is" : {
+
+    },
+    "Installed Template Switches" : {
+
+    },
+    "Internal" : {
+
+    },
+    "Inverted: the value written is the opposite of the switch." : {
+
+    },
+    "Italian" : {
+
+    },
+    "Items" : {
+
+    },
+    "Japanese" : {
+
+    },
+    "Keeps the %@(…) wrapper it shipped with." : {
+
+    },
+    "Keys" : {
+
+    },
+    "Korean" : {
+
+    },
+    "Language" : {
+
+    },
+    "Last checked" : {
+
+    },
+    "Latest" : {
+
+    },
+    "Leave this open, then above on this iPhone: Settings → Privacy & Security → Developer Mode → “Pair with %@”." : {
+
+    },
+    "Leave this screen open, then open Settings → Privacy & Security → Developer Mode on this iPhone and tap “Pair with %@”. iOS 27 connects the phone to the advertised service itself — no computer is involved." : {
+
+    },
+    "Left out of this run: %@." : {
+
+    },
+    "Legacy Wallpaper Format" : {
+
+    },
+    "Levels" : {
+
+    },
+    "Linear" : {
+
+    },
+    "Liquid Detection" : {
+
+    },
+    "Live Scanner Active" : {
+
+    },
+    "Load" : {
+
+    },
+    "Load Preset" : {
+
+    },
+    "Load preset \"%@\"?" : {
+
+    },
+    "Load result" : {
+
+    },
+    "Load the snapshot taken before the last successful apply? This will replace your current configuration." : {
+
+    },
+    "Loading catalog…" : {
+
+    },
+    "Location" : {
+
+    },
+    "Lockdown port" : {
+
+    },
+    "Log" : {
+
+    },
+    "Logs" : {
+
+    },
+    "Loop (CoreAnimation frame list)" : {
+
+    },
+    "Looping decodes the video to JPEG frames and hands PosterBoard a CoreAnimation frame list (up to %lld frames, at the video's own resolution). It is slow, and the frames are written into the backup, so a long clip makes a large one — trim it first." : {
+
+    },
+    "Made on a computer — AirDrop, Files, iCloud Drive" : {
+
+    },
+    "Made with ❤️ by\nGoldenNugget Development Team" : {
+
+    },
+    "Make a full device backup before applying these changes." : {
+
+    },
+    "Media" : {
+
+    },
+    "Media page" : {
+
+    },
+    "Mercury" : {
+
+    },
+    "Microphone" : {
+
+    },
+    "Mobile releases" : {
+
+    },
+    "More" : {
+
+    },
+    "Name" : {
+
+    },
+    "New Folder" : {
+
+    },
+    "New folder" : {
+
+    },
+    "No" : {
+
+    },
+    "No Cards Detected Yet" : {
+
+    },
+    "No interface carries %@ — the VPN app may be on the wrong network, or its tunnel IP left at default." : {
+
+    },
+    "No matches found." : {
+
+    },
+    "No matching operations" : {
+
+    },
+    "No mobile releases have been published yet." : {
+
+    },
+    "No operations recorded yet" : {
+
+    },
+    "No photos or videos copied yet" : {
+
+    },
+    "No presets yet." : {
+
+    },
+    "Not 0…32 — LocalDevVPN's tunnel-IP field takes a CIDR, and this is the part after the slash." : {
+
+    },
+    "Not a port in 1…65535 — %u is being probed instead." : {
+
+    },
+    "Not an IPv4 address — %@ is being probed instead." : {
+
+    },
+    "Not applying" : {
+
+    },
+    "Not surveyed" : {
+
+    },
+    "Not tested on a device" : {
+
+    },
+    "Notes" : {
+
+    },
+    "Nothing is written on Apply until this is on." : {
+
+    },
+    "Nothing matches “%@”." : {
+
+    },
+    "Nugget creator" : {
+
+    },
+    "OK" : {
+
+    },
+    "Off: runs take the normal path. Stored switches are ignored." : {
+
+    },
+    "On by default, as upstream does. Off: an apply carries only the tweaks." : {
+
+    },
+    "On iOS 26, show tweaks outside their tested iOS version range. Hardware requirements still apply." : {
+
+    },
+    "On: an apply adds two files ahead of the tweaks, in this order —" : {
+
+    },
+    "One pass: every enabled tweak, plus the wallpapers and templates picked on their own pages. Reboot the device afterwards — the injected preferences are read at boot." : {
+
+    },
+    "Opens this step's slide" : {
+
+    },
+    "Operation" : {
+
+    },
+    "Operation History" : {
+
+    },
+    "Other" : {
+
+    },
+    "Other / fallback" : {
+
+    },
+    "PIN: %@" : {
+
+    },
+    "Pair Wirelessly" : {
+
+    },
+    "Pair the device" : {
+
+    },
+    "Pair without a computer" : {
+
+    },
+    "Pairing" : {
+
+    },
+    "Pairing & tunnel" : {
+
+    },
+    "Partial Export" : {
+
+    },
+    "Partial Export…" : {
+
+    },
+    "Passcode" : {
+
+    },
+    "Peer IP (the VPN server)" : {
+
+    },
+    "Phone Pickup" : {
+
+    },
+    "Polish" : {
+
+    },
+    "Portuguese" : {
+
+    },
+    "PosterBoard" : {
+
+    },
+    "PosterBoard research" : {
+
+    },
+    "Preset name" : {
+
+    },
+    "Presets" : {
+
+    },
+    "Previous slide" : {
+
+    },
+    "Protective backup" : {
+
+    },
+    "Protocol detail is not being recorded. The app log still is." : {
+
+    },
+    "Pull" : {
+
+    },
+    "Pull media" : {
+
+    },
+    "Pull to This Device" : {
+
+    },
+    "Pulling %lld%%" : {
+
+    },
+    "Push back to device" : {
+
+    },
+    "Quick Look" : {
+
+    },
+    "Quiet Daemon" : {
+
+    },
+    "Quiet Mode" : {
+
+    },
+    "Range %@–%@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Range %1$@–%2$@."
+          }
+        }
+      }
+    },
+    "Raw Signal Strength" : {
+
+    },
+    "Ready to apply" : {
+
+    },
+    "Ready: %@" : {
+
+    },
+    "Reboot the target device so the injected preferences take effect." : {
+
+    },
+    "Recommended (analytics, tracking & logging)" : {
+
+    },
+    "Recording the protocol detail into minimuxer.log. Off keeps the app log and the run itself, and drops the per-frame lines." : {
+
+    },
+    "Refresh safety rules" : {
+
+    },
+    "Refreshing…" : {
+
+    },
+    "Regular + bold" : {
+
+    },
+    "Regular only" : {
+
+    },
+    "Reload catalog" : {
+
+    },
+    "Remove all packs" : {
+
+    },
+    "Remove all templates" : {
+
+    },
+    "Remove template" : {
+
+    },
+    "Removes the element \"%@\" (by its CoreAnimation id) from: %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Removes the element \"%1$@\" (by its CoreAnimation id) from: %2$@."
+          }
+        }
+      }
+    },
+    "Removes the element \"%@\" from: %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Removes the element \"%1$@\" from: %2$@."
+          }
+        }
+      }
+    },
+    "Rename" : {
+
+    },
+    "Required release: %@" : {
+
+    },
+    "Reset" : {
+
+    },
+    "Reset Page Tweaks" : {
+
+    },
+    "Reset applied community preferences" : {
+
+    },
+    "Reset pairing file" : {
+
+    },
+    "Reset switches" : {
+
+    },
+    "Reset tunnel addresses" : {
+
+    },
+    "Restyle this iPhone's SpringBoard, status bar and daemons. Two steps stand in front of it." : {
+
+    },
+    "Result" : {
+
+    },
+    "Reverse on loop" : {
+
+    },
+    "Reverse on loop plays the clip forwards and then backwards." : {
+
+    },
+    "Roll back" : {
+
+    },
+    "Rollback Last Apply" : {
+
+    },
+    "Rollback is available once an apply has succeeded." : {
+
+    },
+    "Rollback restores the snapshot taken before the last successful apply." : {
+
+    },
+    "Rotation Lock" : {
+
+    },
+    "Rules version" : {
+
+    },
+    "Run log (last 30 lines)" : {
+
+    },
+    "Russian" : {
+
+    },
+    "Rust device and backup stack" : {
+
+    },
+    "Save Preset" : {
+
+    },
+    "Save current configuration" : {
+
+    },
+    "Save or share preset" : {
+
+    },
+    "Save shared preset" : {
+
+    },
+    "Saved presets" : {
+
+    },
+    "Saved state" : {
+
+    },
+    "Scan Cards" : {
+
+    },
+    "Search daemons" : {
+
+    },
+    "Search history…" : {
+
+    },
+    "Search name or author" : {
+
+    },
+    "Search tweaks" : {
+
+    },
+    "Secondary Carrier Name" : {
+
+    },
+    "Secondary Cellular Service" : {
+
+    },
+    "Secondary Cellular Signal Bars" : {
+
+    },
+    "Secondary Data Network" : {
+
+    },
+    "Secondary Data Network Type" : {
+
+    },
+    "Secondary Service Badge" : {
+
+    },
+    "Secondary Signal Strength" : {
+
+    },
+    "Select All" : {
+
+    },
+    "Select Pairing File" : {
+
+    },
+    "Select the pages you would like to reset." : {
+
+    },
+    "Selected: %@. A reset is written as a 0-byte file over the folder, which is how the reference clears them; it runs without needing the store database, so it is the recovery path for a store that is already misbehaving. It does not undo anything already applied." : {
+
+    },
+    "Service Badge" : {
+
+    },
+    "Set Skin for All Cards" : {
+
+    },
+    "Set Up" : {
+
+    },
+    "Sets %@ on element \"%@\" (by its CoreAnimation id)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Sets %1$@ on element \"%2$@\" (by its CoreAnimation id)."
+          }
+        }
+      }
+    },
+    "Sets %@ on element \"%@\"." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Sets %1$@ on element \"%2$@\"."
+          }
+        }
+      }
+    },
+    "Settings" : {
+
+    },
+    "Setup" : {
+
+    },
+    "Setup guide" : {
+
+    },
+    "Share Preset" : {
+
+    },
+    "Share a Saved Preset" : {
+
+    },
+    "Share code" : {
+
+    },
+    "Show Numeric Cellular Strength" : {
+
+    },
+    "Show Numeric Wi-Fi Strength" : {
+
+    },
+    "Showing %lld of %lld operations" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Showing %1$lld of %2$lld operations"
+          }
+        }
+      }
+    },
+    "SideStore · tunnel and usbmux" : {
+
+    },
+    "Silly Mode (every item on)" : {
+
+    },
+    "Siri AI eligibility archives" : {
+
+    },
+    "Skip AFC media" : {
+
+    },
+    "Skip Setup" : {
+
+    },
+    "Skip setup for now" : {
+
+    },
+    "Skip setup: %@" : {
+
+    },
+    "Slide %lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Slide %1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "Something went wrong" : {
+
+    },
+    "Sort" : {
+
+    },
+    "Sort by" : {
+
+    },
+    "Source" : {
+
+    },
+    "Spanish" : {
+
+    },
+    "Springboard" : {
+
+    },
+    "Springboard / Internal Options" : {
+
+    },
+    "Starting the pairing service…" : {
+
+    },
+    "Status" : {
+
+    },
+    "Status Bar" : {
+
+    },
+    "Status bar overrides (classic)" : {
+
+    },
+    "Status bar overrides (iOS 27 archive)" : {
+
+    },
+    "StatusBarOverrides.archive with no cellular entries, which SpringBoard decodes as \"no overrides\"." : {
+
+    },
+    "Stop" : {
+
+    },
+    "Stop Scan" : {
+
+    },
+    "Stopping system services can leave your device stuck restarting or unable to start. Recovery may require restoring the device." : {
+
+    },
+    "Store database" : {
+
+    },
+    "Student Status" : {
+
+    },
+    "Success" : {
+
+    },
+    "Suggested Photos" : {
+
+    },
+    "Summary" : {
+
+    },
+    "Survey" : {
+
+    },
+    "Symlink → %@" : {
+
+    },
+    "TTY" : {
+
+    },
+    "Tap to choose photo" : {
+
+    },
+    "Target extension" : {
+
+    },
+    "Template Errors" : {
+
+    },
+    "Templates" : {
+
+    },
+    "Text" : {
+
+    },
+    "The PC version does this for you" : {
+
+    },
+    "The PC version's Mobile Helper is the easiest route. The two cards below are fallbacks." : {
+
+    },
+    "The Status Bar reset is the one file here that is written whole, not nulled: a fresh, all-default %@ It goes through the same mechanism the Status Bar page applies with." : {
+
+    },
+    "The choices you do not pick are deleted before the files are delivered." : {
+
+    },
+    "The chosen files are renamed to: %@." : {
+
+    },
+    "The device's AFC service published nothing here." : {
+
+    },
+    "The device's existing cloud configuration is not merged in (reading it needs a lockdown service this port has no path for), and no keybag certificate is generated." : {
+
+    },
+    "The live-photo method writes the video into a Photos poster descriptor and needs a freeze frame — the reference raises rather than shipping a descriptor with no thumbnail. The video is rewrapped as .mov unless it already is one." : {
+
+    },
+    "The only template selected asks for sparserestore, which this app does not implement, so nothing is delivered from the Templates page and this run is not started for it." : {
+
+    },
+    "The switches below are live for the next run." : {
+
+    },
+    "This device is on iOS %@, which reads a legacy pack as it is, so nothing is converted here and no pack is asked about." : {
+
+    },
+    "This feature is hidden by HotLoad safety rules. See Settings for rule status." : {
+
+    },
+    "This is not all tweaks" : {
+
+    },
+    "This preset contains daemon modifications that were saved for a different device:" : {
+
+    },
+    "This toggle writes a value other than on/off." : {
+
+    },
+    "This will replace your current configuration." : {
+
+    },
+    "Time" : {
+
+    },
+    "Time Text" : {
+
+    },
+    "Today, %@" : {
+
+    },
+    "Total size" : {
+
+    },
+    "Tunnel" : {
+
+    },
+    "Tunnel IP (this device)" : {
+
+    },
+    "Tunnel IP prefix length" : {
+
+    },
+    "Tunnel addresses" : {
+
+    },
+    "Turkish" : {
+
+    },
+    "Tweaks" : {
+
+    },
+    "Tweaks or daemons" : {
+
+    },
+    "Tweaks selected" : {
+
+    },
+    "Tweaks to include (%lld/%lld)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tweaks to include (%1$lld/%2$lld)"
+          }
+        }
+      }
+    },
+    "Ukrainian" : {
+
+    },
+    "Unknown device" : {
+
+    },
+    "Up one level" : {
+
+    },
+    "Update" : {
+
+    },
+    "Update required" : {
+
+    },
+    "Updates" : {
+
+    },
+    "Upload" : {
+
+    },
+    "Uploads are capped at %@ — an AFC write is a single call with no streaming form, so a larger file is refused rather than truncated." : {
+
+    },
+    "Upstream caps a selection at %lld descriptors, so an import past the cap is refused rather than silently dropped. Each pack is copied into this app — removing it on the PosterBoard page removes the copy, not the original file." : {
+
+    },
+    "Upstream caps a selection at %lld descriptors. Each pack is copied into this app, so removing one here removes the copy — the file you imported is untouched." : {
+
+    },
+    "VPN" : {
+
+    },
+    "Value" : {
+
+    },
+    "Verbose log" : {
+
+    },
+    "Video wallpaper" : {
+
+    },
+    "View release" : {
+
+    },
+    "Voice Control" : {
+
+    },
+    "Wallet" : {
+
+    },
+    "Wallet Cards (%lld)" : {
+
+    },
+    "Wallpaper packs (%lld)" : {
+
+    },
+    "Wallpapers" : {
+
+    },
+    "Wallpapers are delivered as files into this app's own backup of the device, in the %@ domain — the same channel the tweaks use. Nothing is written to the device until Apply." : {
+
+    },
+    "Warnings" : {
+
+    },
+    "Weight" : {
+
+    },
+    "Wi-Fi Signal Bars" : {
+
+    },
+    "Working space" : {
+
+    },
+    "Writes %lld file(s) to the device:" : {
+
+    },
+    "Writes /var/db/com.apple.xpc.launchd/disabled.plist. Disabling a daemon stops its service. Only the %lld labels shown here can ever reach the file." : {
+
+    },
+    "Writes a 0-byte file over %@. Upstream models this as a NullifyFileTweak: it removes a plist rather than writing one." : {
+
+    },
+    "Writes the descriptors into %@ over a tunnel and resprings, so it is live in seconds. No backup is taken, because nothing is delivered back to the device — but for the same reason it applies **only** the packs: tweaks need the backup, so they still go through the **Apply** button on the home page." : {
+
+    },
+    "Yesterday, %@" : {
+
+    },
+    "You can get more tweaks, but they are untested with your iOS version. You can change your mind in Settings." : {
+
+    },
+    "You're up to date." : {
+
+    },
+    "Your selection is saved to %@ on every change and restored on launch, exactly as the desktop app's AutoSave preset does (%@). Import is for a preset from elsewhere; entries this port does not carry are listed below rather than guessed at." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Your selection is saved to %1$@ on every change and restored on launch, exactly as the desktop app's AutoSave preset does (%2$@). Import is for a preset from elsewhere; entries this port does not carry are listed below rather than guessed at."
+          }
+        }
+      }
+    },
+    "iOS %@: each nulled file is written as a valid empty plist, not 0 bytes. A 0-byte plist is a truncated plist on this release and crashes SpringBoard at boot. An empty plist parses, and the system falls back to its own defaults." : {
+
+    },
+    "iOS 27 builds the depth effect only for the modern (“Clownfish”) layout, so a pack made before iOS 27 is rewritten when it is applied — otherwise it installs and looks flat, with no depth. The rewrite re-stamps the family, drops external scripts and republishes the planes, and it is best effort: it can change how a wallpaper looks. A pack holding nothing pre-27 is left alone either way." : {
+
+    },
+    "iOS 27 only applies the depth effect to wallpapers in the modern format, so a legacy wallpaper is rewritten on import. Pick “Install as is” to push the original files untouched instead." : {
+
+    },
+    "iOS 27 status bar research" : {
+
+    },
+    "iOS 27+ — on iOS 26, use a file from a computer" : {
+
+    },
+    "nothing saved yet" : {
+
+    },
+    "saved" : {
+
+    },
+    "statusBarOverrides struct, so every override reads as off." : {
+
+    },
+    "the classic struct" : {
+
+    },
+    "the iOS 27 archive" : {
+
+    },
+    "tunnel: %@ · peer %@:%u reachable: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "tunnel: %1$@ · peer %2$@:%3$u reachable: %4$@"
+          }
+        }
+      }
+    },
+    "value" : {
+
+    },
+    "working…" : {
+
+    },
+    "≈ %@ remaining" : {
+
+    },
+    "≈ %lld min" : {
+
+    },
+    "⚠ Low battery: %lld%%. Connect the charger before restoring." : {
+
+    },
+    "⚠ Low storage: %.1f GB free. Restoring tweaks may require at least %.1f GB free and could fail if the device runs out of space." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "⚠ Low storage: %1$.1f GB free. Restoring tweaks may require at least %2$.1f GB free and could fail if the device runs out of space."
+          }
+        }
+      }
+    },
+    "⚠️ A PosterBoard reset is armed (%@). A reset run clears the store and installs no wallpapers, so with wallpapers selected as well Apply refuses until one of the two is turned off." : {
+
+    }
+  },
+  "version" : "1.0"
+}

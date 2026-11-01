@@ -30,6 +30,10 @@ bash scripts/fix-sdk-arm-headers.sh
 
 bash scripts/compile-assets.sh
 
+# The String Catalogs have to be compiled into <lang>.lproj before xtool copies
+# resources: xtool ships .xcstrings verbatim, which Foundation does not read.
+python3 scripts/compile-localizations.py
+
 echo "building with xtool"
 xtool dev build -c release -i
 

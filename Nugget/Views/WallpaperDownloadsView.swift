@@ -68,9 +68,11 @@ struct WallpaperDownloadsView: View {
                 statusCard
                 if error != nil { errorCard }
                 if visible.isEmpty && !loading {
-                    NativeNote(wallpapers.isEmpty
-                        ? "No wallpapers found. The catalogs are community-run and one of them may be down — the other source is still listed above."
-                        : "Nothing matches “\(search.trimmingCharacters(in: .whitespacesAndNewlines))”.")
+                    if wallpapers.isEmpty {
+                        NativeNote("No wallpapers found. The catalogs are community-run and one of them may be down — the other source is still listed above.")
+                    } else {
+                        NativeNote(String(localized: "Nothing matches “\(search.trimmingCharacters(in: .whitespacesAndNewlines))”."))
+                    }
                 } else {
                     grid
                 }
@@ -213,16 +215,9 @@ struct WallpaperDownloadsView: View {
 
     private var notesCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            NativeNote("A card downloads the wallpaper's `.tendies` pack and imports it "
-                + "into this app. It shows up on the PosterBoard page straight away; "
-                + "nothing is written to the device until you press Apply there.")
-            NativeNote("Upstream caps a selection at \(PosterBoardImports.descriptorLimit) "
-                + "descriptors, so an import past the cap is refused rather than "
-                + "silently dropped. Each pack is copied into this app — removing it on "
-                + "the PosterBoard page removes the copy, not the original file.")
-            NativeNote("Catalogs are cached for \(Int(WallpaperCatalog.catalogTTL / 60)) "
-                + "minutes; the reload button throws the cache away and asks again. "
-                + "Previews are cached until iOS reclaims them.")
+            NativeNote("A card downloads the wallpaper's `.tendies` pack and imports it into this app. It shows up on the PosterBoard page straight away; nothing is written to the device until you press Apply there.")
+            NativeNote(String(localized: "Upstream caps a selection at \(PosterBoardImports.descriptorLimit) descriptors, so an import past the cap is refused rather than silently dropped. Each pack is copied into this app — removing it on the PosterBoard page removes the copy, not the original file."))
+            NativeNote(String(localized: "Catalogs are cached for \(Int(WallpaperCatalog.catalogTTL / 60)) minutes; the reload button throws the cache away and asks again. Previews are cached until iOS reclaims them."))
         }
     }
 

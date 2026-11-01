@@ -60,9 +60,7 @@ struct PasscodeThemeView: View {
         Section {
             Text(identity.describe)
                 .font(.headline)
-            NativeNote("The keypad's artwork is written into "
-                + "/var/mobile/Library/Caches/TelephonyUI-…, which is a cache rather than a "
-                + "preference, so a backup cannot carry it. Lock the device to see the result.")
+            NativeNote("The keypad's artwork is written into /var/mobile/Library/Caches/TelephonyUI-…, which is a cache rather than a preference, so a backup cannot carry it. Lock the device to see the result.")
             if !blocker.isEmpty { NativeSafetyNote(blocker) }
         }
     }
@@ -76,8 +74,7 @@ struct PasscodeThemeView: View {
                       systemImage: "square.and.arrow.down")
             }
             if let theme {
-                NativeNote("\(theme.name) — \(theme.fileCount) file(s), "
-                    + "\(theme.keysPreview.count) key(s) found.")
+                NativeNote(String(localized: "\(theme.name) — \(theme.fileCount) file(s), \(theme.keysPreview.count) key(s) found."))
             }
         }
     }
@@ -120,10 +117,7 @@ struct PasscodeThemeView: View {
         Section {
             optionRow(title: "Language", selection: $language, choices: PasscodeLanguageTarget.allCases)
             optionRow(title: "Weight", selection: $weight, choices: PasscodeBoldTarget.allCases)
-            NativeNote("The device asks for one file per locale, weight and key "
-                + "subtext. \"All languages\" writes every variant — it is the only setting that "
-                + "works on a device whose language you do not know — while the device's own "
-                + "locale and the fallback are always included either way.")
+            NativeNote("The device asks for one file per locale, weight and key subtext. \"All languages\" writes every variant — it is the only setting that works on a device whose language you do not know — while the device's own locale and the fallback are always included either way.")
         }
     }
 
@@ -133,7 +127,7 @@ struct PasscodeThemeView: View {
     /// *is* the wheel-and-menu the reference draws, and a switch would be the
     /// wrong shape for a seventeen-value choice.
     private func optionRow<Option: Identifiable & Hashable & RawRepresentable>(
-        title: String,
+        title: LocalizedStringKey,
         selection: Binding<Option>,
         choices: [Option]
     ) -> some View where Option.RawValue == String, Option.ID == String {

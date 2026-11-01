@@ -82,11 +82,7 @@ struct TemplatesView: View {
 
     private var introSection: some View {
         Section {
-            NativeNote("A `.batter` file is a ZIP holding a `config.json`: it names the domain "
-                + "to restore into and lists what you may change — an image to swap in, a colour, "
-                + "a number, which of three variants to install. Import one, fill in its options "
-                + "here, then press Apply on the home page. Nothing is written to the device until "
-                + "then.")
+            NativeNote("A `.batter` file is a ZIP holding a `config.json`: it names the domain to restore into and lists what you may change — an image to swap in, a colour, a number, which of three variants to install. Import one, fill in its options here, then press Apply on the home page. Nothing is written to the device until then.")
         }
     }
 
@@ -110,8 +106,7 @@ struct TemplatesView: View {
                 } label: {
                     Label("Remove all templates", systemImage: "trash")
                 }
-                NativeNote("Each template is copied into this app, so removing one here removes "
-                    + "the copy — the file you imported is untouched.")
+                NativeNote("Each template is copied into this app, so removing one here removes the copy — the file you imported is untouched.")
             }
         }
     }
@@ -148,10 +143,7 @@ struct TemplatesView: View {
             }
 
             if template.requiresSparserestore {
-                NativeSafetyNote("This template cannot be delivered by this app: it asks for "
-                    + "sparserestore, which this app does not implement. Importing it is "
-                    + "harmless — it is simply left out of the apply, and the run log says so "
-                    + "rather than reporting success.")
+                NativeSafetyNote("This template cannot be delivered by this app: it asks for sparserestore, which this app does not implement. Importing it is harmless — it is simply left out of the apply, and the run log says so rather than reporting success.")
             }
 
             // The preview images the config names.  Horizontal or stacked, per
@@ -186,8 +178,7 @@ struct TemplatesView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .font(.callout)
-                    NativeNote("The template's files are restored into this bundle's container. "
-                        + "Its own note: this also changes files whose names start the same way.")
+                    NativeNote("The template's files are restored into this bundle's container. Its own note: this also changes files whose names start the same way.")
                 }
             }
 
@@ -257,13 +248,10 @@ struct TemplatesView: View {
                     }
                 }
                 if value.required && value.value == nil {
-                    NativeNote("This one is required: the template cannot be applied until a file "
-                        + "is chosen.")
+                    NativeNote("This one is required: the template cannot be applied until a file is chosen.")
                 }
-                NativeNote("Allowed: \(value.allowedFiles). Applies the same file to every path the "
-                    + "template lists.")
-                NativeNote("The chosen file is not kept between launches — re-pick it after "
-                    + "reopening the app. Everything else you set here is.")
+                NativeNote(String(localized: "Allowed: \(value.allowedFiles). Applies the same file to every path the template lists."))
+                NativeNote("The chosen file is not kept between launches — re-pick it after reopening the app. Everything else you set here is.")
 
             case let value as RemoveOption:
                 optionControl(title: value.label) {
@@ -278,11 +266,11 @@ struct TemplatesView: View {
                     .labelsHidden()
                 }
                 if let identifier = value.identifier {
-                    NativeNote("Removes the element \"\(identifier)\""
-                        + (value.useCAID ? " (by its CoreAnimation id)" : "")
-                        + " from: \(value.files.joined(separator: ", ")).")
+                    NativeNote(value.useCAID
+                        ? String(localized: "Removes the element \"\(identifier)\" (by its CoreAnimation id) from: \(value.files.joined(separator: ", ")).")
+                        : String(localized: "Removes the element \"\(identifier)\" from: \(value.files.joined(separator: ", "))."))
                 } else {
-                    NativeNote("Deletes: \(value.files.joined(separator: ", ")).")
+                    NativeNote(String(localized: "Deletes: \(value.files.joined(separator: ", "))."))
                 }
                 if value.inverted {
                     NativeNote("Inverted: the targets are deleted while this is **off**.")
@@ -429,33 +417,34 @@ struct TemplatesView: View {
     }
 
     private func setNote(_ value: SetOption) -> String {
-        var parts = ["Sets \(value.key) on element \"\(value.identifier)\""
-            + (value.useCAID ? " (by its CoreAnimation id)" : "") + "."]
-        parts.append("Applies to: \(value.files.joined(separator: ", ")).")
+        var parts = [value.useCAID
+            ? String(localized: "Sets \(value.key) on element \"\(value.identifier)\" (by its CoreAnimation id).")
+            : String(localized: "Sets \(value.key) on element \"\(value.identifier)\".")]
+        parts.append(String(localized: "Applies to: \(value.files.joined(separator: ", "))."))
         if value.valueType == "float" {
-            parts.append("Declared as a float, so the slider works in thousandths.")
+            parts.append(String(localized: "Declared as a float, so the slider works in thousandths."))
         }
         if let valueTag = value.valueTag {
-            parts.append("Keeps the \(valueTag)(…) wrapper it shipped with.")
+            parts.append(String(localized: "Keeps the \(valueTag)(…) wrapper it shipped with."))
         }
         if let min = value.minValue, let max = value.maxValue, !min.isEmpty, !max.isEmpty {
-            parts.append("Range \(min[0].description)–\(max[0].description).")
+            parts.append(String(localized: "Range \(min[0].description)–\(max[0].description)."))
         }
         if value.inverted {
-            parts.append("Inverted: the value written is the opposite of the switch.")
+            parts.append(String(localized: "Inverted: the value written is the opposite of the switch."))
         }
         if value.toggleOnValue != nil || value.toggleOffValue != nil {
-            parts.append("This toggle writes a value other than on/off.")
+            parts.append(String(localized: "This toggle writes a value other than on/off."))
         }
         return parts.joined(separator: " ")
     }
 
     private func pickerNote(_ value: PickerOption) -> String {
         var parts = [value.allowMultipleSelection
-            ? "Every choice you do not pick is deleted before the files are delivered."
-            : "The choices you do not pick are deleted before the files are delivered."]
+            ? String(localized: "Every choice you do not pick is deleted before the files are delivered.")
+            : String(localized: "The choices you do not pick are deleted before the files are delivered.")]
         if value.renames {
-            parts.append("The chosen files are renamed to: \(value.names.joined(separator: ", ")).")
+            parts.append(String(localized: "The chosen files are renamed to: \(value.names.joined(separator: ", "))."))
         }
         return parts.joined(separator: " ")
     }

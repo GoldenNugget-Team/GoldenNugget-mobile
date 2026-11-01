@@ -121,25 +121,15 @@ struct ResetPagesSheet: View {
     private var procedureSection: some View {
         Section {
             if isIOS27 {
-                NativeSafetyNote("iOS \(deviceVersion): each nulled file is written as a "
-                    + "valid empty plist, not 0 bytes. A 0-byte plist is a truncated plist on "
-                    + "this release and crashes SpringBoard at boot. An empty plist parses, and the "
-                    + "system falls back to its own defaults.")
+                NativeSafetyNote(String(localized: "iOS \(deviceVersion): each nulled file is written as a valid empty plist, not 0 bytes. A 0-byte plist is a truncated plist on this release and crashes SpringBoard at boot. An empty plist parses, and the system falls back to its own defaults."))
             } else {
-                NativeNote("Each nulled file is written as 0 bytes, which makes the "
-                    + "daemon that reads it fall back to its defaults.")
+                NativeNote("Each nulled file is written as 0 bytes, which makes the daemon that reads it fall back to its defaults.")
             }
-            NativeNote("Nothing is read back from the device first: no original values "
-                + "are captured, so a file that was already custom before an apply is put back to "
-                + "its default rather than to what it held. The daemon list is the exception — it "
-                + "is written with the six entries a stock device ships. The selections in this app "
-                + "are left alone; applying again writes the tweaks back.")
-            NativeNote("The Status Bar reset is the one file here that is written whole, not "
-                + "nulled: a fresh, all-default "
-                + (isIOS27 ? "StatusBarOverrides.archive with no cellular entries, which "
-                    + "SpringBoard decodes as \"no overrides\"."
-                    : "statusBarOverrides struct, so every override reads as off.")
-                + " It goes through the same mechanism the Status Bar page applies with.")
+            NativeNote("Nothing is read back from the device first: no original values are captured, so a file that was already custom before an apply is put back to its default rather than to what it held. The daemon list is the exception — it is written with the six entries a stock device ships. The selections in this app are left alone; applying again writes the tweaks back.")
+            let statusBarShape = isIOS27
+                ? String(localized: "StatusBarOverrides.archive with no cellular entries, which SpringBoard decodes as \"no overrides\".")
+                : String(localized: "statusBarOverrides struct, so every override reads as off.")
+            NativeNote(String(localized: "The Status Bar reset is the one file here that is written whole, not nulled: a fresh, all-default \(statusBarShape) It goes through the same mechanism the Status Bar page applies with."))
         }
     }
 
@@ -150,7 +140,7 @@ struct ResetPagesSheet: View {
 
     private func fileCount(_ page: ResetPage) -> String {
         let count = page.locations.count
-        return count == 1 ? "1 file" : "\(count) files"
+        return count == 1 ? String(localized: "1 file") : String(localized: "\(count) files")
     }
 
     /// The file name, not the path. Every location here sits in one of a few

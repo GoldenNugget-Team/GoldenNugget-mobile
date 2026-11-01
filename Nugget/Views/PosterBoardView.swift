@@ -152,9 +152,7 @@ struct PosterBoardView: View {
         Section {
             Text(identity.describe)
                 .font(.headline)
-            NativeNote("Wallpapers are delivered as files into this app's own backup "
-                + "of the device, in the \(PosterBoard.domain) domain — the same channel the "
-                + "tweaks use. Nothing is written to the device until Apply.")
+            NativeNote(String(localized: "Wallpapers are delivered as files into this app's own backup of the device, in the \(PosterBoard.domain) domain — the same channel the tweaks use. Nothing is written to the device until Apply."))
         }
     }
 
@@ -182,13 +180,10 @@ struct PosterBoardView: View {
                 NativeSafetyNote(airliftBlocker)
             }
             if applyMode == .airlift {
-                NativeNote("The store database is not part of this mode, so its card "
-                    + "is hidden: the injection writes the descriptors straight into the "
-                    + "container and the rows are not touched. Automatic refresh is ignored too.")
+                NativeNote("The store database is not part of this mode, so its card is hidden: the injection writes the descriptors straight into the container and the rows are not touched. Automatic refresh is ignored too.")
             }
             if !selection.resetModes.isEmpty, !applyMode.supportsReset {
-                NativeSafetyNote("The reset you have selected cannot be done over AirLift. "
-                    + "Switch back to Protective backup to keep it.")
+                NativeSafetyNote("The reset you have selected cannot be done over AirLift. Switch back to Protective backup to keep it.")
             }
         }
     }
@@ -205,7 +200,7 @@ struct PosterBoardView: View {
         let reason = Airlift.unsupportedReason(deviceVersion: identity.version, buildVersion: identity.buildVersion)
         if !reason.isEmpty { return reason }
         if !FileManager.default.fileExists(atPath: AppPaths.pairingFile.path) {
-            return "AirLift needs a pairing record and none is stored. Import one on the home page."
+            return String(localized: "AirLift needs a pairing record and none is stored. Import one on the home page.")
         }
         return ""
     }
@@ -229,16 +224,11 @@ struct PosterBoardView: View {
 
     private var databaseNote: String {
         var lines = [
-            "Fetched database: \(databaseSummary)",
-            "A wallpaper exists in two places at once — its descriptor files, and three rows in "
-                + "the store's own sqlite. The rows carry the device's provider registrations "
-                + "and the metadata the picker sorts by, so they cannot be invented: the apply "
-                + "fetches the store from the device first and adds rows to a copy of it.",
+            String(localized: "Fetched database: \(databaseSummary)"),
+            String(localized: "A wallpaper exists in two places at once — its descriptor files, and three rows in the store's own sqlite. The rows carry the device's provider registrations and the metadata the picker sorts by, so they cannot be invented: the apply fetches the store from the device first and adds rows to a copy of it."),
         ]
         if selection.autoRefresh {
-            lines.append("Automatic refresh is on (upstream's default): each apply also writes "
-                + "PBF_RESET_FILE_PROTECTIONS, which is what makes PosterBoard re-read the "
-                + "store at boot. Turn it off to leave the device's preferences alone.")
+            lines.append(String(localized: "Automatic refresh is on (upstream's default): each apply also writes PBF_RESET_FILE_PROTECTIONS, which is what makes PosterBoard re-read the store at boot. Turn it off to leave the device's preferences alone."))
         }
         return lines.joined(separator: "\n\n")
     }
@@ -269,9 +259,7 @@ struct PosterBoardView: View {
                 importPack(result)
             }
             if selection.tendies.isEmpty {
-                NativeNote("No packs imported yet. A `.tendies` file is a ZIP "
-                    + "holding a wallpaper's descriptor; import one from a wallpaper "
-                    + "collection (Cowabunga and CaPlayground publish them), then Apply.")
+                NativeNote("No packs imported yet. A `.tendies` file is a ZIP holding a wallpaper's descriptor; import one from a wallpaper collection (Cowabunga and CaPlayground publish them), then Apply.")
             } else {
                 ForEach(selection.tendies) { pack in
                     packRow(pack)
@@ -283,10 +271,7 @@ struct PosterBoardView: View {
                     Label("Remove all packs", systemImage: "trash")
                 }
                 .disabled(running)
-                NativeNote("Upstream caps a selection at "
-                    + "\(PosterBoardImports.descriptorLimit) descriptors. Each pack is "
-                    + "copied into this app, so removing one here removes the copy — "
-                    + "the file you imported is untouched.")
+                NativeNote(String(localized: "Upstream caps a selection at \(PosterBoardImports.descriptorLimit) descriptors. Each pack is copied into this app, so removing one here removes the copy — the file you imported is untouched."))
             }
             // Upstream's `auto_convert_legacy` checkbox, on by default. It gates
             // both the import dialog and the apply-time rewrite, so it belongs
@@ -301,18 +286,13 @@ struct PosterBoardView: View {
 
     private var legacyConvertNote: String {
         var lines = [
-            "iOS 27 builds the depth effect only for the modern (“Clownfish”) layout, so a pack "
-                + "made before iOS 27 is rewritten when it is applied — otherwise it installs and "
-                + "looks flat, with no depth. The rewrite re-stamps the family, drops external "
-                + "scripts and republishes the planes, and it is best effort: it can change how a "
-                + "wallpaper looks. A pack holding nothing pre-27 is left alone either way.",
+            String(localized: "iOS 27 builds the depth effect only for the modern (“Clownfish”) layout, so a pack made before iOS 27 is rewritten when it is applied — otherwise it installs and looks flat, with no depth. The rewrite re-stamps the family, drops external scripts and republishes the planes, and it is best effort: it can change how a wallpaper looks. A pack holding nothing pre-27 is left alone either way."),
         ]
         if let atLeast27 = PosterBoard.compareVersion(identity.version, "27"), atLeast27 < 0 {
-            lines.append("This device is on iOS \(identity.version), which reads a legacy pack as "
-                + "it is, so nothing is converted here and no pack is asked about.")
+            lines.append(String(localized: "This device is on iOS \(identity.version), which reads a legacy pack as it is, so nothing is converted here and no pack is asked about."))
         }
         if !PosterBoardPreferences.autoConvertLegacy {
-            lines.append("Conversion is off, so legacy packs are pushed with their original files.")
+            lines.append(String(localized: "Conversion is off, so legacy packs are pushed with their original files."))
         }
         return lines.joined(separator: "\n\n")
     }
@@ -429,7 +409,7 @@ struct PosterBoardView: View {
     private var calculationModeRow: some View {
         Picker("Calculation mode", selection: $selection.calculationMode) {
             ForEach(PosterBoardCalculationMode.allCases) { mode in
-                Text(mode.title).tag(mode.rawValue)
+                Text(LocalizedStringKey(mode.title)).tag(mode.rawValue)
             }
         }
     }
@@ -437,21 +417,13 @@ struct PosterBoardView: View {
     private var videoNote: String {
         var lines = [String]()
         if selection.loop {
-            lines.append("Looping decodes the video to JPEG frames and hands PosterBoard a "
-                + "CoreAnimation frame list (up to \(PosterBoardVideo.frameLimit) frames, at the "
-                + "video's own resolution). It is slow, and the frames are written into the "
-                + "backup, so a long clip makes a large one — trim it first.")
-            lines.append("A video that carries a rotation transform is decoded in its stored "
-                + "orientation, which is what the reference's decoder does; such a clip may "
-                + "appear rotated on the Lock Screen.")
+            lines.append(String(localized: "Looping decodes the video to JPEG frames and hands PosterBoard a CoreAnimation frame list (up to \(PosterBoardVideo.frameLimit) frames, at the video's own resolution). It is slow, and the frames are written into the backup, so a long clip makes a large one — trim it first."))
+            lines.append(String(localized: "A video that carries a rotation transform is decoded in its stored orientation, which is what the reference's decoder does; such a clip may appear rotated on the Lock Screen."))
         } else {
-            lines.append("The live-photo method writes the video into a Photos poster descriptor "
-                + "and needs a freeze frame — the reference raises rather than shipping a "
-                + "descriptor with no thumbnail. The video is rewrapped as .mov unless it "
-                + "already is one.")
+            lines.append(String(localized: "The live-photo method writes the video into a Photos poster descriptor and needs a freeze frame — the reference raises rather than shipping a descriptor with no thumbnail. The video is rewrapped as .mov unless it already is one."))
         }
         if selection.loop && selection.reverse {
-            lines.append("Reverse on loop plays the clip forwards and then backwards.")
+            lines.append(String(localized: "Reverse on loop plays the clip forwards and then backwards."))
         }
         return lines.joined(separator: "\n\n")
     }
@@ -462,7 +434,7 @@ struct PosterBoardView: View {
         Section("Reset") {
             Toggle("Full reset — wipe everything and start empty", isOn: $selection.fullReset)
             ForEach(PosterBoardResetMode.allCases) { mode in
-                Toggle(mode.rawValue, isOn: binding(for: mode))
+                Toggle(LocalizedStringKey(mode.rawValue), isOn: binding(for: mode))
             }
             if !resetWarning.isEmpty {
                 NativeSafetyNote(resetWarning)
@@ -484,17 +456,11 @@ struct PosterBoardView: View {
 
     private var resetWarning: String {
         if selection.fullReset {
-            return "Full reset: the store's Extensions, GalleryCache and Backups directories are "
-                + "zeroed and replaced with an empty database. Every wallpaper on the device is "
-                + "gone, and the database fetched before this point is stale — the next apply "
-                + "fetches a fresh one."
+            return String(localized: "Full reset: the store's Extensions, GalleryCache and Backups directories are zeroed and replaced with an empty database. Every wallpaper on the device is gone, and the database fetched before this point is stale — the next apply fetches a fresh one.")
         }
         if selection.resetModes.isEmpty { return "" }
         let names = selection.resetModes.map(\.rawValue).sorted().joined(separator: ", ")
-        return "Selected: \(names). A reset is written as a 0-byte file over the folder, which is "
-            + "how the reference clears them; it runs without needing the store database, so it "
-            + "is the recovery path for a store that is already misbehaving. It does not undo "
-            + "anything already applied."
+        return String(localized: "Selected: \(names). A reset is written as a 0-byte file over the folder, which is how the reference clears them; it runs without needing the store database, so it is the recovery path for a store that is already misbehaving. It does not undo anything already applied.")
     }
 
     // MARK: - What the one Apply will carry
@@ -521,8 +487,7 @@ struct PosterBoardView: View {
             if selection.isActive {
                 Text("Ready: \(selection.describe)").foregroundStyle(.tint)
             } else {
-                NativeNote("No packs imported yet — import a `.tendies` above to "
-                    + "apply it this way.")
+                NativeNote("No packs imported yet — import a `.tendies` above to apply it this way.")
             }
             Button {
                 if hotloadWarnings.isEmpty { applyViaAirlift() }
@@ -538,11 +503,7 @@ struct PosterBoardView: View {
             if !airliftBlocker.isEmpty {
                 NativeSafetyNote(airliftBlocker)
             }
-            NativeNote("Writes the descriptors into \(PosterBoard.domain) over a "
-                + "tunnel and resprings, so it is live in seconds. No backup is taken, because "
-                + "nothing is delivered back to the device — but for the same reason it applies "
-                + "**only** the packs: tweaks need the backup, so they still go through the "
-                + "**Apply** button on the home page.")
+            NativeNote(String(localized: "Writes the descriptors into \(PosterBoard.domain) over a tunnel and resprings, so it is live in seconds. No backup is taken, because nothing is delivered back to the device — but for the same reason it applies **only** the packs: tweaks need the backup, so they still go through the **Apply** button on the home page."))
         }
     }
 
@@ -560,26 +521,15 @@ struct PosterBoardView: View {
                 // wallpapers ride that same backup. Saying "fetches the database
                 // first" here would be true of that run, but the database card
                 // above is hidden, so it would read as a reference to nothing.
-                NativeNote("The **Apply** button on the home page delivers the "
-                    + "tweaks, and the wallpapers you picked go with them in one protective "
-                    + "backup — it is a backup-mode run regardless of this page's setting. To "
-                    + "apply the packs alone, with no backup, use **Apply via AirLift** above.")
+                NativeNote("The **Apply** button on the home page delivers the tweaks, and the wallpapers you picked go with them in one protective backup — it is a backup-mode run regardless of this page's setting. To apply the packs alone, with no backup, use **Apply via AirLift** above.")
             } else if selection.isActive {
                 Text("Ready: \(selection.describe)").foregroundStyle(.tint)
-                NativeNote("Delivered by the **Apply** button on the home page, "
-                    + "together with the tweaks. It fetches the store's database from the "
-                    + "device first, so that run takes one extra exchange. Reboot the device "
-                    + "afterwards — the store is read at boot.")
+                NativeNote("Delivered by the **Apply** button on the home page, together with the tweaks. It fetches the store's database from the device first, so that run takes one extra exchange. Reboot the device afterwards — the store is read at boot.")
             } else {
-                NativeNote("Nothing selected yet. Whatever is picked here is "
-                    + "delivered by the **Apply** button on the home page, together with the "
-                    + "tweaks — one backup, one restore.")
+                NativeNote("Nothing selected yet. Whatever is picked here is delivered by the **Apply** button on the home page, together with the tweaks — one backup, one restore.")
             }
             if applyMode != .airlift {
-                NativeNote("The database itself can be fetched on its own, from the "
-                    + "card above — it is the one stage that can fail on its own terms (the "
-                    + "device decides whether it will upload the container), so being able to "
-                    + "run it, watch it and retry is worth its own button.")
+                NativeNote("The database itself can be fetched on its own, from the card above — it is the one stage that can fail on its own terms (the device decides whether it will upload the container), so being able to run it, watch it and retry is worth its own button.")
             }
         }
     }

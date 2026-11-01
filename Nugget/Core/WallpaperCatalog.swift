@@ -53,7 +53,7 @@ enum WallpaperSource: String, CaseIterable, Identifiable, Sendable {
 
     var label: String {
         switch self {
-        case .all: "All"
+        case .all: String(localized: "All")
         case .cowabunga: "Cowabunga"
         case .caplayground: "CaPlayground"
         }

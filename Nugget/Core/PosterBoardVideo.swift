@@ -11,7 +11,12 @@ enum PosterBoardCalculationMode: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String { self == .linear ? "Linear" : "Discrete" }
+    var title: String {
+        switch self {
+        case .linear: String(localized: "Linear")
+        case .discrete: String(localized: "Discrete")
+        }
+    }
 }
 
 /// A video wallpaper, as the page has assembled it.

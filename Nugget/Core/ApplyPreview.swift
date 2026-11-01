@@ -45,9 +45,8 @@ struct ApplyPreview {
     static func estimatedWorkingSpaceLine() -> String? {
         guard let total = totalBytesOnVolume, total > 0 else { return nil }
         let recommended = max(5 * 1024 * 1024 * 1024, Int64(Double(total) * 0.10))
-        return String(format: "Estimated working space: keep at least %.1f GB free"
-                      + " for the backup and restore.",
-                      Double(recommended) / (1024.0 * 1024 * 1024))
+        let gigabytes = Double(recommended) / (1024.0 * 1024 * 1024)
+        return String(localized: "Estimated working space: keep at least \(gigabytes, specifier: "%.1f") GB free for the backup and restore.")
     }
 
     /// The desktop's `_storage_warning_line` (`main_window_mixins.py:872`):
@@ -59,11 +58,9 @@ struct ApplyPreview {
               let free = freeBytes, free >= 0 else { return nil }
         let threshold = max(5 * 1024 * 1024 * 1024, Int64(Double(total) * 0.10))
         if free >= threshold { return nil }
-        return String(format: "⚠ Low storage: %.1f GB free. Restoring tweaks may"
-                      + " require at least %.1f GB free and could fail if the"
-                      + " device runs out of space.",
-                      Double(free) / (1024.0 * 1024 * 1024),
-                      Double(threshold) / (1024.0 * 1024 * 1024))
+        let freeGB = Double(free) / (1024.0 * 1024 * 1024)
+        let thresholdGB = Double(threshold) / (1024.0 * 1024 * 1024)
+        return String(localized: "⚠ Low storage: \(freeGB, specifier: "%.1f") GB free. Restoring tweaks may require at least \(thresholdGB, specifier: "%.1f") GB free and could fail if the device runs out of space.")
     }
 
     /// The desktop's `_time_estimate_line` (`main_window_mixins.py:909`):
@@ -74,7 +71,7 @@ struct ApplyPreview {
         let seconds = 120 + count * 8
         let (minutes, remainder) = seconds.quotientAndRemainder(dividingBy: 60)
         let rounded = remainder >= 30 ? minutes + 1 : minutes
-        return "≈ \(rounded) min"
+        return String(localized: "≈ \(rounded) min")
     }
 
     /// The volume's total capacity, for the storage lines.
@@ -111,16 +108,18 @@ struct ApplyPreview {
         if statusBar.isActive {
             let mechanism = StatusBarMechanism.mechanism(for: deviceVersion)
             let built = try statusBar.payload(for: mechanism)
-            rows.append(Row(label: "Status bar "
-                + (mechanism == .classic ? "overrides (classic)" : "overrides (iOS 27 archive)"),
-                            byteCount: built.data.count))
+            let label = mechanism == .classic
+                ? String(localized: "Status bar overrides (classic)")
+                : String(localized: "Status bar overrides (iOS 27 archive)")
+            rows.append(Row(label: label, byteCount: built.data.count))
         }
 
         let skipSetup = skipSetupEnabled
             ? SkipSetup.build(supervised: false, organizationName: "")
             : SkipSetup.Build(payloads: [], warnings: [])
         for payload in skipSetup.payloads {
-            rows.append(Row(label: "Skip setup: \(payload.label)", byteCount: payload.byteCount))
+            rows.append(Row(label: String(localized: "Skip setup: \(payload.label)"),
+                            byteCount: payload.byteCount))
         }
         for warning in skipSetup.warnings { notes.append(warning) }
 

@@ -112,10 +112,7 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity)
                 .listRowBackground(Color.clear)
 
-            NativeNote("GoldenNugget for desktop is the original this app is "
-                + "a port of. It runs the same protocols over its own Rust and Swift "
-                + "stack instead of driving pymobiledevice3, and speaks to iOS 26 and "
-                + "27 rather than only to tethered devices.")
+            NativeNote("GoldenNugget for desktop is the original this app is a port of. It runs the same protocols over its own Rust and Swift stack instead of driving pymobiledevice3, and speaks to iOS 26 and 27 rather than only to tethered devices.")
         }
     }
 
@@ -149,19 +146,17 @@ struct SettingsView: View {
             contributorRow("mattisklein (Project Linwood)", "Siri AI eligibility archives", "https://github.com/mattisklein")
             contributorRow("0xjohnnydev", "AirLift", "https://github.com/0xjohnnydev")
             contributorRow("Prognosticate-X", "iOS 27 status bar research", "https://github.com/Prognosticate-X/")
-            NativeNote("The vendored copies carry local patches, listed with "
-                + "the reason for each in Vendor/patches/README.md. SideStore's minimuxer "
-                + "is © 2026 SideStore.")
+            NativeNote("The vendored copies carry local patches, listed with the reason for each in Vendor/patches/README.md. SideStore's minimuxer is © 2026 SideStore.")
         }
     }
 
-    private func contributorRow(_ name: String, _ role: String, _ address: String) -> some View {
+    private func contributorRow(_ name: String, _ role: LocalizedStringKey, _ address: String) -> some View {
         Link(destination: URL(string: address)!) {
             creditRow(name, role, systemImage: "person")
         }
     }
 
-    private func creditRow(_ title: String, _ role: String, systemImage: String) -> some View {
+    private func creditRow(_ title: String, _ role: LocalizedStringKey, systemImage: String) -> some View {
         HStack(spacing: 12) {
             Label(title, systemImage: systemImage)
             Spacer(minLength: 12)
@@ -186,9 +181,7 @@ struct SettingsView: View {
             } label: {
                 Label("Setup guide", systemImage: "list.number")
             }
-            NativeNote("Checks the two things this app needs before it can reach the "
-                + "device — the LocalDevVPN tunnel and a pairing record — and walks "
-                + "through both. This is the guide a first launch opens.")
+            NativeNote("Checks the two things this app needs before it can reach the device — the LocalDevVPN tunnel and a pairing record — and walks through both. This is the guide a first launch opens.")
         }
     }
 
@@ -235,10 +228,7 @@ struct SettingsView: View {
             if !logs.hasRust, !logs.rustStatus.isEmpty {
                 NativeNote(logs.rustStatus)
             }
-            NativeNote("A report wants all three: diagnostics.txt carries the keyword "
-                + "slice of the Rust log (mobilebackup2 protocol + jktcp flow verdict) for "
-                + "the last run plus the app log's tail, the app log says what was decided, "
-                + "and minimuxer.log says what the device answered.")
+            NativeNote("A report wants all three: diagnostics.txt carries the keyword slice of the Rust log (mobilebackup2 protocol + jktcp flow verdict) for the last run plus the app log's tail, the app log says what was decided, and minimuxer.log says what the device answered.")
         }
     }
 
@@ -250,7 +240,8 @@ struct SettingsView: View {
                           url: URL, available: Bool) -> some View {
         ShareLink(item: url) {
             HStack(spacing: 12) {
-                Label(size.map { "\(title) (\($0) KB)" } ?? title, systemImage: systemImage)
+                Label(size.map { String(localized: "\(title) (\($0) KB)") } ?? title,
+                      systemImage: systemImage)
                 Spacer(minLength: 0)
             }
         }
@@ -280,15 +271,11 @@ struct SettingsView: View {
     /// What the switch does, in the order the two files are written.
     private var skipSetupNote: String {
         [
-            "On by default, as upstream does. Off: an apply carries only the tweaks.",
-            "On: an apply adds two files ahead of the tweaks, in this order —",
-            "1. SysSharedContainerDomain-systemgroup.com.apple.configurationprofiles/"
-                + "Library/ConfigurationProfiles/CloudConfigurationDetails.plist, "
-                + "\(SkipSetup.panes.count) setup panes marked skipped;",
-            "2. ManagedPreferencesDomain/mobile/com.apple.purplebuddy.plist, setup marked done.",
-            "The device's existing cloud configuration is not merged in (reading it needs "
-                + "a lockdown service this port has no path for), and no keybag certificate "
-                + "is generated.",
+            String(localized: "On by default, as upstream does. Off: an apply carries only the tweaks."),
+            String(localized: "On: an apply adds two files ahead of the tweaks, in this order —"),
+            String(localized: "1. SysSharedContainerDomain-systemgroup.com.apple.configurationprofiles/Library/ConfigurationProfiles/CloudConfigurationDetails.plist, \(SkipSetup.panes.count) setup panes marked skipped;"),
+            String(localized: "2. ManagedPreferencesDomain/mobile/com.apple.purplebuddy.plist, setup marked done."),
+            String(localized: "The device's existing cloud configuration is not merged in (reading it needs a lockdown service this port has no path for), and no keybag certificate is generated."),
         ].joined(separator: "\n")
     }
 
@@ -373,25 +360,26 @@ struct SettingsView: View {
     private var historyCountLine: String {
         let matches = matchingHistory.count
         if matches > visibleHistory.count {
-            return "Showing \(visibleHistory.count) of \(matches) operations"
+            return String(localized: "Showing \(visibleHistory.count) of \(matches) operations")
         }
         if matches > 0 {
-            return "\(matches) operations found"
+            return String(localized: "\(matches) operations found")
         }
         let filtered = !historySearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || historyMode != "all" || historyResult != "all"
-        return filtered ? "No matching operations" : "No operations recorded yet"
+        return filtered
+            ? String(localized: "No matching operations")
+            : String(localized: "No operations recorded yet")
     }
 
     /// One row's line, in the reference's own vocabulary
     /// (`settings.py:823`): `when • mode • device • iOS version • result`.
     private func historyRowText(_ record: ApplyHistory.Record) -> String {
-        let mode = record.mode == "apply" ? "Apply" : "Reset"
-        let result = record.success ? "Success" : "Failed"
-        let device = record.device.isEmpty ? "Unknown device" : record.device
+        let mode = record.mode == "apply" ? String(localized: "Apply") : String(localized: "Reset")
+        let result = record.success ? String(localized: "Success") : String(localized: "Failed")
+        let device = record.device.isEmpty ? String(localized: "Unknown device") : record.device
         let ios = record.ios.isEmpty ? "?" : record.ios
-        return "\(Self.displayTimestamp(record.timestamp))  •  \(mode)  •  "
-            + "\(device)  •  iOS \(ios)  •  \(result)"
+        return String(localized: "\(Self.displayTimestamp(record.timestamp))  •  \(mode)  •  \(device)  •  iOS \(ios)  •  \(result)")
     }
 
     /// `datetime.fromisoformat(...).strftime("%Y-%m-%d %H:%M")`, falling back to
@@ -416,8 +404,8 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Development mode")
                     NativeNote(devModeOn
-                        ? "The switches below are live for the next run."
-                        : "Off: runs take the normal path. Stored switches are ignored.")
+                        ? String(localized: "The switches below are live for the next run.")
+                        : String(localized: "Off: runs take the normal path. Stored switches are ignored."))
                 }
             }
 
@@ -430,10 +418,8 @@ struct SettingsView: View {
 
                 switchRow("Verbose log",
                           note: verboseLog
-                            ? "Recording the protocol detail into minimuxer.log. "
-                              + "Off keeps the app log and the run itself, and drops "
-                              + "the per-frame lines."
-                            : "Protocol detail is not being recorded. The app log still is.",
+                            ? String(localized: "Recording the protocol detail into minimuxer.log. Off keeps the app log and the run itself, and drops the per-frame lines.")
+                            : String(localized: "Protocol detail is not being recorded. The app log still is."),
                           isOn: $verboseLog)
 
                 switchRow("Skip AFC media",
@@ -457,7 +443,7 @@ struct SettingsView: View {
     // MARK: - Rows
 
     /// A labelled switch with the explanation underneath it.
-    private func switchRow(_ title: String, note: String, isOn: Binding<Bool>) -> some View {
+    private func switchRow(_ title: LocalizedStringKey, note: String, isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)

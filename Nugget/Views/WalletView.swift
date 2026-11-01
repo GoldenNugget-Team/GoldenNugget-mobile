@@ -51,7 +51,7 @@ struct WalletView: View {
             .padding(.vertical)
         }
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle(cards.isEmpty ? "Wallet" : "Wallet Cards (\(cards.count))")
+        .navigationTitle(Text(cards.isEmpty ? "Wallet" : "Wallet Cards (\(cards.count))"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -139,7 +139,7 @@ struct WalletView: View {
         let reason = Airlift.unsupportedReason(deviceVersion: identity.version, buildVersion: identity.buildVersion)
         if !reason.isEmpty { return reason }
         if !FileManager.default.fileExists(atPath: AppPaths.pairingFile.path) {
-            return "AirLift needs a pairing record and none is stored. Import one on the home page."
+            return String(localized: "AirLift needs a pairing record and none is stored. Import one on the home page.")
         }
         return ""
     }

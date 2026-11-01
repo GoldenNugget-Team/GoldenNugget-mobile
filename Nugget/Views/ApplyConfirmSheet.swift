@@ -58,9 +58,7 @@ struct ApplyConfirmSheet: View {
                                 .font(.subheadline)
                                 .foregroundStyle(.red)
                         }
-                        NativeSafetyNote("These settings contradict each other. The later "
-                            + "tweak wins on the device, so the result may not be what "
-                            + "the list suggests.")
+                        NativeSafetyNote("These settings contradict each other. The later tweak wins on the device, so the result may not be what the list suggests.")
                     }
                 }
 
@@ -124,6 +122,6 @@ struct ApplyConfirmSheet: View {
         let charging = device.batteryState == .charging || device.batteryState == .full
         let percent = Int((level * 100).rounded())
         if charging || percent > 20 { return nil }
-        return "⚠ Low battery: \(percent)%. Connect the charger before restoring."
+        return String(localized: "⚠ Low battery: \(percent)%. Connect the charger before restoring.")
     }
 }

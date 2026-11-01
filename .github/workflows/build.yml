@@ -53,6 +53,13 @@ jobs:
       - name: Build IPA
         run: ./scripts/build-ipa.sh Release
 
+      # The build above emitted `.stringsdata`; this compares them with the
+      # committed String Catalog.  A Text("…") that was added without being
+      # extracted, or a key whose text changed, fails here rather than shipping
+      # as untranslatable English.
+      - name: Check localization catalog
+        run: python3 scripts/sync-localizations.py --check
+
       - name: Upload artifact
         uses: actions/upload-artifact@v7.0.1
         with:

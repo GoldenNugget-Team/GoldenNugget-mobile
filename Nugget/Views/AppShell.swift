@@ -26,7 +26,7 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .home: "Home"
         case .tweaks: "Tweaks"
@@ -125,7 +125,7 @@ enum AppDestination: String, CaseIterable, Identifiable, Hashable {
     /// the same reason it has no sidebar row.
     var isInMoreMenu: Bool { tab == nil && showsInSidebar }
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .home: "GoldenNugget"
         case .tweaks: "Tweaks"
@@ -411,8 +411,7 @@ struct RootView: View {
         if !destination.allowed(by: hotload.currentPolicy) {
             ContentUnavailableView("Feature unavailable",
                                    systemImage: "exclamationmark.triangle",
-                                   description: Text("This feature is hidden by HotLoad safety "
-                                                     + "rules. See Settings for rule status."))
+                                   description: Text("This feature is hidden by HotLoad safety rules. See Settings for rule status."))
         } else {
             switch destination {
             case .home:
@@ -514,7 +513,7 @@ private struct MoreView: View {
                     $0.isAvailable(policy: hotload.currentPolicy, device: device.current)
                 }
                 if !pages.isEmpty {
-                    Section(section.title) {
+                    Section(LocalizedStringKey(section.title)) {
                         ForEach(pages) { destination in
                             NavigationLink(value: destination) {
                                 Label(destination.title, systemImage: destination.systemImage)

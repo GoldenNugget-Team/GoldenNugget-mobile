@@ -58,7 +58,7 @@ struct DaemonsView: View {
                         }
                     } header: {
                         NativeCollapsibleHeader(
-                            title: "\(section.rawValue) (\(onCount(in: groups))/\(groups.count))",
+                            title: String(localized: "\(section.rawValue) (\(onCount(in: groups))/\(groups.count))"),
                             collapsed: collapsed)
                     }
                 }
@@ -98,10 +98,7 @@ struct DaemonsView: View {
         Section {
             Text(identity.describe)
                 .font(.headline)
-            NativeNote("\(onCount(in: DaemonGroups.all.filter { $0.showsSwitch })) "
-                + "of \(DaemonGroups.all.filter { $0.showsSwitch }.count) daemon group(s) on. "
-                + "The groups upstream marks interface-visible but gives no switch are in the "
-                + "Recommended set only.")
+            NativeNote(String(localized: "\(onCount(in: DaemonGroups.all.filter { $0.showsSwitch })) of \(DaemonGroups.all.filter { $0.showsSwitch }.count) daemon group(s) on. The groups upstream marks interface-visible but gives no switch are in the Recommended set only."))
         }
     }
 
@@ -126,14 +123,10 @@ struct DaemonsView: View {
         Section {
             masterRow
             if !hotload.currentPolicy.forcedDaemons.isEmpty {
-                NativeSafetyNote("HotLoad forces \(hotload.currentPolicy.forcedDaemons.count) daemon label(s) disabled, even when daemon modifications are off.")
+                NativeSafetyNote(String(localized: "HotLoad forces \(hotload.currentPolicy.forcedDaemons.count) daemon label(s) disabled, even when daemon modifications are off."))
             }
             recommendedRow
-            NativeNote("Writes "
-                + "/var/db/com.apple.xpc.launchd/disabled.plist. Disabling a "
-                + "daemon stops its service. Only the "
-                + "\(DaemonGroups.allowedKeys.count) labels shown here can "
-                + "ever reach the file.")
+            NativeNote(String(localized: "Writes /var/db/com.apple.xpc.launchd/disabled.plist. Disabling a daemon stops its service. Only the \(DaemonGroups.allowedKeys.count) labels shown here can ever reach the file."))
         }
     }
 
@@ -167,10 +160,7 @@ struct DaemonsView: View {
             let spec = TweakCatalog.screenTimeSpec
             TweakRow(spec: spec, selection: $selection,
                      isOn: { isOn(spec) }, setOn: { requestSetOn($0, for: spec) })
-            NativeNote("Writes a 0-byte file over "
-                + "\(DaemonGroups.screenTime.path). Upstream models this as "
-                + "a NullifyFileTweak: it removes a plist rather than "
-                + "writing one.")
+            NativeNote(String(localized: "Writes a 0-byte file over \(DaemonGroups.screenTime.path). Upstream models this as a NullifyFileTweak: it removes a plist rather than writing one."))
         }
     }
 
@@ -188,7 +178,7 @@ struct DaemonsView: View {
                 .disabled(group.labels.allSatisfy { hotload.currentPolicy.forcedDaemons[$0] != nil })
             let forced = group.labels.filter { hotload.currentPolicy.forcedDaemons[$0] != nil }
             if !forced.isEmpty {
-                NativeSafetyNote("HotLoad: \(forced.count)/\(group.labels.count) labels forced disabled. "
+                NativeSafetyNote(String(localized: "HotLoad: \(forced.count)/\(group.labels.count) labels forced disabled. ")
                     + (forced.first.flatMap { hotload.currentPolicy.forcedDaemons[$0] } ?? ""))
             }
         } else {

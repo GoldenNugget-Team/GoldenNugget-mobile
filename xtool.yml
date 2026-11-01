@@ -48,4 +48,11 @@ resources:
   # screen -- which is what the light-only AppIcon*.png files were doing.
   - layout/Applications/GoldenNuggetMobile.app/Logo@2x.png
   - layout/Applications/GoldenNuggetMobile.app/Logo@1x.png
+  # Localizations.  Xcode compiles the String Catalogs itself; xtool cannot, so
+  # scripts/compile-localizations.py writes the same <lang>.lproj/Localizable.strings
+  # (and InfoPlist.strings) into build/localizations first.  Each language is a
+  # separate resource because a `.lproj` must sit at the bundle root; add a line
+  # per language when a translation lands.  `en.lproj` is always generated, even
+  # while the catalog has no translations, so a clean checkout builds.
+  - build/localizations/en.lproj
 entitlementsPath: entitlements.plist

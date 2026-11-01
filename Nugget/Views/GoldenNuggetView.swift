@@ -375,7 +375,7 @@ struct GoldenNuggetView: View {
     private var applyCard: some View {
         Section {
             NativeNote(applyNote)
-            NativePrimaryButton(title: running ? "Applying…" : applyTitle,
+            NativePrimaryButton(title: running ? String(localized: "Applying…") : applyTitle,
                                 running: running,
                                 disabled: !canApply) {
                 applyTweaks()
@@ -415,7 +415,11 @@ struct GoldenNuggetView: View {
                 .progressViewStyle(.linear)
                 .opacity(progress == nil ? 0.35 : 1)
             HStack {
-                Text(progress == nil ? "working…" : String(format: "%.0f%%", progress ?? 0))
+                if let progress {
+                    Text(verbatim: String(format: "%.0f%%", progress))
+                } else {
+                    Text("working…")
+                }
                 if !eta.isEmpty {
                     Spacer()
                     // `eta.py`'s "m:ss" remaining — empty until a stable rate is
@@ -444,8 +448,7 @@ struct GoldenNuggetView: View {
                                disabled: running || resetting) {
                 showResetSheet = true
             }
-            NativeNote("Puts whole pages back to stock on the device. The next screen "
-                + "picks which ones and names the files it writes.")
+            NativeNote("Puts whole pages back to stock on the device. The next screen picks which ones and names the files it writes.")
         }
     }
 
@@ -472,9 +475,7 @@ struct GoldenNuggetView: View {
     private var mediaCard: some View {
         Section("Media") {
             if let totals = mediaTotals, totals.files > 0 {
-                Text("\(totals.files) photo(s) and video(s) — "
-                    + ByteCountFormatter.string(fromByteCount: totals.bytes, countStyle: .file)
-                    + " kept in the app")
+                Text("\(totals.files) photo(s) and video(s) — \(ByteCountFormatter.string(fromByteCount: totals.bytes, countStyle: .file)) kept in the app")
                     .font(.subheadline)
             } else {
                 Text("No photos or videos copied yet")
@@ -487,8 +488,7 @@ struct GoldenNuggetView: View {
                                 disabled: !canRestoreMedia) {
                 restoreMedia()
             }
-            NativeNote("Copied automatically at setup and on every launch; this writes "
-                + "every kept photo and video back to the device's Media folder.")
+            NativeNote("Copied automatically at setup and on every launch; this writes every kept photo and video back to the device's Media folder.")
             Button {
                 // Asks the shell: a tab on a phone, a push on a tablet.
                 openDestination(.media)
@@ -680,22 +680,23 @@ struct GoldenNuggetView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 ProgressView()
-                Text(wirelessPair.serviceName.map { "Advertising “\($0)” — waiting for this iPhone to connect…" }
-                     ?? "Starting the pairing service…")
-                    .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let serviceName = wirelessPair.serviceName {
+                    Text("Advertising “\(serviceName)” — waiting for this iPhone to connect…")
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("Starting the pairing service…")
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             if let pin = wirelessPair.pin {
                 Text("PIN: \(pin)")
                     .font(.title3.monospaced().weight(.semibold))
                     .textSelection(.enabled)
-                NativeNote("Confirm this PIN in Settings → Privacy & Security → Developer "
-                    + "Mode → “Pair with \(WirelessPairing.displayName)” to finish pairing.")
+                NativeNote(String(localized: "Confirm this PIN in Settings → Privacy & Security → Developer Mode → “Pair with \(WirelessPairing.displayName)” to finish pairing."))
             } else {
-                NativeNote("Leave this screen open, then open Settings → Privacy & Security → "
-                    + "Developer Mode on this iPhone and tap “Pair with "
-                    + "\(WirelessPairing.displayName)”. iOS 27 connects the phone to the "
-                    + "advertised service itself — no computer is involved.")
+                NativeNote(String(localized: "Leave this screen open, then open Settings → Privacy & Security → Developer Mode on this iPhone and tap “Pair with \(WirelessPairing.displayName)”. iOS 27 connects the phone to the advertised service itself — no computer is involved."))
             }
             Button(role: .destructive) {
                 wirelessPair.cancel()
@@ -717,11 +718,7 @@ struct GoldenNuggetView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Tunnel addresses")
                 .font(.headline)
-            NativeNote("How this app finds the LocalDevVPN tunnel: it waits for the "
-                + "tunnel IP on an interface, then probes the peer's lockdown port. "
-                + "\(Tunnel.isCustomised ? "Custom values in use." : "Defaults in use.") "
-                + "These steer this app only — the vendored library finds the peer from the "
-                + "route table and always dials 62078.")
+            NativeNote(String(localized: "How this app finds the LocalDevVPN tunnel: it waits for the tunnel IP on an interface, then probes the peer's lockdown port. \(Tunnel.isCustomised ? String(localized: "Custom values in use.") : String(localized: "Defaults in use.")) These steer this app only — the vendored library finds the peer from the route table and always dials 62078."))
             VStack(alignment: .leading, spacing: 6) {
                 Text("Tunnel IP (this device)")
                     .font(.caption)
@@ -732,7 +729,7 @@ struct GoldenNuggetView: View {
                     .textInputAutocapitalization(.never)
                     .keyboardType(.numbersAndPunctuation)
                 if !tunnelIfaceIPOK {
-                    NativeSafetyNote("Not an IPv4 address — \(Tunnel.defaultIfaceIP) is being probed instead.")
+                    NativeSafetyNote(String(localized: "Not an IPv4 address — \(Tunnel.defaultIfaceIP) is being probed instead."))
                 }
             }
             VStack(alignment: .leading, spacing: 6) {
@@ -745,7 +742,7 @@ struct GoldenNuggetView: View {
                     .textInputAutocapitalization(.never)
                     .keyboardType(.numbersAndPunctuation)
                 if !tunnelPeerIPOK {
-                    NativeSafetyNote("Not an IPv4 address — \(Tunnel.defaultPeerIP) is being probed instead.")
+                    NativeSafetyNote(String(localized: "Not an IPv4 address — \(Tunnel.defaultPeerIP) is being probed instead."))
                 }
             }
             VStack(alignment: .leading, spacing: 6) {
@@ -761,7 +758,7 @@ struct GoldenNuggetView: View {
                     .keyboardType(.numberPad)
                     .nativeKeyboardDone()
                 if !tunnelPortOK {
-                    NativeSafetyNote("Not a port in 1…65535 — \(Tunnel.defaultServicePort) is being probed instead.")
+                    NativeSafetyNote(String(localized: "Not a port in 1…65535 — \(Tunnel.defaultServicePort) is being probed instead."))
                 }
             }
             VStack(alignment: .leading, spacing: 6) {
@@ -777,14 +774,13 @@ struct GoldenNuggetView: View {
                     .keyboardType(.numberPad)
                     .nativeKeyboardDone()
                 if !tunnelPrefixOK {
-                    NativeSafetyNote("Not 0…32 — LocalDevVPN's tunnel-IP field takes a CIDR, and this is the part after the slash.")
+                    NativeSafetyNote(String(localized: "Not 0…32 — LocalDevVPN's tunnel-IP field takes a CIDR, and this is the part after the slash."))
                 }
             }
-            NativeNote("Copy into LocalDevVPN: tunnel IP \(Tunnel.ifaceIP)/\(Tunnel.ifacePrefixLength), peer \(Tunnel.peerIP), port \(Tunnel.servicePort).")
+            NativeNote(String(localized: "Copy into LocalDevVPN: tunnel IP \(Tunnel.ifaceIP)/\(Tunnel.ifacePrefixLength), peer \(Tunnel.peerIP), port \(Tunnel.servicePort)."))
             // Both values come from state — see `tunnelSummary`.  The probe
             // is a 2 s `poll()` and must never run in a body.
-            Text("tunnel: \(tunnelSummary) · peer \(Tunnel.peerIP):\(Tunnel.servicePort) "
-                + "reachable: \(peerReachable.map(String.init) ?? "…")")
+            Text("tunnel: \(tunnelSummary) · peer \(Tunnel.peerIP):\(Tunnel.servicePort) reachable: \(peerReachable.map(String.init) ?? "…")")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -830,12 +826,12 @@ struct GoldenNuggetView: View {
     /// full backup and change nothing.
     private var applyTitle: String {
         let names = [
-            tweakSelection.hasPendingWrites || tweakSelection.daemonModificationsEnabled || !hotload.currentPolicy.forcedDaemonKeys.isEmpty ? "Tweaks" : nil,
-            posterBoardSelection.isActive ? "Wallpapers" : nil,
-            templateSelection.usesDomains ? "Templates" : nil,
+            tweakSelection.hasPendingWrites || tweakSelection.daemonModificationsEnabled || !hotload.currentPolicy.forcedDaemonKeys.isEmpty ? String(localized: "Tweaks") : nil,
+            posterBoardSelection.isActive ? String(localized: "Wallpapers") : nil,
+            templateSelection.usesDomains ? String(localized: "Templates") : nil,
         ].compactMap { $0 }
-        if names.isEmpty { return "Apply" }
-        return "Apply " + names.joined(separator: " & ")
+        if names.isEmpty { return String(localized: "Apply") }
+        return String(localized: "Apply \(names.joined(separator: " & "))")
     }
 
     /// What the button will carry, in one line — and then only the branches that
@@ -848,25 +844,18 @@ struct GoldenNuggetView: View {
     /// that will drop part of the selection, is something to read *before* the
     /// tap, not in the failure afterwards.
     private var applyNote: String {
-        var lines = ["One pass: every enabled tweak, plus the wallpapers and templates "
-            + "picked on their own pages. Reboot the device afterwards — the injected "
-            + "preferences are read at boot."]
+        var lines = [String(localized: "One pass: every enabled tweak, plus the wallpapers and templates picked on their own pages. Reboot the device afterwards — the injected preferences are read at boot.")]
         if posterBoardSelection.fullReset || !posterBoardSelection.resetModes.isEmpty {
-            lines.append("⚠️ A PosterBoard reset is armed (\(posterBoardSelection.describe)). "
-                + "A reset run clears the store and installs no wallpapers, so with wallpapers "
-                + "selected as well Apply refuses until one of the two is turned off.")
+            lines.append(String(localized: "⚠️ A PosterBoard reset is armed (\(posterBoardSelection.describe)). A reset run clears the store and installs no wallpapers, so with wallpapers selected as well Apply refuses until one of the two is turned off."))
         }
         if templateSelection.isActive {
             if !templateSelection.usesDomains {
-                lines.append("The only template selected asks for sparserestore, which this app "
-                    + "does not implement, so nothing is delivered from the Templates page and "
-                    + "this run is not started for it.")
+                lines.append(String(localized: "The only template selected asks for sparserestore, which this app does not implement, so nothing is delivered from the Templates page and this run is not started for it."))
             }
             let blocked = templateSelection.undeliverable
             if !blocked.isEmpty {
-                lines.append("Left out of this run: "
-                    + blocked.map { "\($0.template.title) — \($0.reason)" }.joined(separator: "; ")
-                    + ".")
+                let list = blocked.map { "\($0.template.title) — \($0.reason)" }.joined(separator: "; ")
+                lines.append(String(localized: "Left out of this run: \(list)."))
             }
         }
         return lines.joined(separator: "\n\n")

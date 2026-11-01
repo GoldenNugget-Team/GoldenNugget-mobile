@@ -44,9 +44,7 @@ struct PresetManagerView: View {
     var body: some View {
         List {
             Section {
-                NativeNote("Save, switch and share complete tweak configurations. "
-                    + "Loading a preset replaces the current selection; the home "
-                    + "Apply still delivers it to the device.")
+                NativeNote("Save, switch and share complete tweak configurations. Loading a preset replaces the current selection; the home Apply still delivers it to the device.")
             }
 
             saveSection
@@ -83,8 +81,7 @@ struct PresetManagerView: View {
             Button("Cancel", role: .cancel) {}
             Button("Roll back") { performRollback() }
         } message: {
-            Text("Load the snapshot taken before the last successful apply? "
-                + "This will replace your current configuration.")
+            Text("Load the snapshot taken before the last successful apply? This will replace your current configuration.")
         }
         .alert("Delete Preset", isPresented: isPresented($pendingDelete),
                presenting: pendingDelete) { info in
@@ -271,10 +268,10 @@ struct PresetManagerView: View {
     /// (`preset_menu.py:123`).  The hidden-feature warning is not reproduced:
     /// this port has no per-feature safety rules engine to consult.
     private func loadConfirmMessage(_ info: GoldenNuggetPresets.PresetInfo) -> String {
-        var text = "Load preset \"\(info.name)\"?"
-        if !info.description.isEmpty { text += "\n\nDescription: \(info.description)" }
-        text += "\nDevice: \(info.deviceModel) • iOS \(info.iosVersion)"
-        text += "\n\nThis will replace your current configuration."
+        var text = String(localized: "Load preset \"\(info.name)\"?")
+        if !info.description.isEmpty { text += "\n\n" + String(localized: "Description: \(info.description)") }
+        text += "\n" + String(localized: "Device: \(info.deviceModel) • iOS \(info.iosVersion)")
+        text += "\n\n" + String(localized: "This will replace your current configuration.")
         if let warning = daemonCompatibilityWarning(info) {
             text += "\n\n⚠ \(warning)"
         }
@@ -294,10 +291,9 @@ struct PresetManagerView: View {
             mismatches.append("\(savedType) vs current \(currentType)")
         }
         guard !mismatches.isEmpty else { return nil }
-        return "This preset contains daemon modifications that were saved for a "
-            + "different device:\n" + mismatches.map { "• \($0)" }.joined(separator: "\n")
-            + "\n\nDaemons are sensitive to the iOS version and device type, and "
-            + "applying incompatible ones can bootloop your device. Proceed with caution."
+        return String(localized: "This preset contains daemon modifications that were saved for a different device:")
+            + "\n" + mismatches.map { "• \($0)" }.joined(separator: "\n")
+            + "\n\n" + String(localized: "Daemons are sensitive to the iOS version and device type, and applying incompatible ones can bootloop your device. Proceed with caution.")
     }
 
     private func performLoad(_ info: GoldenNuggetPresets.PresetInfo) {

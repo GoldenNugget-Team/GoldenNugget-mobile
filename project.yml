@@ -70,6 +70,10 @@
 name: GoldenNuggetMobile
 options:
   bundleIdPrefix: com.awesomenull
+  # The source language of Localizable.xcstrings / InfoPlist.xcstrings.  XcodeGen
+  # writes it into the project's `developmentRegion` and `knownRegions`, which is
+  # what makes the catalogs compile to `<lang>.lproj` rather than being copied.
+  developmentLanguage: en
   createIntermediateGroups: true
   groupSortPosition: top
   # Generation is two steps in one: XcodeGen writes project.pbxproj, then the
@@ -92,6 +96,12 @@ settings:
     LM_SKIP_METADATA_EXTRACTION: YES
     GENERATE_INFOPLIST_FILE: NO
     INFOPLIST_FILE: layout/Applications/GoldenNuggetMobile.app/Info.plist
+    # Extract LocalizedStringKey / String(localized:) uses from Swift at compile
+    # time (`.stringsdata` in DerivedData).  scripts/sync-localizations.py turns
+    # those into catalog entries, which is how a key that is added in code cannot
+    # silently ship untranslated.
+    SWIFT_EMIT_LOC_STRINGS: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
     PRODUCT_BUNDLE_IDENTIFIER: com.awesomenull.goldennugget
     PRODUCT_NAME: GoldenNuggetMobile
     CODE_SIGN_ENTITLEMENTS: entitlements.plist
@@ -153,6 +163,14 @@ targets:
     platform: iOS
     sources:
       - path: Nugget
+      # The String Catalogs are the source of truth for every user-facing string.
+      # Xcode compiles them to <lang>.lproj/Localizable.strings and
+      # <lang>.lproj/InfoPlist.strings at build time; the xtool path gets the
+      # same files from scripts/compile-localizations.py (see xtool.yml).
+      - path: layout/Applications/GoldenNuggetMobile.app/Localizable.xcstrings
+        buildPhase: resources
+      - path: layout/Applications/GoldenNuggetMobile.app/InfoPlist.xcstrings
+        buildPhase: resources
       # The catalog, compiled by actool into Assets.car.  It currently holds one
       # asset — the Icon Composer document below — but it stays the place a
       # colour or image asset would go.

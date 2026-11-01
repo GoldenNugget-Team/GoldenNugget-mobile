@@ -574,34 +574,34 @@ enum StatusBarItem: Int, CaseIterable, Hashable {
     /// not by index order.
     var title: String {
         switch self {
-        case .time: return "Time"
-        case .date: return "Date"
-        case .quietMode: return "Quiet Mode"
-        case .airplaneMode: return "Airplane Mode"
-        case .cellularSignalStrength: return "Cellular Signal Strength"
-        case .secondaryCellularSignalStrength: return "Secondary Signal Strength"
-        case .cellularService: return "Cellular Service"
-        case .secondaryCellularService: return "Secondary Cellular Service"
-        case .cellularDataNetwork: return "Data Network Type"
-        case .secondaryCellularDataNetwork: return "Secondary Data Network"
-        case .mainBattery: return "Battery"
-        case .prominentlyShowBatteryDetail: return "Battery Detail"
-        case .bluetooth: return "Bluetooth"
-        case .tty: return "TTY"
-        case .alarm: return "Alarm"
-        case .location: return "Location"
-        case .rotationLock: return "Rotation Lock"
-        case .cameraUse: return "Camera"
-        case .airPlay: return "AirPlay"
-        case .assistant: return "Assistant"
-        case .carPlay: return "CarPlay"
-        case .student: return "Student Status"
-        case .microphoneUse: return "Microphone"
-        case .vpn: return "VPN"
-        case .phonePickup: return "Phone Pickup"
-        case .liquidDetection: return "Liquid Detection"
-        case .voiceControl: return "Voice Control"
-        case .extra1: return "Extra 1"
+        case .time: return String(localized: "Time")
+        case .date: return String(localized: "Date")
+        case .quietMode: return String(localized: "Quiet Mode")
+        case .airplaneMode: return String(localized: "Airplane Mode")
+        case .cellularSignalStrength: return String(localized: "Cellular Signal Strength")
+        case .secondaryCellularSignalStrength: return String(localized: "Secondary Signal Strength")
+        case .cellularService: return String(localized: "Cellular Service")
+        case .secondaryCellularService: return String(localized: "Secondary Cellular Service")
+        case .cellularDataNetwork: return String(localized: "Data Network Type")
+        case .secondaryCellularDataNetwork: return String(localized: "Secondary Data Network")
+        case .mainBattery: return String(localized: "Battery")
+        case .prominentlyShowBatteryDetail: return String(localized: "Battery Detail")
+        case .bluetooth: return String(localized: "Bluetooth")
+        case .tty: return String(localized: "TTY")
+        case .alarm: return String(localized: "Alarm")
+        case .location: return String(localized: "Location")
+        case .rotationLock: return String(localized: "Rotation Lock")
+        case .cameraUse: return String(localized: "Camera")
+        case .airPlay: return String(localized: "AirPlay")
+        case .assistant: return String(localized: "Assistant")
+        case .carPlay: return String(localized: "CarPlay")
+        case .student: return String(localized: "Student Status")
+        case .microphoneUse: return String(localized: "Microphone")
+        case .vpn: return String(localized: "VPN")
+        case .phonePickup: return String(localized: "Phone Pickup")
+        case .liquidDetection: return String(localized: "Liquid Detection")
+        case .voiceControl: return String(localized: "Voice Control")
+        case .extra1: return String(localized: "Extra 1")
         }
     }
 }

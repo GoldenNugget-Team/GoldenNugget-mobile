@@ -17,8 +17,8 @@ enum TweaksMode: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .tweaks: "Tweaks"
-        case .daemons: "Daemons"
+        case .tweaks: String(localized: "Tweaks")
+        case .daemons: String(localized: "Daemons")
         }
     }
 }
@@ -225,8 +225,7 @@ struct TweaksView: View {
         Section {
             Text(identity.describe)
                 .font(.headline)
-            NativeNote("\(selection.enabledCount) of \(visibleSpecs.count) applicable tweak(s) enabled. "
-                + "Incompatible and un-ported tweaks are hidden, the same way the reference hides them.")
+            NativeNote(String(localized: "\(selection.enabledCount) of \(visibleSpecs.count) applicable tweak(s) enabled. Incompatible and un-ported tweaks are hidden, the same way the reference hides them."))
         }
     }
 
@@ -277,7 +276,7 @@ struct TweaksView: View {
                     }
                 } header: {
                     NativeCollapsibleHeader(
-                        title: "\(section.rawValue) (\(on)/\(specs.count))",
+                        title: String(localized: "\(section.rawValue) (\(on)/\(specs.count))"),
                         collapsed: collapsed)
                 }
             }
@@ -386,11 +385,10 @@ struct TweaksView: View {
     /// manual path for a preset that came from somewhere else.
     private var autosaveNote: String {
         let path = "Documents/GoldenNugget/Presets/\(GoldenNuggetAutosave.presetName).json"
-        let state = autosaveSaved ? "saved" : "nothing saved yet"
-        return "Your selection is saved to \(path) on every change and restored on "
-            + "launch, exactly as the desktop app's AutoSave preset does (\(state)). "
-            + "Import is for a preset from elsewhere; entries this port does not carry "
-            + "are listed below rather than guessed at."
+        let state = autosaveSaved
+            ? String(localized: "saved")
+            : String(localized: "nothing saved yet")
+        return String(localized: "Your selection is saved to \(path) on every change and restored on launch, exactly as the desktop app's AutoSave preset does (\(state)). Import is for a preset from elsewhere; entries this port does not carry are listed below rather than guessed at.")
     }
 
     private func importAutosave(from url: URL) {

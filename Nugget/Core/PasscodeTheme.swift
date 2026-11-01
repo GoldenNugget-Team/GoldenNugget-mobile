@@ -47,23 +47,23 @@ enum PasscodeLanguageTarget: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .all: return "All languages"
-        case .uk: return "Ukrainian"
-        case .ru: return "Russian"
-        case .en: return "English"
-        case .other: return "Other / fallback"
-        case .es: return "Spanish"
-        case .de: return "German"
-        case .fr: return "French"
-        case .pl: return "Polish"
-        case .it: return "Italian"
-        case .pt: return "Portuguese"
-        case .tr: return "Turkish"
-        case .ja: return "Japanese"
-        case .ko: return "Korean"
-        case .zh: return "Chinese"
-        case .ar: return "Arabic"
-        case .he: return "Hebrew"
+        case .all: return String(localized: "All languages")
+        case .uk: return String(localized: "Ukrainian")
+        case .ru: return String(localized: "Russian")
+        case .en: return String(localized: "English")
+        case .other: return String(localized: "Other / fallback")
+        case .es: return String(localized: "Spanish")
+        case .de: return String(localized: "German")
+        case .fr: return String(localized: "French")
+        case .pl: return String(localized: "Polish")
+        case .it: return String(localized: "Italian")
+        case .pt: return String(localized: "Portuguese")
+        case .tr: return String(localized: "Turkish")
+        case .ja: return String(localized: "Japanese")
+        case .ko: return String(localized: "Korean")
+        case .zh: return String(localized: "Chinese")
+        case .ar: return String(localized: "Arabic")
+        case .he: return String(localized: "Hebrew")
         }
     }
 
@@ -98,9 +98,9 @@ enum PasscodeBoldTarget: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .both: return "Regular + bold"
-        case .boldOnly: return "Bold only"
-        case .regularOnly: return "Regular only"
+        case .both: return String(localized: "Regular + bold")
+        case .boldOnly: return String(localized: "Bold only")
+        case .regularOnly: return String(localized: "Regular only")
         }
     }
 
