@@ -614,7 +614,16 @@ struct GoldenNuggetView: View {
         Section {
             DisclosureGroup(isExpanded: $connectionExpanded) {
                 VStack(alignment: .leading, spacing: 14) {
+                    // `borderless` is what keeps the two acquire buttons apart:
+                    // the disclosure's content is a *single* `List` row, and the
+                    // default button style gives that row one tap target, so a tap
+                    // on "Select Pairing File" also ran `Pair Wirelessly` (and the
+                    // other way round) — the picker opened while the pairing
+                    // service started behind it. Borderless gives every button its
+                    // own bounds, the same way a row of buttons in a toolbar
+                    // behaves.
                     pairingRows
+                        .buttonStyle(.borderless)
                     Divider()
                     tunnelEditor
                 }
