@@ -108,7 +108,7 @@ Want to see your name here? Open [Pull Request](https://github.com/GoldenNugget-
 
 ## Requirements to build:
 Xcode 26+ or xtool with iOS 26+ SDK\
-Rust (NeoSpring and airlift)\
+Rust (minimuxer, idevice, NeoSpring and airlift)\
 Swift 6+ (Untested with older, may work)
 macOS 15.6 Sequoia+ or Ubuntu 22.04+
 
