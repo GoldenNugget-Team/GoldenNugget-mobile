@@ -1,58 +1,11 @@
 version: 1
-# `product` must be the single static library product in Package.swift: xtool
-# names the app binary after it, and CFBundleExecutable in the Info.plist below
-# has to match or the signing step fails with "Can't parse BundleExecute file!".
 product: GoldenNuggetMobile
 bundleID: com.awesomenull.goldennugget
-# iOS 26: Liquid Glass renders only when MinimumOSVersion >= 26, which
-# Info.plist's MinimumOSVersion and this target both carry.  Package.swift,
-# project.yml and project.pbxproj carry the same 26.0 — the four files have to
-# agree, or the binary's LC_BUILD_VERSION ends up stamping a different pair of
-# numbers than the Info.plist the device reads.
 deploymentTarget: 26.0
 infoPath: layout/Applications/GoldenNuggetMobile.app/Info.plist
-# Both builders add UIDeviceFamily themselves: xtool's application defaults
-# are [1, 2], matching project.yml's TARGETED_DEVICE_FAMILY for Xcode.
 resources:
-  # The icon is an Icon Composer bundle. Normally Apple's own actool compiles
-  # it into this car (see scripts/compile-assets.sh and
-  # .github/workflows/assets-car.yml), keeping the iconstack (part 245/246)
-  # and its tintable appearance. When no actool car is committed the AssetKit
-  # shim compiles the catalog on Linux instead, expanding the `.icon`'s base
-  # and dark artwork into a classic part-220 appiconset with both appearances.
-  # Either way the car is the only icon source on purpose: the shim's loose
-  # PNGs are base-appearance only and would shadow the dark variant.
-  #
-  # xtool cannot compile the catalog itself: it copies actool out of the darwin
-  # SDK into xtool/.xtool-tmp/actool and execs it, and that copy loses the
-  # executable bit — the SDK's actool is 0755, the copy lands 0664 — so the
-  # launch dies with ".xtool-tmp/actool is not an executable file" before any
-  # argument is parsed.  There is no hook between the copy and the exec, and
-  # xtool execs an absolute path, so PATH does not help.  Even with the bit
-  # restored it would fail again: that actool is "Mach-O 64-bit arm64" and this
-  # is an x86_64 Linux host.
-  #
-  # So scripts/compile-assets.sh leaves Assets.car in build/assets/ first
-  # (copied from actool's output when present, otherwise written by the shim),
-  # and xtool ships it here as an ordinary resource.  Run that script before
-  # `xtool dev build`; see the build order in scripts/build-ipa-xtool.sh.
-  #
-  # AppIcon60x60@2x is deliberately absent: iconPath above already puts a file
-  # of that name in the bundle root, and two entries would fight over one
-  # destination.  AppIcon1024x1024 is absent too — the 1024 artwork (both
-  # appearances) lives in Assets.car, and shipping it loose as well would add
-  # ~500 KB of PNG for nothing.
-  - build/assets/Assets.car
-  # In-app header logo (NativeLogo). Same artwork as the app icon, under names
-  # no icon key can claim, so it can never shadow the iconstack on the home
-  # screen -- which is what the light-only AppIcon*.png files were doing.
-  - layout/Applications/GoldenNuggetMobile.app/Logo@2x.png
-  - layout/Applications/GoldenNuggetMobile.app/Logo@1x.png
-  # Localizations.  Xcode compiles the String Catalogs itself; xtool cannot, so
-  # scripts/compile-localizations.py writes the same <lang>.lproj/Localizable.strings
-  # (and InfoPlist.strings) into build/localizations first.  Each language is a
-  # separate resource because a `.lproj` must sit at the bundle root; add a line
-  # per language when a translation lands.  `en.lproj` is always generated, even
-  # while the catalog has no translations, so a clean checkout builds.
-  - build/localizations/en.lproj
+    - build/assets/Assets.car
+    - layout/Applications/GoldenNuggetMobile.app/Logo@2x.png
+    - layout/Applications/GoldenNuggetMobile.app/Logo@1x.png
+    - build/localizations/en.lproj
 entitlementsPath: entitlements.plist
