@@ -373,6 +373,9 @@
     "Clear the video choice" : {
 
     },
+    "Clear tint" : {
+
+    },
     "Clears the Collections and MercuryPoster descriptor folders." : {
 
     },
@@ -591,6 +594,9 @@
     "Disable Wi-Fi icon" : {
 
     },
+    "Disabled" : {
+
+    },
     "Discrete" : {
 
     },
@@ -609,6 +615,12 @@
     "Dump diagnostics into log" : {
 
     },
+    "Edit fields… (%lld selected)" : {
+
+    },
+    "Edit values…" : {
+
+    },
     "Empty the local store" : {
 
     },
@@ -619,6 +631,9 @@
 
     },
     "Enable incompatible tweaks" : {
+
+    },
+    "Enabled" : {
 
     },
     "English" : {
@@ -758,6 +773,9 @@
 
     },
     "How to apply" : {
+
+    },
+    "Icon tint color" : {
 
     },
     "Import" : {
@@ -1000,7 +1018,13 @@
     "OK" : {
 
     },
+    "Off" : {
+
+    },
     "Off: runs take the normal path. Stored switches are ignored." : {
+
+    },
+    "On" : {
 
     },
     "On by default, as upstream does. Off: an apply carries only the tweaks." : {
@@ -1620,6 +1644,9 @@
     "Upstream caps a selection at %lld descriptors. Each pack is copied into this app, so removing one here removes the copy — the file you imported is untouched." : {
 
     },
+    "Use" : {
+
+    },
     "VPN" : {
 
     },
@@ -1645,6 +1672,9 @@
 
     },
     "Wallpaper packs (%lld)" : {
+
+    },
+    "Wallpaper presets" : {
 
     },
     "Wallpapers" : {
