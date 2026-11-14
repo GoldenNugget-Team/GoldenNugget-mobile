@@ -2768,6 +2768,57 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI {
         closed = true
     }
 
+    /// The streaming form of `fsWrite`: the handle stays open across calls and
+    /// `nextChunk(want)` supplies the body in pieces, so the file never has to
+    /// be one allocation on this side either.
+    private func fsStreamWrite(
+        client: OpaquePointer,
+        path: String,
+        chunkSize: Int,
+        nextChunk: @escaping @Sendable (Int) throws -> Data
+    ) throws -> Int64 {
+        var fileHandle: OpaquePointer? = nil
+        let openErr = path.withCString { pathPtr in
+            // Same open as fsWrite: AfcWr truncates, so a replacement shorter
+            // than what was there cannot leave a tail of the old contents.
+            afc_file_open(client, pathPtr, AfcFopenMode(rawValue: 4), &fileHandle)
+        }
+        if let openErr = openErr {
+            let msg = self.getErrorMessage(from: openErr)
+            defer { safeFreeError(openErr) }
+            throw IdeviceGatewayError(.serviceError, reason: "afc_file_open (write) failed for \(path): \(msg)")
+        }
+        guard let fileHandle else {
+            throw IdeviceGatewayError(.serviceError, reason: "afc_file_open returned no handle for \(path)")
+        }
+        defer { _ = afc_file_close(fileHandle) }
+
+        // The read-side ceiling again: past 8 MiB a single AFC request can
+        // start being refused, and 4096 keeps a caller's zero from meaning
+        // "no data at all" rather than "one small packet".
+        let want = max(4096, min(chunkSize, 8 * 1024 * 1024))
+        var total: Int64 = 0
+        while true {
+            let chunk = try nextChunk(want)
+            // Empty input is the caller's end-of-file, not a packet of none:
+            // sending an empty buffer to afc_file_write is at best a no-op and
+            // on some firmware an error, so it stops the loop instead.
+            if chunk.isEmpty { break }
+            let writeErr = chunk.withUnsafeBytes { raw -> UnsafeMutablePointer<IdeviceFfiError>? in
+                afc_file_write(fileHandle, raw.bindMemory(to: UInt8.self).baseAddress, chunk.count)
+            }
+            if let writeErr = writeErr {
+                let msg = self.getErrorMessage(from: writeErr)
+                defer { safeFreeError(writeErr) }
+                throw IdeviceGatewayError(
+                    .serviceError,
+                    reason: "afc_file_write failed for \(path) at offset \(total): \(msg)")
+            }
+            total += Int64(chunk.count)
+        }
+        return total
+    }
+
     private func fsMakeDirectory(client: OpaquePointer, path: String) throws {
         let err = path.withCString { pathPtr in
             afc_make_directory(client, pathPtr)
@@ -2885,6 +2936,22 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI {
         try await withFFIDispatch {
             try self.withAfcFs {
                 try self.fsStream(client: $0, path: path, chunkSize: chunkSize, onChunk: onChunk)
+            }
+        }
+    }
+
+    /// The write counterpart of `afcStreamFile`: one AFC connection held open
+    /// for the whole file, `nextChunk(want)` feeding it up to `want` bytes at a
+    /// time, so a 2 GB video never has to exist in one `Data`. Returns the
+    /// number of bytes the caller handed over.
+    public func afcStreamWrite(
+        path: String,
+        chunkSize: Int,
+        nextChunk: @escaping @Sendable (Int) throws -> Data
+    ) async throws -> Int64 {
+        try await withFFIDispatch {
+            try self.withAfcFs {
+                try self.fsStreamWrite(client: $0, path: path, chunkSize: chunkSize, nextChunk: nextChunk)
             }
         }
     }

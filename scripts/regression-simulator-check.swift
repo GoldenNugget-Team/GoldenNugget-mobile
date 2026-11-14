@@ -162,14 +162,21 @@ final class RegressionSuite {
             self.check(Set(recovered.entries.map(\.source)) == Set(["/DCIM/a.jpg", "/DCIM/b.jpg"]), "next append repairs partial journal")
             self.check(!FileManager.default.fileExists(atPath: AfcMediaBackup.journalURL.path), "successful pull compacts journal")
         }
-        await run("large originals are retained") {
+        await run("large originals are copied, removed and restored") {
             let gateway = try self.resetStore("large")
             gateway.largePath = "/DCIM/video.mov"
-            gateway.largeSize = AfcMediaBackup.inlineWriteLimit + 1
+            // One byte past the old whole-file afcWrite limit: a streaming
+            // restore must not reintroduce that cap.
+            gateway.largeSize = 64 * 1024 * 1024 + 1
             _ = try await AfcMediaBackup.pull(deletingOriginals: true)
             let manifest = try AfcMediaBackup.read()
-            self.check(gateway.removed.isEmpty, "unsupported restore size never deletes original")
-            self.check(manifest.entries.first?.deleted == false, "large copy marked as non-destructive")
+            self.check(gateway.removed == ["/DCIM/video.mov"],
+                       "a verified large copy removes its original")
+            self.check(manifest.entries.first?.deleted == true,
+                       "large copy journaled as deleted")
+            try await AfcMediaBackup.push()
+            self.check(gateway.files["/DCIM/video.mov"]?.count == Int(gateway.largeSize),
+                       "the large file streams back whole")
         }
         await run("journal write failure cannot delete original") {
             let gateway = try self.resetStore("journal-error")

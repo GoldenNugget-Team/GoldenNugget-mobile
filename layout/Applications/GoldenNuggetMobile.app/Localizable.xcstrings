@@ -47,12 +47,12 @@
         }
       }
     },
-    "%@ will be copied into this app's container. Files larger than 64 MiB will also stay on the device. Free space there: %@. Once removed, the copy in the container is the only one -- and the container is deleted if the app is." : {
+    "%@ will be copied into this app's container. Free space there: %@. Once removed, the copy in the container is the only one -- and the container is deleted if the app is." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$@ will be copied into this app's container. Files larger than 64 MiB will also stay on the device. Free space there: %2$@. Once removed, the copy in the container is the only one -- and the container is deleted if the app is."
+            "value" : "%@ will be copied into this app's container. Free space there: %@. Once removed, the copy in the container is the only one -- and the container is deleted if the app is."
           }
         }
       }
@@ -1048,6 +1048,16 @@
     "Operation History" : {
 
     },
+    "Originals are removed after the verified copy is saved for recovery." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Originals are removed after the verified copy is saved for recovery."
+          }
+        }
+      }
+    },
     "Other" : {
 
     },
@@ -1791,9 +1801,7 @@
         }
       }
     },
-    "⚠️ A PosterBoard reset is armed (%@). A reset run clears the store and installs no wallpapers, so with wallpapers selected as well Apply refuses until one of the two is turned off." : {
-
-    }
+    "⚠️ A PosterBoard reset is armed (%@). A reset run clears the store and installs no wallpapers, so with wallpapers selected as well Apply refuses until one of the two is turned off." : {}
   },
   "version" : "1.0"
 }

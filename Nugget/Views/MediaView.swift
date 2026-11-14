@@ -72,7 +72,7 @@ struct MediaView: View {
             Button("Copy and remove originals", role: .destructive) { Task { await doPull() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("\(bytes(survey?.bytes ?? 0)) will be copied into this app's container. Files larger than 64 MiB will also stay on the device. Free space there: \(bytes(free)). Once removed, the copy in the container is the only one -- and the container is deleted if the app is.")
+            Text("\(bytes(survey?.bytes ?? 0)) will be copied into this app's container. Free space there: \(bytes(free)). Once removed, the copy in the container is the only one -- and the container is deleted if the app is.")
         }
     }
 
@@ -141,7 +141,7 @@ struct MediaView: View {
                     .foregroundStyle(deleteOriginals ? Color.red : Color.primary)
             }
             NativeNote(deleteOriginals
-                ? "Originals up to 64 MiB are removed after the verified copy is saved for recovery. Larger originals stay on the device."
+                ? "Originals are removed after the verified copy is saved for recovery."
                 : "Off: copies are made and the originals stay put.")
         }
     }

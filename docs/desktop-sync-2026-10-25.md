@@ -28,8 +28,9 @@ were left intact. Existing mobile changes were retained.
 - AFC push checks the complete recorded inventory before any device write:
   missing, truncated, linked and invalid paths fail. Partial restore is reported
   as failure. Pull rechecks source size, timestamp and type before deletion.
-  Copies remain available locally until explicitly cleared. The mobile 64 MiB
-  AFC write limit remains: larger originals are retained during pull.
+  Copies remain available locally until explicitly cleared. Large originals no
+  longer stay behind: push streams files of any size back over one AFC
+  connection, so the old 64 MiB whole-write cap is gone.
 - Community Catalog parses strict boolean `untested` metadata for presets and
   templates and displays the device-testing warning. Omitted flags default to
   false; invalid flags reject the affected row. Truncated GN1 zlib streams are

@@ -5,7 +5,9 @@ The eight findings from the October 17 audit have been addressed:
 - Both Rust RemotePairing readers omit the credential dictionary from logs. The IDevice change is installed by `redact_pairing.patch`. Before enabling file logging, the app removes legacy diagnostic files containing leaked pairing fields; pairing records are preserved.
 - Media pulls preserve existing index entries. A verified copy is recorded in an append-only, synchronized recovery journal before its original can be deleted. Successful pulls atomically compact the journal into the existing JSON index. Interrupted final journal records are ignored and repaired before the next append.
 - Media operations reserve the store for the whole transfer. Clear and a second transfer cannot race journal writes. Invalid existing index data fails the pull before deletion.
-- Originals above the existing 64 MiB AFC restore limit are kept on the device, with the limit shown in the Media page.
+- Originals of any size are removed once their verified copy is stored, and
+  push streams large files back in chunks: the former 64 MiB AFC whole-write
+  cap no longer leaves large originals stuck in the store.
 - Engine operations reserve the run before preparation. An abandoned FFI call continues to block new runs until it actually returns, protecting the shared session and backup directory. In-flight accounting starts before either cancellation racer is scheduled.
 - Pairing completion checks its generation before stopping Bonjour or ending background time. Each Rust pairing run writes its own temporary record; only the current successful run can promote it to the canonical pairing path.
 - Numeric imports use the editor's finite/range/type checks and checked integer conversion.

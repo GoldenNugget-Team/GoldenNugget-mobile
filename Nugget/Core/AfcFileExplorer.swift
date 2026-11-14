@@ -18,9 +18,10 @@ import IdeviceGateway
 /// the path before pressing the button.
 enum AfcFileExplorer {
 
-    /// The largest file `afcWrite` will take in one call. The API has no
-    /// streaming write, so a push is a single buffer, and a file bigger than
-    /// this is refused before anything is sent rather than after.
+    /// The largest file the Files page uploads. AFC can stream a write now —
+    /// the media restore does — but this page hands the picker's file over as
+    /// one buffer (`Data(contentsOf:)`), so the cap is that page's own memory
+    /// guard, not a limit of the gateway API.
     static let pushSizeLimit: Int64 = 64 * 1024 * 1024
 
     /// Where pulled files land. Under the container, never on the device: a

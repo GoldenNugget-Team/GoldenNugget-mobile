@@ -116,6 +116,19 @@ public protocol DeviceGatewayAPI: AnyObject, Sendable {
         onChunk: @escaping @Sendable (Data) throws -> Void
     ) async throws -> Int64
 
+    /// Write one file from `nextChunk`'s chunks, in order, without ever holding
+    /// the whole file in memory — the write counterpart of `afcStreamFile`.
+    ///
+    /// `nextChunk(want)` returns the next up-to-`want` bytes of the file, or an
+    /// empty `Data` when the input is exhausted; the connection stays open
+    /// across the calls for the same reason `afcStreamFile` documents. Returns
+    /// the number of bytes actually written.
+    func afcStreamWrite(
+        path: String,
+        chunkSize: Int,
+        nextChunk: @escaping @Sendable (Int) throws -> Data
+    ) async throws -> Int64
+
     // MARK: - App containers (house_arrest)
     //
     // The same AFC client, handed over by house_arrest instead of opened
@@ -255,6 +268,14 @@ public extension DeviceGatewayAPI {
         path: String,
         chunkSize: Int,
         onChunk: @escaping @Sendable (Data) throws -> Void
+    ) async throws -> Int64 {
+        throw AfcFsUnsupportedError()
+    }
+
+    func afcStreamWrite(
+        path: String,
+        chunkSize: Int,
+        nextChunk: @escaping @Sendable (Int) throws -> Data
     ) async throws -> Int64 {
         throw AfcFsUnsupportedError()
     }

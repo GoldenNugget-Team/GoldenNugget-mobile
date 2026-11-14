@@ -292,7 +292,7 @@ enum AfcMediaBackup {
             try appendJournal(saved)
 
             var deleted = false
-            if deletingOriginals && entry.size <= inlineWriteLimit {
+            if deletingOriginals {
                 let current = try await gateway.afcEntryInfo(path: entry.path)
                 guard !current.isDirectory, current.linkTarget == nil,
                       current.size == entry.size, current.modified == entry.modified else {
@@ -308,9 +308,6 @@ enum AfcMediaBackup {
                 }
             }
 
-            if deletingOriginals && entry.size > inlineWriteLimit {
-                onProgress?("AFC media: original kept for \(relative) — exceeds the 64 MiB restore limit")
-            }
             manifest.entries[savedIndex].deleted = deleted
             if deleted { try appendJournal(manifest.entries[savedIndex]) }
 
@@ -336,8 +333,8 @@ enum AfcMediaBackup {
     ///
     /// Same rules as the streamed path: the original is removed only after the
     /// device itself still reports the size and date the stored copy was
-    /// verified against, and a file above the AFC write limit keeps its original
-    /// because `push` could not put it back.
+    /// verified against. `push` streams any size back now, so size plays no
+    /// part in whether an original is removable.
     ///
     /// Returns the row to journal as `deleted`, or `nil` when the original was
     /// kept — a kept original is logged, never fatal: the copy is intact either
@@ -347,10 +344,6 @@ enum AfcMediaBackup {
         storedAs: String,
         onProgress: ((String) -> Void)?
     ) async throws -> Entry? {
-        guard entry.size <= inlineWriteLimit else {
-            onProgress?("AFC media: original kept for \(storedAs) — exceeds the 64 MiB restore limit")
-            return nil
-        }
         let gateway = try await gateway()
         guard let current = try? await gateway.afcEntryInfo(path: entry.path) else {
             onProgress?("AFC media: could not re-check \(entry.path) — original kept, copy is intact")
@@ -401,33 +394,28 @@ enum AfcMediaBackup {
                 try? await gateway.afcMakeDirectory(path: directory)
             }
 
-            // `afcWrite` takes the whole file as one `Data`, and there is no
-            // streaming write in the gateway API — so unlike the pull there is
-            // no way to avoid holding it in memory. A file that does not fit is
-            // reported and skipped rather than risking a jetsam kill that takes
-            // the run down with it; the local copy is left untouched either way.
-            let size = (try? FileManager.default
-                .attributesOfItem(atPath: local.path)[.size] as? NSNumber)??.int64Value ?? 0
-            guard size <= Self.inlineWriteLimit else {
-                onProgress?("AFC push: \(entry.storedAs) is \(size) byte(s) — too large "
-                    + "to write over AFC (limit \(Self.inlineWriteLimit)); local copy kept")
-                skipped += 1
-                continue
+            // Streamed, like the pull: the gateway holds one AFC connection for
+            // the whole file and this side reads the local copy chunk by chunk,
+            // so a 2 GB video never has to exist in one `Data`. The old
+            // whole-file `afcWrite` capped what could be restored at 64 MiB for
+            // exactly that memory reason, which is how restores came back
+            // incomplete with the large originals still sitting in the store.
+            let reader = try StoreChunkReader(url: local)
+            let handed = try await gateway.afcStreamWrite(path: entry.source, chunkSize: chunkSize) {
+                try reader.next($0)
             }
-
-            let data = try Data(contentsOf: local)
-            guard data.count == entry.size else {
-                throw GoldenNuggetError("AFC media store changed while reading \(entry.storedAs). Restore stopped.")
+            guard handed == entry.size else {
+                throw GoldenNuggetError(
+                    "AFC media store changed while reading \(entry.storedAs). Restore stopped.")
             }
-            try await gateway.afcWrite(path: entry.source, data: data)
 
             // The pull verifies before deleting, so the push verifies before
             // reporting: a short write is caught here rather than discovered
             // later as a truncated photo.
             let written = (try? await gateway.afcEntryInfo(path: entry.source))?.size ?? -1
-            guard written == size else {
+            guard written == entry.size else {
                 onProgress?("AFC push: \(entry.source) size mismatch — device reports "
-                    + "\(written), expected \(size)")
+                    + "\(written), expected \(entry.size)")
                 skipped += 1
                 continue
             }
@@ -455,9 +443,28 @@ enum AfcMediaBackup {
         return out
     }
 
-    /// The largest file `afcWrite` will take. Chosen to stay clear of the memory
-    /// a jetsam kill would cost, not to match anything the device reports.
-    static let inlineWriteLimit: Int64 = 64 << 20
+    /// A `FileHandle` in a Sendable box, so the gateway's worker can read the
+    /// store's copy off disk chunk by chunk while the async run waits on the
+    /// AFC write. `FileHandle` itself is not `Sendable`; the box is safe because
+    /// exactly one thread — the gateway's worker inside `afcStreamWrite` —
+    /// touches the handle, and `beginTransfer` keeps every other store
+    /// mutation out for the whole transfer.
+    private final class StoreChunkReader: @unchecked Sendable {
+        private let handle: FileHandle
+
+        init(url: URL) throws {
+            self.handle = try FileHandle(forReadingFrom: url)
+        }
+
+        /// Up to `want` bytes from the current offset; empty `Data` at end of
+        /// file, which is the gateway's end-of-input signal.
+        func next(_ want: Int) throws -> Data {
+            guard let data = try handle.read(upToCount: want) else { return Data() }
+            return data
+        }
+
+        deinit { try? handle.close() }
+    }
 
     /// Empty the store, once the originals are back and verified on the device.
     static func clear() throws {

@@ -33,6 +33,11 @@ fixes.
 - Failed update checks are shown as a failure, never as "Up to date!", and
   hotload rules/releases are written to their cache atomically
   (already the behaviour here; re-verified against the 9.7.7 fixes).
+- Media restore no longer stops at 64 MiB. The gateway gained a streaming
+  write (`afcStreamWrite`), `AfcMediaBackup.push` feeds it the store's copy
+  chunk by chunk, and the pull's matching size guard is gone: large videos
+  restore like everything else instead of being skipped and left behind in
+  the container.
 
 ## Documented deviations (desktop fixes with no mobile counterpart)
 

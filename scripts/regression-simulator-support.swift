@@ -82,6 +82,17 @@ final class IdeviceGateway {
         try afterStream?()
         return Int64(data.count)
     }
+    func afcStreamWrite(path: String, chunkSize: Int, nextChunk: (Int) throws -> Data) async throws -> Int64 {
+        writes.append(path)
+        var data = Data()
+        while true {
+            let chunk = try nextChunk(chunkSize)
+            if chunk.isEmpty { break }
+            data += chunk
+        }
+        files[path] = data
+        return Int64(data.count)
+    }
     func afcDelete(path: String) async throws { removed.append(path); files.removeValue(forKey: path) }
     func afcMakeDirectory(path: String) async throws {}
     func afcWrite(path: String, data: Data) async throws { writes.append(path); files[path] = data }
