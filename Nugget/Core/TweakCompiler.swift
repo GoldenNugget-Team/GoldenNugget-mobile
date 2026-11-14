@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// One file to deliver into the backup: the payload and where it belongs.
 ///
@@ -188,9 +189,10 @@ enum TweakCompiler {
         // files reach the backup.
         var order: [TweakFileLocation] = []
         var plists: [TweakFileLocation: [String: Any]] = [:]
-        // Locations to overwrite with a 0-byte file rather than a serialised
-        // plist. Upstream's `NullifyFileTweak` does exactly that, and the
-        // injector writes `contents` verbatim, so an empty payload is it.
+        // Locations to overwrite with a valid empty plist rather than a
+        // serialised dict.  Upstream's `NullifyFileTweak` writes
+        // `plistlib.dumps({})` — never zero bytes, which a boot-looping
+        // SpringBoard on iOS 26.2+ reads and crashes on.
         var nullified: [TweakFileLocation] = []
         var skipped: [(label: String, reason: String)] = []
         var archives: [TweakPayload] = []
@@ -238,8 +240,28 @@ enum TweakCompiler {
                    !selection.enabled.contains(spec.exclusiveWith ?? ""),
                    let data = TweakCatalog.siriAIArchives[spec.id],
                    let dest = TweakDomainMap.split(path: spec.location.rawValue) {
+                    // `siri_ai.payload_file`: refuse a damaged embedded archive
+                    // before it ever reaches the device — the digest must match
+                    // the reference's table, otherwise the bundle is corrupt and
+                    // the tweak is skipped rather than applied half-blind.
+                    let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                    guard digest == TweakCatalog.siriAIHashes[spec.id] else {
+                        skipped.append((spec.id, "the embedded Siri AI archive is damaged; reinstall GoldenNugget"))
+                        continue
+                    }
                     archives.append(TweakPayload(domain: dest.domain, relativePath: dest.relativePath,
                                                  contents: data, owner: 0))
+                }
+                continue
+            }
+
+            // `PosterKitOverrides` stages binary edits into the wallpaper
+            // archives the pulled PosterBoard container already carries, so
+            // the compile pass — which builds preference plists only — leaves
+            // it to the engine (see `GoldenNuggetEngine.applyPosterKit`).
+            if spec.factory == "PosterKitOverrides" {
+                if selection.isOn(spec) {
+                    skipped.append((spec.id, "staged with the PosterBoard container by the engine"))
                 }
                 continue
             }
@@ -278,6 +300,12 @@ enum TweakCompiler {
                 skipped.append((spec.id, "registry entry has no plist key"))
                 continue
             }
+            // The named factories the reference implements as `apply_tweak`
+            // overrides.  Each one lands where its Python counterpart writes.
+            if spec.factory != "BasicPlistTweak",
+               Self.writeNamedFactory(spec, selection: selection, into: &plists, &order) {
+                continue
+            }
             if plists[spec.location] == nil { order.append(spec.location) }
             var dict = plists[spec.location] ?? [:]
             if let offValue = spec.offValue {
@@ -303,9 +331,14 @@ enum TweakCompiler {
                     skipped.append((location.rawValue, "no backup-domain prefix matches this location"))
                     continue
                 }
+                // `plistlib.dumps({})` — a valid *empty* plist, never zero
+                // bytes.  Desktop 9.7.7 made this change because a truncated
+                // plist is a boot-loop input on iOS 26.2+ (SpringBoard crashes
+                // reading it at boot); the XML format matches the reference's
+                // `plistlib.dumps` default and every other plist here.
                 payloads.append(TweakPayload(domain: dest.domain,
                                              relativePath: dest.relativePath,
-                                             contents: Data()))
+                                             contents: serialisePlist([:])))
                 emitted.append(location)
                 continue
             }
@@ -363,5 +396,179 @@ enum TweakCompiler {
     static func serialisePlist(_ plist: [String: Any]) -> Data {
         (try? PropertyListSerialization.data(fromPropertyList: plist,
                                              format: .xml, options: 0)) ?? Data()
+    }
+
+    // MARK: - Named factories
+
+    /// The reference's `apply_tweak` overrides, one branch per class
+    /// (`tweak_classes.py`).  Returns false when the spec still belongs in the
+    /// generic single-key merge below.
+    private static func writeNamedFactory(_ spec: TweakSpec,
+                                          selection: TweakSelection,
+                                          into plists: inout [TweakFileLocation: [String: Any]],
+                                          _ order: inout [TweakFileLocation]) -> Bool {
+        // A tri-state row's written value: "used on" → `on_value`, "used off"
+        // → `off_value` (its negation), exactly like `set_state`.
+        let triWritten: Any? = {
+            guard spec.triState else { return nil }
+            let on = (spec.onValue.map { value -> Bool in
+                if case .bool(let flag) = value { return flag }
+                return true
+            }) ?? true
+            let value = selection.value(for: spec)
+            if case .bool(let state) = value {
+                return (state ? on : !on) as Any
+            }
+            return value.plistObject
+        }()
+
+        switch spec.factory {
+        case "FeatureFlagTweak", "GlassFeatureFlagTweak":
+            guard let category = spec.flagCategory, let state = triWritten else { return false }
+            var dict = plists[.featureflags] ?? [:]
+            if plists[.featureflags] == nil { order.append(.featureflags) }
+            var categoryDict = dict[category] as? [String: Any] ?? [:]
+            for name in spec.flagNames {
+                categoryDict[name] = ["Enabled": state]
+            }
+            dict[category] = categoryDict
+            plists[.featureflags] = dict
+            return true
+        case "MailSearchReceiverPreference":
+            guard let state = triWritten else { return false }
+            if plists[spec.location] == nil { order.append(spec.location) }
+            var dict = plists[spec.location] ?? [:]
+            var states = dict[spec.key] as? [String: Any] ?? [:]
+            states["com.apple.email.SearchIndexer"] = state
+            dict[spec.key] = states
+            plists[spec.location] = dict
+            return true
+        case "TriStateBooleanPlistTweak":
+            guard let state = triWritten else { return false }
+            if plists[spec.location] == nil { order.append(spec.location) }
+            var dict = plists[spec.location] ?? [:]
+            dict[spec.key] = state
+            plists[spec.location] = dict
+            return true
+        case "UIKitInternalBooleanTweak":
+            guard let state = triWritten else { return false }
+            for location in [TweakFileLocation.uikit, .uikitPreferencesHomeDomain] {
+                if plists[location] == nil { order.append(location) }
+                var dict = plists[location] ?? [:]
+                dict[spec.key] = state
+                plists[location] = dict
+            }
+            writeUIKitFeatureFlagGate(into: &plists, &order)
+            return true
+        case "DiscreteScrollDurationTweak", "DirectionalScrollDurationTweak", "UIKitAnimationScaleTweak":
+            // `UIKitInternalScrollDurationTweak` / `UIKitAnimationScaleTweak`:
+            // the fixed value rides both UIKit preferences and turns on the
+            // shared internal-preferences gate.
+            var number: Double?
+            let value = selection.value(for: spec)
+            if case .double(let d) = value { number = d }
+            else if case .int(let i) = value { number = Double(i) }
+            guard let number, number.isFinite else { return false }
+            if spec.factory == "UIKitAnimationScaleTweak", !(0.1...3.0).contains(number) { return false }
+            if spec.factory != "UIKitAnimationScaleTweak", !(0.0...1.0).contains(number) { return false }
+            for location in [TweakFileLocation.uikit, .uikitPreferencesHomeDomain] {
+                if plists[location] == nil { order.append(location) }
+                var dict = plists[location] ?? [:]
+                dict[spec.key] = number as Any
+                plists[location] = dict
+            }
+            writeUIKitFeatureFlagGate(into: &plists, &order)
+            return true
+        case "GlassLegibilityTweak":
+            let value = selection.value(for: spec)
+            let number: Int?
+            if case .int(let i) = value { number = i }
+            else if case .double(let d) = value, d == d.rounded() { number = Int(d) }
+            else { number = nil }
+            guard let number, number == 0 || number == 1 else { return false }
+            if plists[spec.location] == nil { order.append(spec.location) }
+            var dict = plists[spec.location] ?? [:]
+            dict[spec.key] = number
+            plists[spec.location] = dict
+            return true
+        case "NestedNumericPreference":
+            guard let child = spec.childKey else { return false }
+            let value = selection.value(for: spec)
+            var number: Any?
+            if case .double(let d) = value { number = d }
+            else if case .int(let i) = value { number = i }
+            guard let number else { return false }
+            if plists[spec.location] == nil { order.append(spec.location) }
+            var dict = plists[spec.location] ?? [:]
+            // The destination must be a dictionary (`NestedNumericPreference.
+            // apply_tweak` raises when it is not).  A missing key starts a
+            // fresh one; an existing non-dictionary key is replaced, because a
+            // scalar there is legacy data the number would not survive inside.
+            var target = dict[spec.key] as? [String: Any] ?? [:]
+            target[child] = number
+            dict[spec.key] = target
+            plists[spec.location] = dict
+            return true
+        case "DiagnosticTrackerDates", "MailSearchTaskBaseDate":
+            if plists[spec.location] == nil { order.append(spec.location) }
+            var dict = plists[spec.location] ?? [:]
+            if spec.factory == "DiagnosticTrackerDates" {
+                dict[spec.key] = ["XPCActivity": [
+                    "EarliestExpirationDate": plistDate(year: 4001),
+                    "XPCActivityScheduledDate": plistDate(year: 4001, hour: 2),
+                ]]
+            } else {
+                dict[spec.key] = ["com.apple.email.searchIndexerBGTask": plistDate(year: 4001)]
+            }
+            plists[spec.location] = dict
+            return true
+        case "DisableDynamicIslandTweak":
+            // `ReversibleBooleanPlistTweak` + the `SBSSystemApertureDisabled`
+            // mirror into the HomeDomain SpringBoard preferences.
+            if plists[spec.location] == nil { order.append(spec.location) }
+            var dict = plists[spec.location] ?? [:]
+            let state = selection.isOn(spec)
+            for key in ["SBSuppressDynamicIslandCompletely",
+                        "SBNeverRenderSystemApertureFillOnGPU",
+                        "SBSSystemApertureDisabled"] {
+                dict[key] = state as Any
+            }
+            plists[spec.location] = dict
+            var home = plists[.springboardPreferencesHomeDomain] ?? [:]
+            if plists[.springboardPreferencesHomeDomain] == nil { order.append(.springboardPreferencesHomeDomain) }
+            home["SBSSystemApertureDisabled"] = state as Any
+            plists[.springboardPreferencesHomeDomain] = home
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// `_write_uikit_internal_preference`: the UIKit/UIPreferences feature-flag
+    /// gate every internal UIKit preference rides along with.
+    private static func writeUIKitFeatureFlagGate(into plists: inout [TweakFileLocation: [String: Any]],
+                                                  _ order: inout [TweakFileLocation]) {
+        if plists[.featureflags] == nil { order.append(.featureflags) }
+        var flags = plists[.featureflags] ?? [:]
+        var uikit = flags["UIKit"] as? [String: Any] ?? [:]
+        var preferences = uikit["UIPreferences"] as? [String: Any] ?? [:]
+        preferences["Enabled"] = true
+        uikit["UIPreferences"] = preferences
+        flags["UIKit"] = uikit
+        plists[.featureflags] = flags
+    }
+
+    /// The reference's far-future `datetime(4001, 1, 1[, 2])`: `plistlib`
+    /// formats a naive datetime as if it were UTC, so the port builds the
+    /// same instant on the UTC calendar.
+    private static func plistDate(year: Int, hour: Int = 0) -> Date {
+        var components = DateComponents()
+        components.year = year
+        components.month = 1
+        components.day = 1
+        components.hour = hour
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? calendar.timeZone
+        return calendar.date(from: components) ?? Date()
     }
 }

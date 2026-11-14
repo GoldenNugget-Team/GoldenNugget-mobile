@@ -173,6 +173,7 @@ extension TweakValue {
         case .int(let value): return value != 0
         case .double(let value): return value != 0
         case .string(let value): return !value.isEmpty
+        case .dictionary(let value): return !value.isEmpty
         }
     }
 }

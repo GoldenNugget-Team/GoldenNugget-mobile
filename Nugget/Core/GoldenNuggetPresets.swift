@@ -193,7 +193,13 @@ enum GoldenNuggetPresets {
                 }
                 entry["value"] = dict
             } else {
-                entry["value"] = spec.offValue != nil && selection.values[spec.id] == nil ? NSNull() : selection.value(for: spec).plistObject
+                // A tri-state row stores "not used" as an absent value, and the
+                // reference serializes its `None` as JSON null, so the shape
+                // matches a desktop preset byte for byte.
+                let stored = selection.values[spec.id]
+                entry["value"] = (spec.offValue != nil || spec.triState) && stored == nil
+                    ? NSNull()
+                    : selection.value(for: spec).plistObject
             }
             tweaks[spec.id] = entry
         }

@@ -20,11 +20,16 @@ import Foundation
 /// `PropertyListSerialization` as an integer, not as a `Double` that happens to
 /// have no fraction — the same distinction that made a `UInt32` `Mode` decode as
 /// a number reference and cost a whole diagnosis round (see `MBFileBlob`).
-enum TweakValue: Equatable, Sendable {
+enum TweakValue: Hashable, Sendable {
     case bool(Bool)
     case int(Int)
     case double(Double)
     case string(String)
+    /// A nested mapping (`PosterKitOverrides`'s selected fields,
+    /// `WallpaperPreferencesTweak`'s `{"none": …}` tree, `_clock_animation`'s
+    /// flag dict).  `plistObject` hands it to `PropertyListSerialization`
+    /// unchanged, so the nesting the reference's Python dict had is preserved.
+    indirect case dictionary([String: TweakValue])
 
     /// The object `PropertyListSerialization` should be handed for this value.
     var plistObject: Any {
@@ -33,6 +38,8 @@ enum TweakValue: Equatable, Sendable {
         case .int(let value): return value
         case .double(let value): return value
         case .string(let value): return value
+        case .dictionary(let values):
+            return Dictionary(uniqueKeysWithValues: values.map { ($0.key, $0.value.plistObject) })
         }
     }
 
@@ -43,7 +50,14 @@ enum TweakValue: Equatable, Sendable {
         case .int(let value): return String(value)
         case .double(let value): return String(value)
         case .string(let value): return value
+        case .dictionary(let values): return "\(values.count) field(s)"
         }
+    }
+
+    /// A member of a `.dictionary` value, for the dict-shaped selections.
+    func dictionaryValue(_ key: String) -> TweakValue? {
+        guard case .dictionary(let values) = self else { return nil }
+        return values[key]
     }
 
     /// Re-shape a value that came from outside (a preset) into what `spec`
@@ -61,12 +75,20 @@ enum TweakValue: Equatable, Sendable {
     ///     so the default is the only place the intent survives.
     func coerced(to spec: TweakSpec) -> TweakValue {
         switch spec.kind {
+        case .posterArchive, .wallpaper, .posterFlag:
+            // The dict-shaped kinds take a dictionary as-is; the import
+            // validation (`validationIssue`) checks the fields, the way the
+            // reference's `PosterKitOverrides.stage` /
+            // `WallpaperPreferencesTweak.apply_tweak` raise on bad fields.
+            if case .dictionary = self { return self }
+            return spec.value
         case .toggle:
             switch self {
             case .bool(let b): return .bool(b)
             case .int(let i): return .bool(i != 0)
             case .double(let d): return .bool(d != 0)
             case .string(let s): return .bool((s as NSString).boolValue)
+            case .dictionary: return spec.value
             }
         case .number:
             // Imports obey the same finite/range/type rules as the editor.
@@ -109,6 +131,24 @@ struct TweakSpec: Sendable {
     /// ReversibleBooleanPlistTweak writes false on a subsequent disabled apply.
     var reversibleBoolean: Bool = false
     var requiresDynamicIsland: Bool = false
+    /// A `TriStateBooleanPlistTweak` selection: "used on" / "used off" /
+    /// "not used".  Master-off discards the stored state (nothing is written),
+    /// unlike an `ExperimentalBooleanPlistTweak`, whose off selection persists
+    /// `offValue` for rollback.
+    var triState: Bool = false
+    /// The value a tri-state row writes in its "used on" state; "used off"
+    /// writes the negation, like the reference's `off_value`.
+    var onValue: TweakValue? = nil
+    /// `FeatureFlagTweak` / `GlassFeatureFlagTweak`: the flags write into
+    /// `flagCategory` inside the FeatureFlags plist, one entry per name.
+    var flagCategory: String? = nil
+    var flagNames: [String] = []
+    /// `NestedNumericPreference`: the number lands inside `key`'s dictionary
+    /// under this child key.
+    var childKey: String? = nil
+    /// Research-only rows carry an `unavailable_reason` and are shown greyed
+    /// out instead of hidden (`show_when_unavailable`).
+    var showWhenUnavailable: Bool = false
 
     var factory: String = "BasicPlistTweak"
     var offValue: TweakValue? = nil
@@ -237,6 +277,112 @@ extension TweakSpec {
         let integral = step == step.rounded() && (minValue == minValue.rounded())
         return "\(minValue)–\(maxValue), step \(step)" + (integral ? "" : " (decimal)")
     }
+
+    /// The apply-time value checks the reference runs inside the factory
+    /// classes (`PosterKitOverrides.stage`,
+    /// `WallpaperPreferencesTweak.apply_tweak`, `GlassLegibilityTweak`,
+    /// `UIKitAnimationScaleTweak`, `UIKitInternalScrollDurationTweak`).
+    ///
+    /// They live here rather than in the compiler because a preset import can
+    /// produce a selection no editor would: the reference raises from
+    /// `apply_tweak` and aborts the apply, and this port answers with the
+    /// same refusal through `TweakSelection.validationIssue`, before any
+    /// device work starts.
+    func selectionValueIssue(_ value: TweakValue) -> String? {
+        switch factory {
+        case "PosterKitOverrides":
+            guard case .dictionary(let fields) = value else { return nil }
+            let allowed = Dictionary(uniqueKeysWithValues: PosterKitOptions.all.map { ($0.key, $0) })
+            for (key, item) in fields.sorted(by: { $0.key < $1.key }) {
+                guard let field = allowed[key] else {
+                    return "Invalid PosterKit setting: \(key)"
+                }
+                switch (field.defaultValue, item) {
+                case (.bool, .bool), (.double, .double), (.int, .int), (.string, .string):
+                    break
+                // A whole-number default accepts a fractional input the same
+                // way Python's `int`/`float` duality does: the field decides
+                // the plist type at write time.
+                case (.double, .int), (.int, .double):
+                    break
+                default:
+                    return "Invalid PosterKit setting: \(key)"
+                }
+                if key == "Clock:timeFontConfiguration.timeFontIdentifier" {
+                    if case .string(let font) = item, PosterKitOptions.clockFontIdentifiers.contains(font) {} else {
+                        return "Choose a clock font identifier from the available candidates, not a runtime symbol."
+                    }
+                }
+                if key == "Clock:timeNumberingSystem", case .string(let text) = item,
+                   text.trimmingCharacters(in: .whitespaces).isEmpty || text == "$null" {
+                    return "Enter a numbering-system identifier, or uncheck Use for Clock Numbering System."
+                }
+                if case .double(let number) = item {
+                    if let (lower, upper, _) = field.limits, !number.isFinite || number < lower || number > upper {
+                        return "PosterKit value outside allowed editor range: \(key)"
+                    }
+                }
+                if case .int(let number) = item {
+                    if let (lower, upper, _) = field.limits, Double(number) < lower || Double(number) > upper {
+                        return "PosterKit value outside allowed editor range: \(key)"
+                    }
+                }
+            }
+            return nil
+        case "WallpaperPreferencesTweak":
+            guard case .dictionary(let outer) = value,
+                  case .dictionary(let fields)? = outer["none"] else { return nil }
+            for key in ["SBWallpaperHasVideoKey", "SBWallpaperMagnifyEnabledKey",
+                        "SBWallpaperPortraitKey", "SBWallpaperSupportsCroppingKey",
+                        "kSBProceduralWallpaperHomeUserSetKey"] {
+                // `WallpaperPreferencesTweak` accepts a bool or a 0/1 int and
+                // normalizes both to a bool.
+                switch fields[key] {
+                case .bool: break
+                case .int(let flag) where flag == 0 || flag == 1: break
+                default: return "Expected a boolean wallpaper field: \(key)"
+                }
+            }
+            for (key, lower, upper) in [("SBWallpaperParallaxFactorKey", 0.0, 100.0),
+                                        ("SBWallpaperStillTimeInVideoKey", 0.0, 86400.0),
+                                        ("SBWallpaperZoomScaleKey", 0.01, 100.0)] {
+                guard case .double(let number)? = fields[key] else {
+                    if case .int(let integer)? = fields[key] {
+                        let number = Double(integer)
+                        if !(lower...upper).contains(number) { return "Invalid numeric wallpaper field: \(key)" }
+                        continue
+                    }
+                    return "Invalid numeric wallpaper field: \(key)"
+                }
+                if !number.isFinite || !(lower...upper).contains(number) {
+                    return "Invalid numeric wallpaper field: \(key)"
+                }
+            }
+            return nil
+        case "GlassLegibilityTweak":
+            switch value {
+            case .int(let number) where number == 0 || number == 1: return nil
+            case .double(let number) where number == 0 || number == 1: return nil
+            default: return "Glass legibility appearance must be 0 or 1."
+            }
+        case "UIKitAnimationScaleTweak":
+            let number: Double?
+            if case .double(let d) = value { number = d } else if case .int(let i) = value { number = Double(i) } else { number = nil }
+            guard let number, number.isFinite, (0.1...3.0).contains(number) else {
+                return "Animation duration scale must be between 0.1 and 3."
+            }
+            return nil
+        case "DiscreteScrollDurationTweak", "DirectionalScrollDurationTweak":
+            let number: Double?
+            if case .double(let d) = value { number = d } else if case .int(let i) = value { number = Double(i) } else { number = nil }
+            guard let number, number.isFinite, (0.0...1.0).contains(number) else {
+                return "Scrolling duration must be between 0 and 1 second."
+            }
+            return nil
+        default:
+            return nil
+        }
+    }
 }
 
 /// The live selection: which specs are on, and with what value.
@@ -270,7 +416,15 @@ struct TweakSelection: Equatable {
     mutating func setOn(_ on: Bool, for spec: TweakSpec) {
         if on && spec.section == .daemons { daemonModificationsEnabled = true }
         if on { enabled.insert(spec.id) } else { enabled.remove(spec.id) }
-        if spec.offValue != nil { values[spec.id] = on ? spec.value : spec.offValue }
+        if spec.triState {
+            // `TriStateBooleanPlistTweak.set_enabled`: on seeds the "used on"
+            // state, off returns to "not used" and discards whatever the
+            // editor last chose.
+            if on { values[spec.id] = spec.onValue ?? spec.value }
+            else { values.removeValue(forKey: spec.id) }
+        } else if spec.offValue != nil {
+            values[spec.id] = on ? spec.value : spec.offValue
+        }
         if on {
             if let id = spec.exclusiveWith, let other = TweakCatalog.byID[id], isOn(other) { setOn(false, for: other) }
         }
@@ -280,6 +434,21 @@ struct TweakSelection: Equatable {
     mutating func setValue(_ value: TweakValue, for spec: TweakSpec) {
         values[spec.id] = value
         enabled.insert(spec.id)
+    }
+
+    /// `TriStateBooleanPlistTweak.set_state`: choose the written state while
+    /// the master toggle stays on.  The choice, not the written value, is
+    /// stored — the compiler maps it through the spec's `onValue`.
+    mutating func setTriState(_ state: Bool, for spec: TweakSpec) {
+        values[spec.id] = .bool(state)
+    }
+
+    /// Store a dictionary-shaped selection (`PosterKitOverrides`'s fields,
+    /// `WallpaperPreferencesTweak`'s `{"none": …}` tree) without the enable
+    /// side effect: the desktop editor's `store` keeps `toggle_enabled=False`,
+    /// so editing a field never switches the master toggle on.
+    mutating func setDictionary(_ dictionary: [String: TweakValue], for spec: TweakSpec) {
+        values[spec.id] = .dictionary(dictionary)
     }
 
     mutating func removeValue(for spec: TweakSpec) {
@@ -325,6 +494,9 @@ struct TweakSelection: Equatable {
                 if text.count > 255 || text.range(of: "^(?:[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+)?$", options: .regularExpression) == nil {
                     return "Enter a valid app bundle identifier for \(spec.title), or clear the field."
                 }
+            }
+            if let issue = spec.selectionValueIssue(value(for: spec)) {
+                return "\(spec.title): \(issue)"
             }
         }
         return nil

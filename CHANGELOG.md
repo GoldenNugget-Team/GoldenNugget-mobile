@@ -1,56 +1,67 @@
-# GoldenNugget Mobile — Desktop 9.7.2 Sync
+# GoldenNugget Mobile — Desktop 9.7.7 Sync
 
-## HotLoad and updates
-
-- Port HotLoad safety rules with offline caching, device/app version scopes, feature hiding, daemon overrides, warnings and mandatory-update gates.
-- Check mobile GitHub releases automatically and from Settings, with release notes and IPA download links.
-- Keep rule and release channels specific to GoldenNugget Mobile. Install updates using the existing sideloading workflow.
-
-## General
-
-- Add experimental Siri AI eligibility overrides for unsupported regions, plus a dedicated reset. Available on iPhones running iOS 27.x; upstream verification covers only iPhone 16 Pro, build 24A437. Requires Siri language English (US), an unencrypted protective backup, and a reboot.
-- Expand the preference catalog to 258 tweaks, including a 60 FPS limit and the replacement Home Screen search setting for iOS 27.1+.
-- Remove obsolete Apple Watch, NanoTimeKit, Translate, DeviceCheck and Decisiond daemon controls, matching desktop's 53 groups.
-- Mirror managed preferences into HomeDomain on iOS 27; reset both copies with valid empty plists on every supported iOS version.
-- Validate the complete AFC media inventory before restore and keep originals that change during copying. Incomplete restores report a failure while keeping local copies.
-- Show untested catalog markers, import standalone community templates from Templates, and link to Batter Builder.
-- Add an option to enable untested preference tweaks on iOS 26. Hardware restrictions and the stricter Siri AI requirements remain enforced.
-- Improve iOS 27 network badges and cellular signal controls, including separate SIM settings and explicit zero-bar overrides.
-
-## Media
-
-- Copy the device's photos and videos into the app container automatically when the setup guide is finished, and top the copy up once per launch afterwards. Only files that changed are streamed again, so a launch costs a directory walk rather than a second copy of the library.
-- Add a **Restore media** button to the home page, next to the counts of what the container holds, which writes every kept photo and video back to the device and verifies each one. The Media page keeps its manual survey, pull and empty tools. The automatic copy never deletes originals; that stays behind the Media page's own switch.
-- Skip a media stage that would collide with an automatic copy in progress instead of reporting a failure, so an apply still runs while photos are being copied.
-
-## PosterBoard
-
-- Fix Full Reset failing with a `sqlite_sequence` error on empty databases.
-- Deliver the PosterBoard database in WAL mode, which is the mode the device's own store declares — including the empty store a Full Reset installs. PosterBoard opens the store read-only and immediately runs `PRAGMA journal_mode=WAL`; on a DELETE-mode database that pragma is a write and fails with "attempt to write a readonly database", after which the store logs "data store never ever initialized" and rebuilds itself from the gallery. Every wallpaper got a new identity, and anything whose content lives only in the store — every custom wallpaper — disappeared. The snapshot is still self-contained: its pages are checkpointed into the main file and the `-wal`/`-shm` the restore carries stay zero-byte companions.
-- Preserve native PosterBoard snapshots and manifest metadata when applying wallpaper changes.
-- Deliver each wallpaper once, as the installed configuration the device's own store holds. A second copy under `Extensions/com.apple.Posters.CollectionsPosterApp/descriptors/` gave the store a duplicate identity it could not reconcile, and rebuilding the database is how it settled that — every wallpaper gone.
-- Import only the applied wallpaper's own manifest rows and those of its parent directories. Directory records are instructions to place a directory, so re-importing the whole container's tree told the device to recreate directories whose files the restore never carried.
-- Improve handling of damaged or invalid `.tendies` ZIP archives with readable import errors.
-
-## UI
-
-- Replace the phone's burger menu with the platform's tab bar: Home, Tweaks, Wallpapers, Media and a grouped **More** list for the remaining pages. The iPad keeps its sidebar, where both columns fit.
-- Merge the Daemons page into Tweaks behind a Tweaks / Daemons switch, so one selection, one autosave and one Apply cover both halves.
-- Trim the home page to the run: one line under Apply, a single folded row for pairing and the tunnel, a compact media card, and a one-sentence reset. The diagnostics dump and its share rows moved to Settings → Logs.
-- Browse tweaks and daemon groups in collapsible categories using the native SwiftUI interface.
-- Show experimental warnings, hardware requirements, and conflicting-tweak restrictions before applying changes.
-- Ask for a cellular signal override when status-bar modifications are first enabled.
+This release ports every applicable fix from desktop 9.7.7 and, for the items
+that cannot exist on an on-device app, documents why. The catalog is unchanged
+at 369 tweaks; the compiler, the backups and the status-bar archive carry the
+fixes.
 
 ## Fixes
 
-- Preserve loaded preset selections after restart when autosave is enabled, including explicit experimental rollback values.
-- Apply iOS 26 compatibility preferences consistently when browsing, importing presets, previewing, and compiling tweaks.
-- Improve daemon configuration, reject unknown daemon labels, and match desktop OTA preference cleanup during reset.
-- Refuse Siri AI delivery through forced Partial Restore or an encrypted protective backup.
-- Retain the mobile AirLift availability restriction from iOS 27.2 beta 3 onward.
-- Bound the Rust diagnostic log and reclaim oversized ones at launch. A two-hour backup could write 18.7 GB into `minimuxer.log`, which left too little free space on the volume the device checks before uploading, so later backups offered zero files.
-- Scan the diagnostic logs for leftover pairing secrets without the byte-by-byte walk that could not finish inside the launch allowance. A 54 MB `minimuxer.log` took 58 s in a Debug build, so iOS killed the app with a scene-create watchdog on every launch; the same scan is now 0.1 s and still finds a dump at the end of the file.
-- Answer the device's disk-purge request instead of replying "not supported", and report the device's own refusal code. Free-space refusals now name the volume's free space rather than blaming the keep-filter.
-- Make Stop work during a PosterBoard database fetch. That upload ran outside the stall watcher, which is the only thing that polls the stop flag, so the button reported "stop requested" and nothing happened.
+- The Clear ("nullify") Screen Time tweak now delivers a valid *empty*
+  XML plist (`plistlib.dumps({})`) instead of a zero-byte file. A truncated
+  plist is a boot-loop input on iOS 26.2+: SpringBoard reads it at boot and
+  crashes. Every plist the compiler writes now goes through the same
+  serialiser, so the reset paths can never drift apart.
+- An enabled blank-carrier status-bar override now builds a *hiding* cellular
+  entry (issue #83). The previous code collapsed an explicitly-set empty name
+  into "no entry", which folded the override into the reset record and the
+  real carrier name came back after a respring. The GUI keeps showing
+  "Hidden" for it.
+- PosterBoard wallpapers: the solid-color image is injected into the coloured
+  Background layer instead of the last self-closing CALayer (issue #90), so
+  WallpaperKit's depth renderer never force-unwraps a missing image.
+- A 5 GB free-disk-space preflight runs before both device backups
+  (`ProtectiveBackup.requireFreeSpace`), the same static minimum
+  (`MIN_FREE_DISK_GB = 5.0`) desktop enforces. The check no longer demands
+  the device's whole used capacity — a 256 GB phone with 200 GB of apps was
+  rejected although the selective backup only needs tens of GB; real
+  exhaustion stays covered by the device's own verdict
+  (`DLPurgeDiskSpace` → `MBErrorDomain/105`).
+- Siri AI eligibility archives are verified against the desktop's sha256
+  table before they are staged. A damaged embedded archive is skipped with a
+  clear reason instead of reaching the device half-blind.
+- Failed update checks are shown as a failure, never as "Up to date!", and
+  hotload rules/releases are written to their cache atomically
+  (already the behaviour here; re-verified against the 9.7.7 fixes).
 
-Siri AI activation and restore have not yet been verified on a physical device with the mobile app. Reset Siri AI Overrides clears all eligibility overrides, including those installed by other tools; turning the enable switch off does not undo an applied override.
+## Documented deviations (desktop fixes with no mobile counterpart)
+
+- Data-loss guard (`_refuse_unverified_ios27_apply`): the mobile apply has no
+  path that skips the protective backup on iOS 27 — the pulled backup is the
+  precondition of the restore, so the desktop failure mode (applying without
+  a verified backup) cannot occur.
+- Re-review after a finished apply: desktop dialog mechanics. The mobile
+  preview is deliberately the *pending* plan (`ApplyPreview`), documented in
+  that file's header.
+- Nullify payloads "delivered as-is, without a baseline merge" and issue #85
+  (unreadable managed-preference baselines degrade to whole-payload
+  delivery): mobile has no content-level baseline merge at all — every
+  payload is delivered verbatim — so both desktop fixes describe a code path
+  that does not exist here.
+- Phase 3 pre-start "Find My" wait bounded to one 15-minute window: mobile
+  has no swallow-and-retry loop around Find My; restore failures fail fast
+  through `ChannelRecovery.retry`, which is bounded by attempts.
+- Live phase-5 media push `include_historical=False`: the mobile apply never
+  pushes media back (its phase 5 is a pull into the store). The manual
+  Restore-media push verifies every stored copy's size before writing and is
+  the only copy of files whose originals were deleted, so the whole store is
+  intentionally pushed.
+- Tendie-archive re-validation right before `extractall`: the mobile
+  extractor validates every entry inside the same loop that writes it, so
+  the TOCTOU window is structurally closed.
+- Crash-handling dialog threading, the stale progress card on cache
+  restore, and repository pointers: desktop GUI/repository mechanics with no
+  mobile counterpart.
+- Hotload safety rules remain an empty list on mobile: the desktop rules are
+  inert examples scoped to desktop build numbers (9.7 exact, 9.3/9.3.1,
+  badNews ≤ 9.7.1) and never fired on mobile versioning.

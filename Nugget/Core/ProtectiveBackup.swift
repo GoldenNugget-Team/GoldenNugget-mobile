@@ -18,6 +18,7 @@ enum ProtectiveBackup {
         udid: String,
         onProgress: ((Double) -> Void)? = nil
     ) async throws {
+        try requireFreeSpace(at: backupRoot)
         let minimuxer = Minimuxer.shared()
         AppLog.write("Creating protective backup (no photos/video) at \(backupRoot.path)…")
 
@@ -198,6 +199,30 @@ enum ProtectiveBackup {
 
     /// Free space on the volume the backup root lives on, as one printable line.
     ///
+    /// `restore/protective.py`'s `check_disk_space_for_backup`: only the small
+    /// static floor is enforced before a device backup — demanding the device's
+    /// whole used capacity reflected nothing (the protective backup is
+    /// selective and photos ride AFC), so real exhaustion stays covered by the
+    /// honest free-space reporting to the device and its own verdict
+    /// (`DLPurgeDiskSpace` → `MBErrorDomain/105`), which raises with concrete
+    /// numbers. The floor exists because a full disk mid-backup corrupts the
+    /// snapshot *and* the apply flow with it; failing before anything is
+    /// written is the cheap outcome.
+    static func requireFreeSpace(at root: URL) throws {
+        let attributes = try FileManager.default.attributesOfFileSystem(forPath: root.path)
+        let free = attributes[.systemFreeSize] as? Int ?? 0
+        // `MIN_FREE_DISK_GB = 5.0` (`protective.py:120`).
+        let minimumFree = 5 * 1024 * 1024 * 1024
+        guard free >= minimumFree else {
+            let formatter = ByteCountFormatter()
+            formatter.countStyle = .file
+            throw GoldenNuggetError("Not enough free disk space: "
+                + formatter.string(fromByteCount: Int64(free))
+                + " available, at least 5 GB is required for the backup (it is "
+                + "written to \(root.path)). Free up space and try again.")
+        }
+    }
+
     /// The device's own free-space check measures this exact number, so every
     /// "the device offered nothing" message quotes it: with `MBErrorDomain/105`
     /// that figure is the whole explanation, and without it the same message

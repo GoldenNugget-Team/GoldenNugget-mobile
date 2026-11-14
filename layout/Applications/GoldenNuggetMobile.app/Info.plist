@@ -27,7 +27,15 @@
 		</dict>
 	</dict>
 	<key>CFBundleIdentifier</key>
-	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<!-- com.awesomenull.goldennugget, hardcoded rather than
+	     $(PRODUCT_BUNDLE_IDENTIFIER): Xcode substitutes build settings into
+	     Info.plists itself, xtool does not — it provisions from this file
+	     verbatim, and a literal "$(PRODUCT_BUNDLE_IDENTIFIER)" there is what
+	     Apple's API rejected ("An attribute in the provided entity has
+	     invalid value ... name 'XTool $(PRODUCT_BUNDLE_IDENTIFIER)'").
+	     xtool.yml's bundleID and project.yml's PRODUCT_BUNDLE_IDENTIFIER are
+	     both com.awesomenull.goldennugget, so the two build paths agree. -->
+	<string>com.awesomenull.goldennugget</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -35,13 +43,13 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>9.7.5</string>
+	<string>9.7.7</string>
 	<key>CFBundleSupportedPlatforms</key>
 	<array>
 		<string>iPhoneOS</string>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>9</string>
+	<string>10</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

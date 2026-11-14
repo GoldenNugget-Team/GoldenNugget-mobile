@@ -1,4 +1,0 @@
-module CLZFSE {
-    header "lzfse.h"
-    export *
-}

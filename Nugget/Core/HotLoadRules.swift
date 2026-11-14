@@ -119,6 +119,7 @@ struct HotLoadPolicy {
 
     static func feature(for spec: TweakSpec) -> String {
         switch spec.section {
+        case .posterBoard: return "PosterBoard"
         case .liquidGlass: return "Liquid Glass"
         case .springboard: return "Springboard"
         case .internalOptions: return "Internal"

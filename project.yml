@@ -130,10 +130,12 @@ settings:
     # size — and one sitting there shadows the compiled rendition.
     #
     # actool has to be given the document as an input; see the `sources` note
-    # below.  Both builders then end up with the same car: Xcode runs actool over
-    # the catalog, and the Linux/xtool path ships the car that
-    # .github/workflows/assets-car.yml produced with the same actool arguments
-    # (xtool cannot exec actool itself — xtool.yml carries the measurement).
+    # below.  Both builders then end up with the same icon: Xcode runs actool
+    # over the catalog, and the Linux/xtool path ships the car actool compiled
+    # on macOS — the .github/workflows/assets-car.yml workflow commits it into
+    # the tree after any catalog edit.  scripts/compile-car-coreui.py is the
+    # between-runs fallback (no macOS needed); its flat rendition cannot
+    # express the glass iconstack, so keep the committed car fresh.
     # scripts/generate-appicons.py built the old idiom/size/scale appiconset from
     # the two 1024 masters and is kept for that route, which the icon stack has
     # replaced.
@@ -182,8 +184,8 @@ targets:
       # catalog makes it fail with
       #   `None of the input catalogs contained a matching stickers icon set,
       #    app icon set, or icon stack named "AppIcon".`
-      # which is exactly what the CI step in .github/workflows/assets-car.yml
-      # avoids by passing `$CATALOG` **and** `$CATALOG/AppIcon.icon`.
+      # which is exactly what the offline coreui-car compile avoids by passing
+      # `$CATALOG` **and** `$CATALOG/AppIcon.icon`.
       # `createIntermediateGroups: false` stops XcodeGen from nesting this in a
       # second "Assets.xcassets" group with a random `TEMP_` ID (see the note at
       # the top of this file).

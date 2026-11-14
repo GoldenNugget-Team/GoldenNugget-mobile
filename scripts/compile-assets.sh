@@ -1,86 +1,62 @@
 #!/usr/bin/env bash
-# Compile Assets.xcassets into Assets.car + loose icon PNGs, on Linux.
+# Compile Assets.xcassets into Assets.car + AppIcon-partial.plist, on Linux.
 #
-# Why this is a separate step instead of letting xtool drive actool:
-# xtool copies actool out of the darwin SDK into xtool/.xtool-tmp/actool and
-# execs it.  The copy does not keep the executable bit -- the SDK's actool is
-# 0755 and the copy lands 0664 -- so the launch dies with "is not an
-# executable file" before any argument parsing happens.  There is no hook
-# between the copy and the exec, and xtool execs an absolute path, so PATH
-# does not help either.  The SDK actool is arm64 Mach-O anyway, which this
-# x86_64 host cannot execute even with the bit restored.
-#
-# So: this script runs the AssetKit-backed actool shim over the catalog and
-# leaves the results in build/assets/, and xtool.yml ships them as ordinary
-# resources.  A build is then plain `xtool dev build` plus this step first.
+# xtool cannot compile an asset catalog: it copies actool out of the darwin SDK
+# into xtool/.xtool-tmp/actool and execs it, that copy loses the executable bit
+# (0755 -> 0664), and the SDK actool is arm64 Mach-O which an x86_64 Linux host
+# cannot execute even with the bit restored.
 #
 # Two icon paths:
-#   * When Apple's actool has written a car back into the tree
-#     (.github/workflows/assets-car.yml), that car is authoritative and is
-#     copied through unchanged.  It carries the Icon Composer iconstack
-#     (part 245/246) and the tintable appearance CoreUI can only make on
-#     macOS.
-#   * Otherwise the shim compiles the catalog itself.  It now understands an
-#     Icon Composer `.icon` primary: it expands the bundle's base and dark
-#     artwork into a classic `.appiconset` (part 220) with both appearances and
-#     resamples each slot, so the app still ships a correctly named `AppIcon`
-#     with a dark variant.  Set ASSETKIT_SHIM_FORCE=1 to take this path even
-#     when an actool car is committed -- useful for testing the Linux path
-#     without wiping the authoritative car.
+#   * When a compiled car sits in the tree
+#     (layout/Applications/GoldenNuggetMobile.app/Assets.car), that car is
+#     authoritative and is copied through unchanged.  It is compiled by actool
+#     on macOS — the .github/workflows/assets-car.yml workflow (push on
+#     Assets.xcassets/** or manual `workflow_dispatch` with `commit: true`),
+#     which commits the freshly compiled car back into the tree.  That is the
+#     only route that renders the iconstack the way Xcode does (glass,
+#     tintable appearance); regenerate it after any catalog edit (an outdated
+#     car is how the device ends up showing yesterday's icon while Xcode,
+#     which compiles the catalog fresh, shows today's).
+#   * Otherwise scripts/compile-car-coreui.py renders the catalog's artwork
+#     (layer PNG over the measured gradient/fill, per appearance) and feeds it
+#     to coreui-car's compiler (GoldenNugget-Team/CoreUi-car) — pure Python,
+#     the no-macOS fallback between workflow runs.  See that script's
+#     docstring for the rendition ground truth and its limits.
+#
+# A build is then plain `xtool dev build` plus this step first.
+#
+# Keep in sync with project.yml / pbxproj / xtool.yml deploymentTarget.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CATALOG="$ROOT/layout/Applications/GoldenNuggetMobile.app/Assets.xcassets"
 OUT="$ROOT/build/assets"
-SHIM="$ROOT/tools/assetkit-cli/.build/release/assetkit-cli"
-
-# Keep in sync with project.yml / pbxproj / xtool.yml deploymentTarget.
-DEPLOYMENT_TARGET="26.0"
 
 if [[ ! -d "$CATALOG" ]]; then
     echo "compile-assets: no catalog at $CATALOG" >&2
     exit 1
 fi
 
-ACTOOL_CAR="$ROOT/layout/Applications/GoldenNuggetMobile.app/Assets.car"
-FORCE_SHIM="${ASSETKIT_SHIM_FORCE:-0}"
+COMMITTED_CAR="$ROOT/layout/Applications/GoldenNuggetMobile.app/Assets.car"
 
-if [[ -s "$ACTOOL_CAR" && "$FORCE_SHIM" != "1" ]]; then
-    # Authoritative path.  The car comes from Apple's own actool via
-    # .github/workflows/assets-car.yml.
-    echo "compile-assets: using the actool car ($(stat -c%s "$ACTOOL_CAR") bytes)"
+if [[ -s "$COMMITTED_CAR" ]]; then
+    # Authoritative path.  The car was compiled by actool on macOS —
+    # .github/workflows/assets-car.yml commits it after every catalog edit.
+    echo "compile-assets: using the committed car ($(stat -c%s "$COMMITTED_CAR") bytes)"
     rm -rf "$OUT"
     mkdir -p "$OUT"
-    cp "$ACTOOL_CAR" "$OUT/Assets.car"
+    cp "$COMMITTED_CAR" "$OUT/Assets.car"
     cp "$ROOT/layout/Applications/GoldenNuggetMobile.app/AppIcon-partial.plist" \
        "$OUT/AppIcon-partial.plist" 2>/dev/null || true
     echo "compile-assets: wrote $(ls -1 "$OUT" | wc -l) files to build/assets"
     exit 0
 fi
 
-echo "compile-assets: building the shim"
-
-(cd "$ROOT/tools/assetkit-cli" && swift build -c release)
-
-rm -rf "$OUT"
-mkdir -p "$OUT"
-
-ASSETKIT_SHIM_LOG=/dev/null "$SHIM" \
-    --compile "$OUT" \
-    --app-icon AppIcon \
-    --minimum-deployment-target "$DEPLOYMENT_TARGET" \
-    --platform iphoneos \
-    --output-partial-info-plist "$OUT/AppIcon-partial.plist" \
-    "$CATALOG"
-
-# Report what the catalog actually produced, so a dropped appearance is visible
-# in the build log instead of only in the IPA.
-ASSETKIT_SHIM_LOG=/dev/null "$SHIM" \
-    --compile "$OUT" \
-    --app-icon AppIcon \
-    --minimum-deployment-target "$DEPLOYMENT_TARGET" \
-    --platform iphoneos \
-    --dump-renditions "$CATALOG" \
-    | awk -F'\t' '{print $4}' | sort | uniq -c
-
+echo "compile-assets: no committed car — compiling with coreui-car (fallback)"
+python3 "$ROOT/scripts/compile-car-coreui.py" --output "$OUT"
+# The appearance split is the whole point of this catalog, so it is checked
+# where a build log can be read rather than only on a dark home screen.
+python3 "$ROOT/scripts/check-car-appearances.py" "$OUT/Assets.car" \
+    --require-dark --name AppIcon
+python3 "$ROOT/scripts/check-car-appearances.py" "$OUT/Assets.car" --name ScrappedIcon
 echo "compile-assets: wrote $(ls -1 "$OUT" | wc -l) files to build/assets"

@@ -56,6 +56,11 @@ enum PosterBoardBackup {
                       onProgress: ((Double) -> Void)? = nil,
                       log: @escaping @Sendable (String) -> Void) async throws -> Result {
         let fm = FileManager.default
+        // `posterboard_backup._posterboard_workspace` → `check_disk_space`:
+        // a pulled container plus its scratch copies can reach several GB, and
+        // a full disk mid-pull corrupts the snapshot and the apply with it.
+        // Fail before anything is written, with the same 5 GB threshold.
+        try ProtectiveBackup.requireFreeSpace(at: backupRoot)
         try? fm.removeItem(at: backupRoot)
         try fm.createDirectory(at: backupRoot, withIntermediateDirectories: true)
         let deviceDir = AppPaths.deviceDir(backupRoot: backupRoot, udid: udid)

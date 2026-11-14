@@ -49,9 +49,11 @@ RECOMMENDED: list[str] = []
 INFORMATION: dict[str, str] = {}
 
 # `TweakID.ClearScreenTimeAgentPlist` is a NullifyFileTweak: it does not write
-# the ScreenTime plist, it writes a 0-byte file over it. The port's registry
-# has no nullify shape, so the row exists in the catalog with an empty key and
-# the injector is told to truncate rather than serialise.
+# the ScreenTime plist, it overwrites it with a valid empty plist
+# (`plistlib.dumps({})` — never zero bytes, which a boot-looping SpringBoard on
+# iOS 26.2+ reads and crashes on). The port's registry has no nullify shape, so
+# the row exists in the catalog with an empty key and the injector is told to
+# truncate rather than serialise.
 SCREENTIME = (
     "ClearScreenTimeAgentPlist",
     "Disable Screen Time Agent",
@@ -247,7 +249,8 @@ def emit(Daemon, INTERFACE_DAEMONS, INTERFACE_KEYS, DANGEROUS_KEYS) -> list[str]
     w("    ]")
     w("")
     w("    /// `TweakID.ClearScreenTimeAgentPlist`: a `NullifyFileTweak`, i.e. a")
-    w("    /// 0-byte file written over the plist rather than a serialised dict.")
+    w("    /// valid empty plist written over the plist rather than a serialised")
+    w("    /// dict (`plistlib.dumps({})`; zero bytes would be a truncated plist).")
     w("    static let screenTime = DaemonNullify(")
     w(f"        id: {swift_string(SCREENTIME[0])},")
     w(f"        title: {swift_string(SCREENTIME[1])},")
@@ -313,7 +316,7 @@ def emit(Daemon, INTERFACE_DAEMONS, INTERFACE_KEYS, DANGEROUS_KEYS) -> list[str]
     w("        iphoneOnly: false,")
     w("        ipadOnly: false,")
     w("        disabled: false,")
-    w("        detail: \"Writes a 0-byte file over \"")
+    w("        detail: \"Writes an empty plist over \"")
     w("            + \"\\(DaemonGroups.screenTime.path).\",")
     w("        multiValues: nil")
     w("    )")

@@ -251,8 +251,8 @@ enum StatusBarArchive {
     /// valid archive whose status-bar data carries no cellular entries, which
     /// SpringBoard decodes as "no overrides" and then unlinks.
     static func build(_ overrides: StatusBarOverrides) throws -> Data {
-        let primary = truncate(overrides.carrierName.text, max: maxCarrierLength)
-        let secondary = truncate(overrides.secondaryCarrierName.text, max: maxCarrierLength)
+        let primary = truncate(overrides.carrierName, max: maxCarrierLength)
+        let secondary = truncate(overrides.secondaryCarrierName, max: maxCarrierLength)
 
         var primaryEntry: StatusBarArchiveCellularEntry?
         if let primary {
@@ -289,10 +289,15 @@ enum StatusBarArchive {
         return archiver.encodedData
     }
 
-    private static func truncate(_ text: String, max: Int) -> String? {
-        guard !text.isEmpty else { return nil }
-        let cut = String(text.prefix(max))
-        return cut.isEmpty ? nil : cut
+    /// `_truncate` (`statusbar_archive.py:94`): an explicitly **set** empty
+    /// name is a blank override — it hides the label entirely (issue #83) — so
+    /// it must survive as `""` and produce a cellular entry carrying it;
+    /// collapsing it to nil would fold the override into the reset record and
+    /// the label would come back. Only an unset field means "no entry".
+    private static func truncate(_ field: StatusBarOverrides.Field, max: Int) -> String? {
+        guard field.set else { return nil }
+        let cut = String(field.text.prefix(max))
+        return cut.isEmpty ? "" : cut
     }
 
     /// Trim a service badge to the glyph length iOS will draw.

@@ -15,7 +15,8 @@ as the app's icon source, and the script is what regenerates it.
 
 Replace this file with a real 1024x1024 master and re-run
 `python3 scripts/generate-scrapped-appiconset.py`, then let
-`.github/workflows/assets-car.yml` recompile `Assets.car`.
+.github/workflows/assets-car.yml recompile `Assets.car` with actool (or, as a
+no-macOS fallback, run `python3 scripts/compile-car-coreui.py`).
 
 Do not add an alpha channel: iOS icons are composited on an opaque rounded
 rectangle, and a transparent master is one of the ways the alternate has

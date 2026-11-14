@@ -332,12 +332,25 @@ struct TweaksView: View {
     /// and a hand-built widget list rather than from the registry, and folding
     /// it into this one would show 40 rows with no master switch and no
     /// Recommended set.
+    /// The specs this device can run, in registry order.
+    ///
+    /// A tweak the device cannot run is hidden, not disabled — that is what
+    /// `gui/ios/tweaks.py` does with `is_tweak_compatible`, and an always-inert
+    /// switch would be a worse lie than an absent one.  Research-only rows are
+    /// the exception the reference itself makes (`show_when_unavailable`):
+    /// they render greyed out with their reason instead of disappearing.
+    /// The registry tweaks only. The `daemons` section is the page's other
+    /// mode (`DaemonsView`), because upstream renders it from `load_daemons()`
+    /// and a hand-built widget list rather than from the registry, and folding
+    /// it into this one would show 40 rows with no master switch and no
+    /// Recommended set.
     private var visibleSpecs: [TweakSpec] {
         let hidden = hotload.currentPolicy.hiddenTweakIDs
         return TweakCatalog.all.filter {
             $0.section != .daemons
                 && !hidden.contains($0.id)
-                && $0.isCompatible(deviceVersion: identity.version, isIPhone: identity.isIPhone, deviceModel: identity.productType)
+                && ($0.isCompatible(deviceVersion: identity.version, isIPhone: identity.isIPhone, deviceModel: identity.productType)
+                    || $0.showWhenUnavailable)
                 && matchesSearch($0)
         }
     }

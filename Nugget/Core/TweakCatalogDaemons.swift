@@ -648,7 +648,8 @@ enum DaemonGroups {
     ]
 
     /// `TweakID.ClearScreenTimeAgentPlist`: a `NullifyFileTweak`, i.e. a
-    /// 0-byte file written over the plist rather than a serialised dict.
+    /// valid empty plist written over the plist rather than a serialised
+    /// dict (`plistlib.dumps({})`; zero bytes would be a truncated plist).
     static let screenTime = DaemonNullify(
         id: "ClearScreenTimeAgentPlist",
         title: "Disable Screen Time Agent",
@@ -714,7 +715,7 @@ extension TweakCatalog {
         iphoneOnly: false,
         ipadOnly: false,
         disabled: false,
-        detail: "Writes a 0-byte file over "
+        detail: "Writes an empty plist over "
             + "\(DaemonGroups.screenTime.path).",
         multiValues: nil
     )

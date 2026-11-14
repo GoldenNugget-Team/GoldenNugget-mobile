@@ -10,12 +10,13 @@ name: Assets.car
 # Even with the bit restored it would fail again: that actool is arm64 Mach-O
 # and the build host is x86_64 Linux.
 #
-# The in-tree fallback (tools/AssetKit, driven by scripts/compile-assets.sh) is
-# a clean-room writer. Its rendition keys were reworked to match actool's
-# layout, but its BITMAPKEYS descriptor is still a guess, and a catalog with a
-# wrong descriptor is rejected by CoreUI -- the app then has no icon at all.
-# So the only trustworthy source of a car is actool itself, and actool only
-# runs on macOS. This workflow is that step, isolated from the app build.
+# The in-tree fallback (scripts/compile-car-coreui.py, driven by
+# scripts/compile-assets.sh) is a clean-room writer for coreui-car. Its
+# rendition layout is the on-device-verified ground truth, but it cannot
+# render the glass iconstack a real actool build produces — the app then
+# ships a flat icon. So the only complete source of a car is actool itself,
+# and actool only runs on macOS. This workflow is that step, isolated from
+# the app build.
 #
 # The result is uploaded as an artifact and, when the workflow is triggered
 # with `commit: true`, written back into the tree so the Linux build can ship

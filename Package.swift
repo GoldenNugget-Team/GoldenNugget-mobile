@@ -57,6 +57,11 @@ let package = Package(
                 // holds copies of the app's `.lproj` directories — two of them,
                 // which SwiftPM rejects as duplicate resources.
                 "build",
+                // The `xtool dev` build output lives here too: the packaged
+                // .app carries a copy of the app's `en.lproj`, and a build
+                // output must not turn the target into a localized-resource
+                // package (`defaultLocalization` would then be mandatory).
+                "xtool",
             ],
             // One entry, not a hand-maintained list.  The list that used to live
             // here had already drifted — it was missing Nugget/Core/InFlightCall

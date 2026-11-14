@@ -342,8 +342,20 @@ class GoldenNuggetEngine {
             ? SkipSetup.build(supervised: false, organizationName: "")
             : SkipSetup.Build(payloads: [], warnings: [])
 
+        // PosterKit's selection (`tweak_compiler.py`'s `_compile_posterkit`)
+        // rides its own container pull, not the PosterBoard page, so a run can
+        // carry it and nothing else. Read once here: the guard below, the
+        // separation guard, and the staging all need it.
+        let posterKitOptions: [String: TweakValue]
+        if let posterKit = TweakCatalog.byID["PosterKitOverrides"], selection.isOn(posterKit),
+           case .dictionary(let options) = selection.value(for: posterKit) {
+            posterKitOptions = options
+        } else {
+            posterKitOptions = [:]
+        }
+
         guard !tweakPayloads.isEmpty || !skipSetup.payloads.isEmpty || posterBoard.isActive
-                || statusBar.isActive || templates.usesDomains else {
+                || statusBar.isActive || templates.usesDomains || !posterKitOptions.isEmpty else {
             throw GoldenNuggetError("Nothing to apply: no tweak is enabled (or every enabled one "
                 + "was skipped), skip setup is off, the status bar is untouched, there is "
                 + "nothing selected on the PosterBoard page, and no template delivers through a "
@@ -395,6 +407,18 @@ class GoldenNuggetEngine {
             }
             log("PosterBoard: \(posterBoard.describe) — this run clears the store and installs "
                 + "nothing.")
+        }
+
+        // PosterKit staging edits the *live* wallpaper archives it pulls, so a
+        // wallpaper import would overwrite the very files these edits land in,
+        // and a reset run returns before the archives are even read — the
+        // reference refuses both (`tweak_compiler.py:135`).
+        if !posterKitOptions.isEmpty {
+            if posterBoard.isActive || templates.isActive {
+                throw GoldenNuggetError("Apply PosterKit settings separately from wallpaper "
+                    + "imports and resets.")
+            }
+            log("PosterKit: \(posterKitOptions.count) setting(s)")
         }
 
         // Templates, if the page has any.  Two routes, and which one a template
@@ -512,6 +536,29 @@ class GoldenNuggetEngine {
                 + "(\(ByteCountFormatter.string(fromByteCount: Int64(total), countStyle: .file)))")
         }
 
+        // PosterKit staging (`_compile_posterkit`): the guard above already
+        // refused a run that also imports wallpapers, resets, or templates, so
+        // this pulls its own snapshot of the live container and edits the
+        // wallpaper configuration archives in place. `preserveExisting` is
+        // what turns the pull into the relativePath↔file pairs `stage` walks.
+        var posterKitPayloads: [TweakPayload] = []
+        if !posterKitOptions.isEmpty {
+            log("PosterKit: fetching current wallpaper configurations…")
+            let fetched = try await PosterBoardBackup.fetch(
+                backupRoot: AppPaths.posterBoardFetchRoot, udid: udid,
+                ios27: major >= 27 && !DevSettings.effective.forcePartialRestore,
+                preserveExisting: true,
+                onProgress: { overall in
+                    self.logProgress("posterkits backup progress", overall)
+                },
+                log: { AppLog.write($0) })
+            posterKitPayloads = try PosterKitStaging.stage(
+                options: posterKitOptions,
+                preservedPayloads: fetched.preservedPayloads,
+                log: { AppLog.write($0) })
+            features.insert("PosterBoard")
+        }
+
         // Skip setup, then the tweaks, then the status bar, then the wallpapers: one
         // array, one pass through the injector, which derives the directory rows from
         // each payload's path.  The order is the reference's — `add_skip_setup`
@@ -519,7 +566,7 @@ class GoldenNuggetEngine {
         // before the wallpapers — and it only actually matters for the two
         // skip-setup files, which land in the order they are appended.
         let payloads = skipSetup.payloads + tweakPayloads + statusBarPayloads
-            + posterBoardPayloads + templatePayloads
+            + posterBoardPayloads + templatePayloads + posterKitPayloads
 
         // Wallpapers-only run in AirLift mode: the injection already happened and
         // it resprings on its way out, so running the backup/restore tail here

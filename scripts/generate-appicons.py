@@ -2,18 +2,18 @@
 """Generate the .appiconset slots from the two 1024x1024 masters.
 
 The catalog needs one PNG per (idiom, size, scale) slot, and each slot needs a
-dark twin, because AssetKit -- like actool -- derives the rendition's pixel
-geometry from the source file. A 1024 master pointed at a 60x60@3x slot would
-be labelled 3x while carrying 1024px of bitmap, so the slots are downscaled
-here rather than re-pointed at the master.
+dark twin, because every compiler -- actool and coreui-car alike -- derives
+the rendition's pixel geometry from the source file. A 1024 master pointed at
+a 60x60@3x slot would be labelled 3x while carrying 1024px of bitmap, so the
+slots are downscaled here rather than re-pointed at the master.
 
 The masters are used verbatim: no flattening, no alpha changes, no colour
 adjustments. This script only resamples.
 
 The output is a classic (idiom/size/scale) appiconset, not the modern
-"universal 1024" single-entry form. Xcode accepts both, but the classic form is
-what AssetKit can parse, and having one catalog that both toolchains
-understand is worth more than the modern form's brevity.
+"universal 1024" single-entry form. Xcode accepts both, but the classic form
+is what every toolchain in this project parses, and having one catalog all
+of them understand is worth more than the modern form's brevity.
 """
 
 from __future__ import annotations

@@ -124,6 +124,8 @@ struct GoldenNuggetPreset {
     ///
     /// `NSNumber(1) as? Bool` succeeds in Swift, so the boolean case cannot be
     /// decided by casting — the JSON parser's own type has to be asked for.
+    /// Nested mappings become `.dictionary`, because the dict-shaped specs
+    /// (`PosterKitOverrides`, `WallpaperPreferencesTweak`) round-trip a tree.
     private static func tweakValue(_ any: Any) -> TweakValue? {
         if let string = any as? String { return .string(string) }
         if let number = any as? NSNumber {
@@ -131,6 +133,14 @@ struct GoldenNuggetPreset {
             let double = number.doubleValue
             if double == double.rounded(), abs(double) < 1e15 { return .int(number.intValue) }
             return .double(double)
+        }
+        if let dict = any as? [String: Any] {
+            var out: [String: TweakValue] = [:]
+            for (key, item) in dict {
+                guard let value = tweakValue(item) else { return nil }
+                out[key] = value
+            }
+            return .dictionary(out)
         }
         return nil
     }
@@ -211,7 +221,7 @@ enum GoldenNuggetPresetImport {
             + "list of asset names this port has no store for)",
         "StatusBar": "Status Bar — needs the StatusBarOverrideData struct over CFFI",
         "IconThemes": "Icon Themes — needs the icon asset store",
-        "ClearScreenTimeAgentPlist": "daemons page — a NullifyFileTweak writing a 0-byte plist",
+        "ClearScreenTimeAgentPlist": "daemons page — a NullifyFileTweak writing an empty plist",
     ]
 
     /// Desktop presets carry daemons as one entry: `Daemons` with a `value` dict

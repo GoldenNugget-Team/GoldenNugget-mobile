@@ -10,7 +10,7 @@ the build, so the check has to happen here instead.
 
 The container is a BOM ("BOMStore") written big-endian; the rendition keys and
 the FACETKEYS values inside it are little-endian. Layout, as emitted by actool
-and by the vendored AssetKit alike:
+and by coreui-car's compiler alike:
 
     0x00  "BOMStore"
     0x08  version

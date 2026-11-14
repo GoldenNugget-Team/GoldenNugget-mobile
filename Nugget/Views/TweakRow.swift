@@ -52,11 +52,31 @@ struct TweakRow: View {
     }
 
     var body: some View {
+        let unavailable = !spec.isCompatible(deviceVersion: device.current.version,
+                                             isIPhone: device.current.isIPhone,
+                                             deviceModel: device.current.productType)
+            && spec.showWhenUnavailable
         VStack(alignment: .leading, spacing: 6) {
             switch spec.kind {
             case .toggle:
                 Toggle(isOn: toggleBinding) {
-                    TweakRowLabel(title: spec.title, id: spec.id, detail: spec.detail)
+                    TweakRowLabel(title: unavailable
+                        ? "\(spec.title) — Unavailable — needs verification"
+                        : spec.title,
+                        id: spec.id, detail: unavailable ? spec.unavailableReason ?? spec.detail : spec.detail)
+                }
+                .disabled(unavailable)
+                if spec.triState, selection.isOn(spec) {
+                    // `make_boolean`'s tri-state card: while the master toggle
+                    // is on, the row carries the Enabled/Disabled choice.
+                    Picker(selection: triStateBinding) {
+                        Text("Disabled").tag(false)
+                        Text("Enabled").tag(true)
+                    } label: {
+                        EmptyView()
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
                 }
             case .text:
                 VStack(alignment: .leading, spacing: 6) {
@@ -75,6 +95,15 @@ struct TweakRow: View {
                     TweakNumberField(spec: spec, selection: $selection)
                     TweakRowCaption(id: spec.id, detail: [spec.numberHint, spec.warning].compactMap { $0 }.joined(separator: "\n"))
                 }
+            case .posterArchive:
+                PosterKitEditorRow(spec: spec, selection: $selection, safetyWarning: safetyWarning)
+            case .wallpaper:
+                WallpaperPreferencesEditorRow(spec: spec, selection: $selection, safetyWarning: safetyWarning)
+            case .posterFlag:
+                // No registry spec carries this kind yet; the row shows the
+                // generic value entry the reference's `render_poster_flag`
+                // would drive.
+                PosterKitEditorRow(spec: spec, selection: $selection, safetyWarning: safetyWarning)
             }
             if spec.kind == .toggle, let safetyWarning { NativeSafetyNote(safetyWarning) }
         }
@@ -84,6 +113,13 @@ struct TweakRow: View {
         } message: {
             Text(warningText)
         }
+    }
+
+    private var triStateBinding: Binding<Bool> {
+        Binding(get: {
+            if case .bool(let state) = selection.value(for: spec) { return state }
+            return true
+        }, set: { selection.setTriState($0, for: spec) })
     }
 
     private var toggleBinding: Binding<Bool> {
@@ -153,7 +189,7 @@ struct TweakNumberField: View {
 
 /// A toggle row's label: the title, its registry id in the caption style, and
 /// the registry's description when it has one.
-private struct TweakRowLabel: View {
+struct TweakRowLabel: View {
     let title: String
     let id: String
     let detail: String?
@@ -173,7 +209,7 @@ private struct TweakRowLabel: View {
 
 /// The caption block under a field row: the registry id, then the hint or
 /// description.
-private struct TweakRowCaption: View {
+struct TweakRowCaption: View {
     let id: String
     let detail: String?
 
