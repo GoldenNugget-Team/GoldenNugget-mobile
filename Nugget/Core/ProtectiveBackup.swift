@@ -209,7 +209,23 @@ enum ProtectiveBackup {
     /// snapshot *and* the apply flow with it; failing before anything is
     /// written is the cheap outcome.
     static func requireFreeSpace(at root: URL) throws {
-        let attributes = try FileManager.default.attributesOfFileSystem(forPath: root.path)
+        // `attributesOfFileSystem(forPath:)` needs a path that exists, and the
+        // roots handed here do not yet: the fetch and the pull both call this
+        // preflight *before* creating their directory — the first-ever run
+        // failed right here with Cocoa 260, "The file "PosterBoardFetch"
+        // couldn't be opened because there is no such file". Every path under
+        // Documents answers for the same volume, so walk up to the nearest
+        // existing ancestor and ask that one; the failure message keeps
+        // naming `root`, the place the backup is actually written.
+        var probe = root
+        while !FileManager.default.fileExists(atPath: probe.path) {
+            guard probe.path != "/" else {
+                throw GoldenNuggetError("No existing directory on the way to "
+                    + root.path + " to measure free space against.")
+            }
+            probe = probe.deletingLastPathComponent()
+        }
+        let attributes = try FileManager.default.attributesOfFileSystem(forPath: probe.path)
         let free = attributes[.systemFreeSize] as? Int ?? 0
         // `MIN_FREE_DISK_GB = 5.0` (`protective.py:120`).
         let minimumFree = 5 * 1024 * 1024 * 1024
